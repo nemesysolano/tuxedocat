@@ -1,0 +1,6 @@
+bin/*
+!bin/.gitignore
+obj/*
+!obj/.gitignore
+**/._*
+pydevs/*

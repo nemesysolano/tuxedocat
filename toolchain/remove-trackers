@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+PWD=$(pwd)
+
+find ${PWD} -name '._*' | xargs rm
