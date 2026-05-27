@@ -27,11 +27,14 @@ namespace timeseries::adf{
     extern const std::vector<double> tau_max_ctt;
 
     enum class RegressionType {
-        CONSTANT, // "n"
-        CONSTANT_PLUS_LINEAR, // "c"
-        CONSTANT_PLUS_LINEAR_AND_CUADRATIC, // "ct"
-        NO_CONSTANT // "ctt"
+        CONSTANT, 
+        CONSTANT_PLUS_LINEAR, 
+        CONSTANT_PLUS_LINEAR_AND_CUADRATIC,
+        NO_CONSTANT 
     };
+    using RegressionTypeLabelMap = std::map<RegressionType, std::string>;
+    extern const RegressionTypeLabelMap regression_type_labels_map;
+    std::ostream & operator << (std::ostream & out, const RegressionType reg_type);
 
     using RegressionTypeVectorMap = std::map<RegressionType, std::reference_wrapper<const std::vector<double>>>;
     extern const RegressionTypeVectorMap tau_maxs;
@@ -77,6 +80,15 @@ namespace timeseries::adf{
     extern const MacKinnonTable6x5 z_ctt_largep;
     extern const MacKinnonTable6x5Map z_largeps;
 
+    using MacKinnonTable1x3x4 = std::mdspan<const double, std::extents<size_t, 1, 3, 4>>;
+    extern const MacKinnonTable1x3x4 tau_nc_2010;
+
+    using MacKinnonTable12x3x4 = std::mdspan<const double, std::extents<size_t, 12, 3, 4>>;
+    extern const MacKinnonTable12x3x4 tau_c_2010;
+    extern const MacKinnonTable12x3x4 tau_ct_2010;
+    extern const MacKinnonTable12x3x4 tau_ctt_2010;
+    extern std::expected<const std::mdspan<const double, std::dextents<size_t, 3>>, TuxedoError>  tau_2010s(RegressionType regression_type);
+
     std::expected<double, TuxedoError> mac_kinnon_p(
         double test_stat, // "T-value" from an Augmented Dickey-Fuller regression.
         RegressionType regression_type, // CONSTANT, CONSTANT_PLUS_LINEAR, CONSTANT_PLUS_LINEAR_AND_CUADRATIC and NO_CONSTANT
@@ -89,14 +101,7 @@ namespace timeseries::adf{
         /* size_t N = 1 // The number of series believed to be I(1).  For (Augmented) Dickey-Fuller N = 1. */
     );
 
-    using MacKinnonTable1x3x4 = std::mdspan<const double, std::extents<size_t, 1, 3, 4>>;
-    extern const MacKinnonTable1x3x4 tau_nc_2010;
-
-    using MacKinnonTable12x3x4 = std::mdspan<const double, std::extents<size_t, 12, 3, 4>>;
-    extern const MacKinnonTable12x3x4 tau_c_2010;
-    extern const MacKinnonTable12x3x4 tau_ct_2010;
-    extern const MacKinnonTable12x3x4 tau_ctt_2010;
-    extern std::expected<const std::mdspan<const double, std::dextents<size_t, 3>>, TuxedoError>  tau_2010s(RegressionType regression_type);
+    std::expected<double, TuxedoError> mac_kinnon_crit(size_t N, RegressionType regression_type, double observations);
 
 }
 

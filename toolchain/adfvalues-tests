@@ -2,57 +2,40 @@
 from numpy import array, asarray, inf, polyval
 from scipy.stats import norm
 from statsmodels.tsa import adfvalues
+import numpy as np
 
-def get_tau_coeff(teststat, regression="c", N=1, lags=None):
-    """
-    Returns MacKinnon's approximate p-value for teststat.
+def mackinnonp():
+    test_statistics = np.array([-4.5, -2.8, -1.5, 0.0, 1.2])
+    regression_types = ("n", "c", "ct", "ctt")
 
-    Parameters
-    ----------
-    teststat : float
-        "T-value" from an Augmented Dickey-Fuller regression.
-    regression : str {"c", "n", "ct", "ctt"}
-        This is the method of regression that was used.  Following MacKinnon's
-        notation, this can be "c" for constant, "n" for no constant, "ct" for
-        constant and trend, and "ctt" for constant, trend, and trend-squared.
-    N : int
-        The number of series believed to be I(1).  For (Augmented) Dickey-
-        Fuller N = 1.
+    for reg_type in regression_types:    
+        for index in range(1, len(adfvalues.tau_star_nc)+1):
+            print(f"{reg_type},{index}: ", end='');
 
-    Returns
-    -------
-    p-value : float
-        The p-value for the ADF statistic estimated using MacKinnon 1994.
+            for stat in test_statistics:
+                res = adfvalues.mackinnonp(stat, reg_type, index);
+                print(f"{res}, ", end = '')
+            print() 
 
-    References
-    ----------
-    .. [*] MacKinnon, J.G. 1994  "Approximate Asymptotic Distribution Functions
-        for Unit-Root and Cointegration Tests." Journal of Business & Economics
-        Statistics, 12.2, 167-76.
-
-    Notes
-    -----
-    For (A)DF
-    H_0: AR coefficient = 1
-    H_a: AR coefficient < 1
-    """
-    maxstat = adfvalues._tau_maxs[regression]
-    minstat = adfvalues._tau_mins[regression]
-    starstat = adfvalues._tau_stars[regression]
-    if teststat > maxstat[N-1]:
-        return 1.0
-    elif teststat < minstat[N-1]:
-        return 0.0
-    if teststat <= starstat[N-1]:
-        print(adfvalues._tau_smallps[regression])
-        tau_coef = adfvalues._tau_smallps[regression][N-1]
-    else:
-        # Note: above is only for z stats
-        print(adfvalues._tau_smallps[regression])
-        tau_coef = adfvalues._tau_largeps[regression][N-1]
-
-    return tau_coef
 
 if __name__ == "__main__":
-    tau_coeff = get_tau_coeff(-5.0, "n")
-    print(tau_coeff)
+    N = 1
+    tau = adfvalues.tau_2010s['ctt']
+
+    print('tau')
+    print(tau)
+    print()
+
+    print('tau[N-1, :,::]')
+    print(tau[N-1, :,::])
+
+    print('tau[N-1, :,:: -1]')
+    print(tau[N-1, :,:: -1])    
+    
+    print('tau[N-1, :,:: -1].T')
+    print(tau[N-1, :,:: -1].T)    
+
+    print('polyval(tau[N-1, :,:: -1].T)')
+    print(polyval(tau[N-1, :,:: -1].T,1))
+
+    

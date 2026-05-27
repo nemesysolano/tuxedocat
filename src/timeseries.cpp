@@ -6,7 +6,7 @@ double normal_cdf(double x) {
 }
 
 // Evaluates the polynomial: b0 + b1*t + b2*t^2 + b3*t^3
-double evaluate_polynomial(double tau, const MacKinnonCoeffs& coeffs) {
+double evaluate(double tau, const MacKinnonCoeffs& coeffs) {
     return coeffs.b0 + 
         coeffs.b1 * tau + 
         coeffs.b2 * (tau * tau) + 
@@ -27,12 +27,12 @@ double calculate_mackinnon_p_value_constant_only(double tau) {
     if (tau <= TAU_THRESHOLD) {
         // Values for the far-left tail (strong stationarity)
         small_tau_coeffs = { /* b0 */ 3.2512, /* b1 */ 2.7777, /* b2 */ 0.2952, /* b3 */ -0.0139 }; // EXAMPLE VALUES
-        double z = evaluate_polynomial(tau, small_tau_coeffs);
+        double z = evaluate(tau, small_tau_coeffs);
         return normal_cdf(z);
     } else {
         // Values for the right side (non-stationary)
         large_tau_coeffs = { /* b0 */ 2.5000, /* b1 */ 1.5000, /* b2 */ 0.1000, /* b3 */ -0.0050 }; // EXAMPLE VALUES
-        double z = evaluate_polynomial(tau, large_tau_coeffs);
+        double z = evaluate(tau, large_tau_coeffs);
         return normal_cdf(z);
     }
 }
