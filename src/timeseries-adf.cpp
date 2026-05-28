@@ -2,6 +2,7 @@
 #include "slice.h"
 #include "polynomials.h"
 #include "distributions.h"
+#include <tuple>
 
 using namespace std;
 
@@ -72,17 +73,31 @@ namespace timeseries::adf{
         return mac_kinnon_p(test_stat, regression_type, 1);
     }    
 
-    std::expected<double, TuxedoError> mac_kinnon_crit(size_t N, RegressionType regression_type, double observations){
-        auto tau = tau_2010s(regression_type);
-        if(N < 1 || N > tau->extent(0)) {
+    
+    expected<std::vector<double>, TuxedoError> mac_kinnon_crit(size_t N, RegressionType regression_type, size_t observations){
+        auto tensor = tau_2010s(regression_type);
+        if(N < 1 || N > tensor->extent(0)) {
             return unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);        
+        } else if (observations == 0) {
+            return unexpected(TuxedoError::ERR_NO_OBSERVATIONS);        
         }
 
-        if (observations == NAN) {
-            
-        } else {
-
+        switch (regression_type) { // const auto& tensor, size_t p_idx, double τ, std::span<double> result
+            case RegressionType::NO_CONSTANT:
+                return polynomials::evaluate_horizontally_reversed(tau_nc_2010, N-1, 1.0/observations);
+                
+            case RegressionType::CONSTANT:
+                return polynomials::evaluate_horizontally_reversed(tau_c_2010, N-1, 1.0/observations);
+                
+            case RegressionType::CONSTANT_PLUS_LINEAR:
+                return polynomials::evaluate_horizontally_reversed(tau_ct_2010, N-1, 1.0/observations);
+                
+            case RegressionType::CONSTANT_PLUS_LINEAR_AND_CUADRATIC:
+                return polynomials::evaluate_horizontally_reversed(tau_ctt_2010, N-1, 1.0/observations);
+                
+            default:
+                return std::unexpected(TuxedoError::ERR_INVALID_REGRESSION_TYPE);
         }
-        return 0.0;
+
     }
 }

@@ -39,7 +39,79 @@ vector<double> mac_kinnon_p_expeted_results = {
     0.25273878870590916, 0.95501858893269, 0.9996864820170016, 0.9999997146834694, 0.9999999950301558
 };
 
+
+vector<double> mac_kinnon_crit_results = {
+    -3.15798, -1.879536, -1.469348,
+    -6.045114, -3.92928, -2.98681 ,
+    -7.4279, -4.83107, -4.00149,
+    -8.129156, -5.663524, -4.84376 ,
+    -9.78282, -6.78998, -5.6543 ,
+    -11.1409, -7.72629, -6.43127,
+    -11.979808, -8.310114, -7.043654,
+    -12.88909, -8.952972, -7.823924,
+    -13.704428, -9.659708, -8.164034,
+    -15.036932, -10.362134, -8.414238,
+    -15.55667, -10.814492, -9.211618,
+    -17.085794, -11.684908, -9.976624,
+    -17.009064, -12.148194, -10.469032,
+    -7.97975, -5.013002, -3.98021 ,
+    -8.84252, -6.16565, -5.038994,
+    -9.574578, -6.639924, -5.706506,
+    -11.156728, -7.758174, -6.358378,
+    -12.476492, -8.362278, -6.951052,
+    -12.903326, -8.996, -7.566654,
+    -13.957998, -9.599014, -8.14321 ,
+    -14.74763, -10.24517, -8.64379,
+    -15.279496, -10.804854, -9.259252,
+    -15.956506, -11.232698, -9.923742,
+    -16.742312, -12.067648, -10.402216,
+    -17.478252, -12.537222, -10.406152,
+    -10.793906, -6.459402, -5.005372,
+    -10.624128, -7.370302, -6.132016,
+    -11.306874, -7.91875, -6.72118 ,
+    -12.780392, -8.809564, -7.30006 ,
+    -13.424112, -9.195846, -7.784134,
+    -13.799542, -9.791606, -8.240218,
+    -15.176286, -10.541316, -8.699998,
+    -16.18438, -10.79529, -9.008744,
+    -16.04755, -11.599068, -9.87574 ,
+    -16.638666, -11.68625, -10.074002,
+    -17.660074, -12.39746, -10.901778,
+    -17.682248, -12.858038, -10.710278
+};
+
 #define close_enough(a, b) (std::abs(a - b) < 9e-6)
+
+void mac_kinnon_crit_test() {
+    std::vector<timeseries::adf::RegressionType> regression_types = {
+        timeseries::adf::RegressionType::NO_CONSTANT,
+        timeseries::adf::RegressionType::CONSTANT,
+        timeseries::adf::RegressionType::CONSTANT_PLUS_LINEAR,
+        timeseries::adf::RegressionType::CONSTANT_PLUS_LINEAR_AND_CUADRATIC
+    };
+
+    std::vector<size_t> regression_sizes = {1, 12, 12, 12};    
+    
+    size_t expected_index = 0;
+    size_t regresion_index = 0;
+    for(auto reg_type : regression_types) {
+        auto max_N = regression_sizes[regresion_index++];
+
+        for(size_t N = 1; N <= max_N; ++N) {
+            auto res = timeseries::adf::mac_kinnon_crit(N, reg_type, 5);
+            assert(res.has_value()); // mac_kinnon_p_expeted_results
+
+            for (auto value : *res) {
+                assert(close_enough(value, mac_kinnon_crit_results[expected_index++]));
+            }
+            
+        }
+
+    }
+
+     std::cout << "Passed verification fmac_kinnon_crit_test" << std::endl;
+
+}
 
 void mac_kinnon_p_test() {
     std::cout << "Running mac_kinnon_p_test..." << std::endl;
@@ -94,13 +166,15 @@ int main(int argc, char* argv[]) {
     evaluate_test();
     evaluate_reversed_test();
     mac_kinnon_p_test();
+    mac_kinnon_crit_test();
     tau_2010s_test();
     standard_cdf_test();
     row_span_for_mac_kinnon_table6x3_test();
     row_span_for_mac_kinnon_table6x4_test();
     evaluate_horizontally_test();
     evaluate_horizontally_reversed_test();    
-
+    evaluate_horizontally_vectorized_test();
+    evaluate_horizontally_reversed_vectorized_test();
     return 0;
 }
 #endif

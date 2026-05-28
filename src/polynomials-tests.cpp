@@ -101,89 +101,119 @@ void evaluate_reversed_test() {
 }
 
 void evaluate_horizontally_test() {
-    std::cout << "Running evaluate_horizontally_test..." << std::endl;
+    std::cout << "Running evaluate_horizontally_test (N=1 to 12)..." << std::endl;
 
     auto approx_equal = [](double a, double b, double epsilon = 1e-9) {
         return std::abs(a - b) < epsilon;
     };
 
-    // Create a mock 1x2x3 tensor
-    // Dimensions: p=1 (sequence length), m=2 (rows), n=3 (columns)
-    std::vector<double> flat_data = {
-        1.0, 2.0, 3.0, // p=0, m=0
-        4.0, 5.0, 6.0  // p=0, m=1
-    };
-    
-    // Create an mdspan view over the vector
-    std::mdspan<const double, std::extents<size_t, 1, 2, 3>> tensor(flat_data.data());
+    // Create mock 12x2x3 tensor (12 sequences, 2 rows each, 3 columns)
+    std::vector<double> flat_data(12 * 2 * 3, 1.0); 
+    // Fill with sample data: row[r] = {1.0, 2.0, 3.0} for every sequence
+    for(size_t i=0; i<12*2*3; ++i) flat_data[i] = (i % 3) + 1.0; 
 
-    // Test Case 1: Standard Polynomial P(t) = a_2 * t^2 + a_1 * t + a_0
-    // For p=0, m=0: P(t) = 1.0*t^2 + 2.0*t + 3.0
-    // At t = 2.0 -> (1.0 * 4) + (2.0 * 2) + 3.0 = 11.0
-    auto res1 = polynomials::evaluate_horizontally(tensor, 0, 0, 2.0);
-    assert(res1.has_value());
-    assert(approx_equal(*res1, 11.0));
-    std::cout << "  Passed Test Case 1: Valid horizontal evaluation (Row 0)" << std::endl;
+    std::mdspan<const double, std::extents<size_t, 12, 2, 3>> tensor(flat_data.data());
+    std::vector<double> result_vec(2);
+    std::span<double> res_span(result_vec);
 
-    // Test Case 2: p=0, m=1: P(t) = 4.0*t^2 + 5.0*t + 6.0
-    // At t = 2.0 -> (4.0 * 4) + (5.0 * 2) + 6.0 = 32.0
-    auto res2 = polynomials::evaluate_horizontally(tensor, 0, 1, 2.0);
-    assert(res2.has_value());
-    assert(approx_equal(*res2, 32.0));
-    std::cout << "  Passed Test Case 2: Valid horizontal evaluation (Row 1)" << std::endl;
-
-    // Test Case 3: Out of bounds for Sequence Length (p_idx)
-    auto err1 = polynomials::evaluate_horizontally(tensor, 1, 0, 2.0); // p_idx = 1 (Max is 0)
-    assert(!err1.has_value());
-    assert(err1.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
-    std::cout << "  Passed Test Case 3: Out of bounds (p_idx)" << std::endl;
-
-    // Test Case 4: Out of bounds for Row Number (row_num)
-    auto err2 = polynomials::evaluate_horizontally(tensor, 0, 2, 2.0); // row_num = 2 (Max is 1)
-    assert(!err2.has_value());
-    assert(err2.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
-    std::cout << "  Passed Test Case 4: Out of bounds (row_num)" << std::endl;
-
-    std::cout << "All evaluate_horizontally_test cases passed!\n" << std::endl;
+    // Test N=1 to 12
+    for (size_t n = 0; n < 12; ++n) {
+        auto err = polynomials::evaluate_horizontally(tensor, n, 2.0, res_span);
+        
+        assert(err == TuxedoError::NO_ERROR);
+        // Expected Row 0: 1*2^2 + 2*2 + 3 = 11.0
+        // Expected Row 1: 1*2^2 + 2*2 + 3 = 11.0
+        assert(approx_equal(res_span[0], 11.0));
+        assert(approx_equal(res_span[1], 11.0));
+    }
+    std::cout << "  Passed all sequence tests N=1 to 12." << std::endl;
 }
 
 void evaluate_horizontally_reversed_test() {
-    std::cout << "Running evaluate_horizontally_reversed_test..." << std::endl;
+    std::cout << "Running evaluate_horizontally_reversed_test (N=1 to 12)..." << std::endl;
 
     auto approx_equal = [](double a, double b, double epsilon = 1e-9) {
         return std::abs(a - b) < epsilon;
     };
 
-    // Create a mock 1x2x3 tensor
-    std::vector<double> flat_data = {
-        1.0, 2.0, 3.0, // p=0, m=0
-        4.0, 5.0, 6.0  // p=0, m=1
+    std::vector<double> flat_data(12 * 2 * 3, 1.0);
+    for(size_t i=0; i<12*2*3; ++i) flat_data[i] = (i % 3) + 1.0;
+
+    std::mdspan<const double, std::extents<size_t, 12, 2, 3>> tensor(flat_data.data());
+    std::vector<double> result_vec(2);
+    std::span<double> res_span(result_vec);
+
+    // Test N=1 to 12
+    for (size_t n = 0; n < 12; ++n) {
+        auto err = polynomials::evaluate_horizontally_reversed(tensor, n, 2.0, res_span);
+        
+        assert(err == TuxedoError::NO_ERROR);
+        // Reversed: P(t) = 3*2^2 + 2*2 + 1 = 17.0
+        assert(approx_equal(res_span[0], 17.0));
+        assert(approx_equal(res_span[1], 17.0));
+    }
+    std::cout << "  Passed all sequence tests N=1 to 12." << std::endl;
+}
+
+void evaluate_horizontally_vectorized_test() {
+    std::cout << "Running evaluate_horizontally_vectorized_test..." << std::endl;
+
+    auto approx_equal = [](double a, double b, double epsilon = 1e-9) {
+        return std::abs(a - b) < epsilon;
     };
-    std::mdspan<const double, std::extents<size_t, 1, 2, 3>> tensor(flat_data.data());
 
-    // Test Case 1: Reversed Polynomial P(t) = a_2 * t^2 + a_1 * t + a_0
-    // For p=0, m=0: Reversed Horner's treats index 0 as a_0, index 1 as a_1, index 2 as a_2
-    // Math: P(t) = 3.0*t^2 + 2.0*t + 1.0
-    // At t = 2.0 -> (3.0 * 4) + (2.0 * 2) + 1.0 = 17.0
-    auto res1 = polynomials::evaluate_horizontally_reversed(tensor, 0, 0, 2.0);
-    assert(res1.has_value());
-    assert(approx_equal(*res1, 17.0));
-    std::cout << "  Passed Test Case 1: Valid reversed horizontal evaluation (Row 0)" << std::endl;
+    // Create mock 12x2x3 tensor
+    std::vector<double> flat_data(12 * 2 * 3, 1.0);
+    for(size_t i=0; i<flat_data.size(); ++i) flat_data[i] = (i % 3) + 1.0; 
+    std::mdspan<const double, std::extents<size_t, 12, 2, 3>> tensor(flat_data.data());
 
-    // Test Case 2: p=0, m=1: P(t) = 6.0*t^2 + 5.0*t + 4.0
-    // At t = 2.0 -> (6.0 * 4) + (5.0 * 2) + 4.0 = 38.0
-    auto res2 = polynomials::evaluate_horizontally_reversed(tensor, 0, 1, 2.0);
-    assert(res2.has_value());
-    assert(approx_equal(*res2, 38.0));
-    std::cout << "  Passed Test Case 2: Valid reversed horizontal evaluation (Row 1)" << std::endl;
+    // Test successful evaluation for sequences N=1 to 12
+    for (size_t n = 0; n < 12; ++n) {
+        auto res = polynomials::evaluate_horizontally(tensor, n, 2.0);
+        
+        assert(res.has_value());
+        assert(res->size() == 2); // m=2 rows
+        // Horner: 1*2^2 + 2*2 + 3 = 11.0
+        assert(approx_equal((*res)[0], 11.0));
+        assert(approx_equal((*res)[1], 11.0));
+    }
 
-    // Test Case 3: Out of bounds (p_idx)
-    auto err1 = polynomials::evaluate_horizontally_reversed(tensor, 1, 0, 2.0);
-    assert(!err1.has_value());
-    assert(err1.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
-    std::cout << "  Passed Test Case 3: Out of bounds handling" << std::endl;
+    // Test error case: Invalid p_idx
+    auto err = polynomials::evaluate_horizontally(tensor, 15, 2.0);
+    assert(!err.has_value());
+    assert(err.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+    
+    std::cout << "  Passed evaluate_horizontally_vectorized_test." << std::endl;
+}
 
-    std::cout << "All evaluate_horizontally_reversed_test cases passed!\n" << std::endl;
+void evaluate_horizontally_reversed_vectorized_test() {
+    std::cout << "Running evaluate_horizontally_reversed_vectorized_test..." << std::endl;
+
+    auto approx_equal = [](double a, double b, double epsilon = 1e-9) {
+        return std::abs(a - b) < epsilon;
+    };
+
+    std::vector<double> flat_data(12 * 2 * 3, 1.0);
+    for(size_t i=0; i<flat_data.size(); ++i) flat_data[i] = (i % 3) + 1.0;
+    std::mdspan<const double, std::extents<size_t, 12, 2, 3>> tensor(flat_data.data());
+
+    // Test successful reversed evaluation
+    for (size_t n = 0; n < 12; ++n) {
+        auto res = polynomials::evaluate_horizontally_reversed(tensor, n, 2.0);
+        
+        assert(res.has_value());
+        assert(res->size() == 2);
+        // Reversed Horner: 3*2^2 + 2*2 + 1 = 17.0
+        assert(approx_equal((*res)[0], 17.0));
+        assert(approx_equal((*res)[1], 17.0));
+    }
+
+    // Test error case: Invalid p_idx
+    auto err = polynomials::evaluate_horizontally_reversed(tensor, 15, 2.0);
+    assert(!err.has_value());
+    assert(err.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+
+    std::cout << "  Passed evaluate_horizontally_reversed_vectorized_test." << std::endl;
 }
 
 #endif

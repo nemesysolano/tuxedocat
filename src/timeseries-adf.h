@@ -101,7 +101,7 @@ namespace timeseries::adf{
         /* size_t N = 1 // The number of series believed to be I(1).  For (Augmented) Dickey-Fuller N = 1. */
     );
 
-    std::expected<double, TuxedoError> mac_kinnon_crit(size_t N, RegressionType regression_type, double observations);
+    std::expected<std::vector<double>, TuxedoError> mac_kinnon_crit(size_t N, RegressionType regression_type, size_t observations);
 
 }
 
