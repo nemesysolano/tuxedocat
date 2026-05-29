@@ -8,6 +8,13 @@ namespace timeseries::adf{
         {RegressionType::CONSTANT_PLUS_LINEAR_AND_CUADRATIC, "ctt"}
     };
 
+    const RegressionTypeTrendMap regression_type_trend_map = {
+        {RegressionType::NO_CONSTANT, 0},                       // "n" -> len is not used, 0
+        {RegressionType::CONSTANT, 1},                          // "c" -> len is 1
+        {RegressionType::CONSTANT_PLUS_LINEAR, 2},              // "ct" -> len is 2
+        {RegressionType::CONSTANT_PLUS_LINEAR_AND_CUADRATIC, 3} // "ctt" -> len is 3
+    };
+    
     const std::vector<double> tau_star_nc ({-1.04, -1.53, -2.68, -3.09, -3.07, -3.77});
     const std::vector<double> tau_min_nc ({-19.04, -19.62, -21.21, -23.25, -21.63, -25.74});
     const std::vector<double> tau_max_nc ({INFINITY, 1.51, 0.86, 0.88, 1.05, 1.24});

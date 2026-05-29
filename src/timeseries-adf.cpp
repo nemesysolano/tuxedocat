@@ -100,4 +100,30 @@ namespace timeseries::adf{
         }
 
     }
+
+    std::expected<AugmentedDickeyFuller, TuxedoError> augmented_dickey_fuller_test(
+        const slice::Span2D & x,
+        size_t max_lag, // 12*(nobs/100)^{1/4}
+        RegressionType regression_type
+    ) {
+        if(x.rows() + x.cols() < 1) {
+            return std::unexpected(TuxedoError::ERR_NO_OBSERVATIONS);
+        }
+
+        auto nobs = x.rows();
+        auto ntrend = regression_type_trend_map.at(regression_type);
+
+        // if maxlag is None:
+        long maxlag = static_cast<long>(std::ceil(12.0 * std::pow(static_cast<double>(nobs) / 100.0, 0.25)));
+        maxlag = std::min(nobs / 2 - ntrend - 1, max_lag);
+
+        // if maxlag < 0:
+        if (maxlag < 0) {
+            return std::unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL);
+        }
+
+        //  xdiff = np.diff(x)
+
+        return std::unexpected(TuxedoError::ERR_NO_OBSERVATIONS);
+    }
 }

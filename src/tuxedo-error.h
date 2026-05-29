@@ -6,6 +6,8 @@ typedef enum TuxedoErrorEnum {
     ERR_ARR_INDEX_OUT_OF_BOUNDS = 1,
     ERR_EMPTY_VECTOR = 2,
     ERR_INVALID_REGRESSION_TYPE = 3,
-    ERR_NO_OBSERVATIONS = 4
+    ERR_NO_OBSERVATIONS = 4,
+    ERR_SAMPLE_TOO_SMALL = 5,
+    ERR_BAD_OUTPUT_DIMESNSIONS = 6,
 } TuxedoError;
 #endif

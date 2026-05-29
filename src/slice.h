@@ -2,7 +2,12 @@
 #define __SLICE_H__
 #include <span>
 #include <iostream>
-
+#include <mdspan>
+#include <expected>
+#include <functional>
+#include "tuxedo-error.h"
+#include <mdspan>
+#include <vector> // <--- Add this
 
 #define row_span(matrix_span, row_num) std::span<const double>(matrix_span.data_handle() + (row_num * matrix_span.extent(1)), matrix_span.extent(1))
 #define print_2d_span(matrix_span) \
@@ -11,4 +16,49 @@
     }
 std::ostream & operator << (std::ostream & out, const std::span<const double> & v);
 
+namespace slice {  
+    class Span2D {
+        protected:
+            const size_t rows_;
+            const size_t cols_;
+        public:
+            Span2D(size_t rows, size_t cols): rows_(rows), cols_(cols) {}
+            virtual std::expected<double, TuxedoError> operator[](size_t row, size_t col) const = 0;
+            inline size_t rows() const {return rows_;}
+            inline size_t cols() const {return cols_;}            
+            virtual const double * data_handle() const = 0;
+    };
+    
+    class MutableSlice2D;
+
+    class Slice2D: public Span2D {
+        private:            
+            std::span<double> data_;
+        public:
+            Slice2D(std::span<double> data, size_t rows, size_t cols): Span2D(rows, cols), data_(data) {}
+            std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
+            const double * data_handle() const override;
+    };
+    
+    class MutableSlice2DCell {
+        private:
+            double & data_;
+        public:
+            MutableSlice2DCell(double & data): data_(data){}
+            inline operator double() const { return data_; }
+            inline MutableSlice2DCell & operator=(double value) { data_ = value; return *this; }
+    };
+   
+    class MutableSlice2D: public Span2D {
+        private:
+            std::vector<double> data_;                    
+        public:
+            MutableSlice2D(size_t rows, size_t cols): Span2D(rows, cols), data_(rows * cols, 0.0) {}
+            std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
+            std::expected<MutableSlice2DCell, TuxedoError> operator[](size_t row, size_t col);
+            const double * data_handle() const override;
+            inline double * mutable_data_handle() { return data_.data(); }
+            virtual ~MutableSlice2D() = default;
+    };         
+}
 #endif // __SLICE_H

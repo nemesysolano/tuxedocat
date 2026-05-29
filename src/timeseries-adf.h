@@ -11,6 +11,7 @@
 #include <expected>
 #include "tuxedo-error.h"
 #include <functional>
+#include <memory>
 
 namespace timeseries::adf{
     extern const std::vector<double> tau_star_nc;
@@ -31,9 +32,13 @@ namespace timeseries::adf{
         CONSTANT_PLUS_LINEAR, 
         CONSTANT_PLUS_LINEAR_AND_CUADRATIC,
         NO_CONSTANT 
-    };
+    };    
     using RegressionTypeLabelMap = std::map<RegressionType, std::string>;
+    using RegressionTypeTrendMap = std::map<RegressionType, int>;
+
     extern const RegressionTypeLabelMap regression_type_labels_map;
+    extern const RegressionTypeTrendMap regression_type_trend_map;
+
     std::ostream & operator << (std::ostream & out, const RegressionType reg_type);
 
     using RegressionTypeVectorMap = std::map<RegressionType, std::reference_wrapper<const std::vector<double>>>;
@@ -103,6 +108,24 @@ namespace timeseries::adf{
 
     std::expected<std::vector<double>, TuxedoError> mac_kinnon_crit(size_t N, RegressionType regression_type, size_t observations);
 
+    struct AugmentedDickeyFullerStruct {
+        double adf;
+        double pvalue;
+        double one_pct;
+        double five_pct;
+        double ten_pct;
+    };
+    
+    using AugmentedDickeyFuller = std::unique_ptr<AugmentedDickeyFullerStruct>;
+
+    typedef enum AutoLagEnum { NONE, AIC, BIC, T_STAT } AutoLagType;
+    
+    // std::expected<AugmentedDickeyFuller, TuxedoError> augmented_dickey_fuller_test(
+    //     slice::Matrix2D x,
+    //     size_t max_lag, // 12*(nobs/100)^{1/4}
+    //     RegressionType regression_type,
+    //     AutoLagType autolag
+    // );
 }
 
 
