@@ -49,22 +49,9 @@ namespace slice {
     MutableSlice2D::~MutableSlice2D() {
 
     }
-    
-    std::expected<MutableSlice2D, TuxedoError> create_mutable_column_slice2d(const Span2D & source_span, size_t column_number) {
-        if (column_number >= source_span.cols()) {
-            return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
-        }
 
-        MutableSlice2D result(source_span.rows(), 1);
-        for (size_t i = 0; i < source_span.rows(); ++i) {
-            auto val = source_span[i, column_number];
-            if (!val.has_value()) return std::unexpected(val.error());
-            
-            auto cell = result[i, 0];
-            if (!cell.has_value()) return std::unexpected(cell.error());
-            
-            cell.value() = val.value();
-        }
+    MutableSlice2D create_mutable_column_slice2d(const Span2D & source_span) {
+        MutableSlice2D result(source_span.rows(), 1);      
         return result;
     }
 

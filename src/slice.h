@@ -62,7 +62,7 @@ namespace slice {
             virtual ~MutableSlice2D();
     };  
     
-    std::expected<MutableSlice2D, TuxedoError>  create_mutable_column_slice2d(const Span2D & source_span, size_t column_number);
+    MutableSlice2D create_mutable_column_slice2d(const Span2D & source_span);
     std::expected<size_t, TuxedoError> copy_column(const Span2D & source_span, size_t source_column, MutableSlice2D & target_span, size_t target_column);
 
 }
