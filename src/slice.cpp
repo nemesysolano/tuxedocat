@@ -46,5 +46,38 @@ namespace slice {
         return data_.data(); 
     };
 
+    MutableSlice2D::~MutableSlice2D() {
+
+    }
     
+    std::expected<MutableSlice2D, TuxedoError> create_mutable_column_slice2d(const Span2D & source_span, size_t column_number) {
+        if (column_number >= source_span.cols()) {
+            return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+        }
+
+        MutableSlice2D result(source_span.rows(), 1);
+        for (size_t i = 0; i < source_span.rows(); ++i) {
+            auto val = source_span[i, column_number];
+            if (!val.has_value()) return std::unexpected(val.error());
+            
+            auto cell = result[i, 0];
+            if (!cell.has_value()) return std::unexpected(cell.error());
+            
+            cell.value() = val.value();
+        }
+        return result;
+    }
+
+    std::expected<size_t, TuxedoError> copy_column(const Span2D & source_span, size_t source_column, MutableSlice2D & target_span, size_t target_column) {
+        if (source_column >= source_span.cols() || target_column >= target_span.cols()) {
+            return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+        }
+        if (source_span.rows() != target_span.rows()) {
+            return std::unexpected(TuxedoError::ERR_BAD_OUTPUT_DIMESNSIONS);
+        }
+        for (size_t i = 0; i < source_span.rows(); ++i) {
+            target_span[i, target_column].value() = source_span[i, source_column].value();
+        }
+        return source_span.rows();
+    }
 }

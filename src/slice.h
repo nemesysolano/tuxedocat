@@ -32,14 +32,14 @@ namespace slice {
     class MutableSlice2D;
 
     class Slice2D: public Span2D {
-        private:            
+        protected:            
             std::span<double> data_;
         public:
             Slice2D(std::span<double> data, size_t rows, size_t cols): Span2D(rows, cols), data_(data) {}
             std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
             const double * data_handle() const override;
     };
-    
+
     class MutableSlice2DCell {
         private:
             double & data_;
@@ -53,12 +53,17 @@ namespace slice {
         private:
             std::vector<double> data_;                    
         public:
+            // 1. Constructor
             MutableSlice2D(size_t rows, size_t cols): Span2D(rows, cols), data_(rows * cols, 0.0) {}
             std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
             std::expected<MutableSlice2DCell, TuxedoError> operator[](size_t row, size_t col);
             const double * data_handle() const override;
             inline double * mutable_data_handle() { return data_.data(); }
-            virtual ~MutableSlice2D() = default;
-    };         
+            virtual ~MutableSlice2D();
+    };  
+    
+    std::expected<MutableSlice2D, TuxedoError>  create_mutable_column_slice2d(const Span2D & source_span, size_t column_number);
+    std::expected<size_t, TuxedoError> copy_column(const Span2D & source_span, size_t source_column, MutableSlice2D & target_span, size_t target_column);
+
 }
 #endif // __SLICE_H

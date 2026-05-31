@@ -228,7 +228,7 @@ void augmented_dickey_fuller_test() {
         slice::Slice2D x(std::span<double>(data), data.size(), 1);
 
         // Run the ADF test (AutoLagType is passed but ignored internally per your constraint)
-        auto result_exp = timeseries::adf::augmented_dickey_fuller_test(
+        auto result_exp = timeseries::adf::augmented_dickey_fuller(
             x, 
             regression_type
         );

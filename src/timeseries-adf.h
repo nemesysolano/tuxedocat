@@ -128,7 +128,7 @@ namespace timeseries::adf{
     };
     
     
-    std::expected<std::unique_ptr<AugmentedDickeyFullerStruct>, TuxedoError> augmented_dickey_fuller_test(
+    std::expected<std::unique_ptr<AugmentedDickeyFullerStruct>, TuxedoError> augmented_dickey_fuller(
         slice::Span2D & x,
         RegressionType regression_type
     );
