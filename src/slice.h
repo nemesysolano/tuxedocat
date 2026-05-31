@@ -23,7 +23,7 @@ namespace slice {
             const size_t cols_;
         public:
             Span2D(size_t rows, size_t cols): rows_(rows), cols_(cols) {}
-            virtual std::expected<double, TuxedoError> operator[](size_t row, size_t col) const = 0;
+            virtual std::expected<double, TuxedoError> operator[](size_t row, size_t col) const = 0;             
             inline size_t rows() const {return rows_;}
             inline size_t cols() const {return cols_;}            
             virtual const double * data_handle() const = 0;

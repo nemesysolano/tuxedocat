@@ -6,5 +6,5 @@
 void tau_2010s_test();
 void mac_kinnon_crit_test();
 void mac_kinnon_p_test();
-
+void augmented_dickey_fuller_test();
 #endif

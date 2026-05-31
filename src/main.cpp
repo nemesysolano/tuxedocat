@@ -33,6 +33,7 @@ int main(int argc, char* argv[]) {
     slice2D_test();
     mutable_slice2D_test();
     first_order_diff_test();
+    augmented_dickey_fuller_test();
     return 0;
 }
 #endif

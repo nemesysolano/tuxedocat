@@ -4,4 +4,12 @@
 #include <span>
 #include <cmath>
 
+namespace timeseries {
+    enum class RegressionType {
+        CONSTANT, 
+        CONSTANT_PLUS_LINEAR, 
+        CONSTANT_PLUS_LINEAR_AND_CUADRATIC,
+        NO_CONSTANT 
+    };    
+}
 #endif

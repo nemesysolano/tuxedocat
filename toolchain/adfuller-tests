@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+import numpy as np
+from statsmodels.tsa.stattools import adfuller
+
+# The exact same dataset used in the C++ test
+data = np.array([
+    0.4967, -0.1383,  0.6477,  1.5230,  0.2341, -0.2341,  1.5792,  0.7674,  
+    0.4695,  0.5426, -0.4634, -0.4657,  0.2420, -1.9133, -1.7249, -0.5623, 
+   -1.0128, -0.3142, -1.2422, -2.6543, -1.1886, -1.4144, -1.3468, -2.7668, 
+   -3.3112, -3.1973, -4.3480, -3.9723, -4.5729, -4.8646
+])
+
+if __name__ == "__main__":
+    # autolag=None disables AIC/BIC and forces the exact maxlag calculation we implemented in C++
+    # regression='c' equals RegressionType::CONSTANT
+    regression_types = ("n", "c","ct", "ctt")
+    regression_labels = {
+        "n":"NO_CONSTANT ", 
+        "c": ",CONSTANT",
+        "ct": "CONSTANT_PLUS_LINEAR", 
+        "ctt": "CONSTANT_PLUS_LINEAR_AND_CUADRATIC",
+        
+    }
+    print(f"|Regression Type                        |ADF Statistic|p-value|Used Lags|Observations|Crit (1%)|Crit (5%)|Crit (10%)|")
+    print( "|---------------------------------------|-------------|-------|---------|------------|---------|---------|----------|")
+    for regression_type in regression_types:
+        result = adfuller(data, maxlag=None, autolag=None, regression=regression_type)
+        print(f"|{regression_labels[regression_type]}           |{result[0]:.8f}|{result[1]:.8f}|{result[2]:.8f}|{result[3]:.8f}|{result[4]['1%']:.8f}|{result[4]['5%']:.8f}|{result[4]['10%']:.8f}|")

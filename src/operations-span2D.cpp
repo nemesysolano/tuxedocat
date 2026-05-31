@@ -1,6 +1,6 @@
 #include "operations-span2D.h"
 #include <Eigen/Dense>
-
+#import "timeseries-adf.h"
 
 namespace operations::span2d {
 /* import numpy as np
@@ -53,4 +53,5 @@ namespace operations::span2d {
         // 6. Return the result (memory is safely moved, not copied, back to the caller)
         return result;
     }
+
 }

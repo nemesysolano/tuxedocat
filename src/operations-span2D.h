@@ -4,10 +4,12 @@
 #include "operations-span2D.h"
 #include <Eigen/Dense>
 #include <expected>
+#include <cmath>
 #include "slice.h"
 
 namespace operations::span2d {
     std::expected<slice::MutableSlice2D, TuxedoError> first_order_diff(slice::Span2D & span2D);
+    std::expected<slice::MutableSlice2D, TuxedoError> lags_matrix();
 }
 
 #endif

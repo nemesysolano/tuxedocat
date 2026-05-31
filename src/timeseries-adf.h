@@ -12,6 +12,7 @@
 #include "tuxedo-error.h"
 #include <functional>
 #include <memory>
+#include "slice.h"
 
 namespace timeseries::adf{
     extern const std::vector<double> tau_star_nc;
@@ -26,6 +27,13 @@ namespace timeseries::adf{
     extern const std::vector<double> tau_star_ctt;
     extern const std::vector<double> tau_min_ctt;
     extern const std::vector<double> tau_max_ctt;
+
+    enum class AutoLagType{
+        NONE,
+        AIC,
+        BIC,
+        T_STAT
+    };
 
     enum class RegressionType {
         CONSTANT, 
@@ -109,23 +117,21 @@ namespace timeseries::adf{
     std::expected<std::vector<double>, TuxedoError> mac_kinnon_crit(size_t N, RegressionType regression_type, size_t observations);
 
     struct AugmentedDickeyFullerStruct {
-        double adf;
-        double pvalue;
-        double one_pct;
-        double five_pct;
-        double ten_pct;
+        double adf; //  The test statistic.
+        double pvalue; //  MacKinnon's approximate p-value based on MacKinnon (1994, 2010).
+        double one_pct; // values for the test statistic at the 1%
+        double five_pct; // values for the test statistic at the 5%
+        double ten_pct; // values for the test statistic at the 10%
+        inline AugmentedDickeyFullerStruct(double adf, double pvalue, double one_pct, double five_pct, double ten_pct): adf(adf), pvalue(pvalue), one_pct(one_pct), five_pct(five_pct), ten_pct(ten_pct) {}                    
+        inline static std::unique_ptr<AugmentedDickeyFullerStruct> create(double adf, double pvalue, double one_pct, double five_pct, double ten_pct) {return std::make_unique<AugmentedDickeyFullerStruct>(adf, pvalue, one_pct, five_pct, ten_pct);}
+        
     };
     
-    using AugmentedDickeyFuller = std::unique_ptr<AugmentedDickeyFullerStruct>;
-
-    typedef enum AutoLagEnum { NONE, AIC, BIC, T_STAT } AutoLagType;
     
-    // std::expected<AugmentedDickeyFuller, TuxedoError> augmented_dickey_fuller_test(
-    //     slice::Matrix2D x,
-    //     size_t max_lag, // 12*(nobs/100)^{1/4}
-    //     RegressionType regression_type,
-    //     AutoLagType autolag
-    // );
+    std::expected<std::unique_ptr<AugmentedDickeyFullerStruct>, TuxedoError> augmented_dickey_fuller_test(
+        slice::Span2D & x,
+        RegressionType regression_type
+    );
 }
 
 
