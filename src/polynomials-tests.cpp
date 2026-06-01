@@ -216,4 +216,91 @@ void evaluate_horizontally_reversed_vectorized_test() {
     std::cout << "  Passed evaluate_horizontally_reversed_vectorized_test." << std::endl;
 }
 
+void fit_test() {
+    std::cout << "Running fit_test (Degree 1 and error handling)..." << std::endl;
+
+    auto approx_equal = [](double a, double b, double epsilon = 1e-7) {
+        return std::abs(a - b) < epsilon;
+    };
+
+    // 1. Setup mock data for: y = 2.0 * x + 1.5
+    std::vector<double> x_data = {1.0, 2.0, 3.0, 4.0, 5.0};
+    std::vector<double> y_data = {3.5, 5.5, 7.5, 9.5, 11.5};
+    
+    std::span<double> x_span(x_data);
+    std::span<double> y_span(y_data);
+    
+    slice::Slice2D X(x_span, 5, 1);
+    slice::Slice2D y(y_span, 5, 1);
+
+    // 2. Test successful Degree 1 fit using explicit 3-arg call
+    auto result_exp = polynomials::fit(X, y, 1);
+    assert(result_exp.has_value());
+    
+    auto& coefs = result_exp.value();
+    assert(coefs.rows() == 2);
+    assert(coefs.cols() == 1);
+    
+    // Expected (highest degree first): c_0 = 2.0, c_1 = 1.5
+    assert(approx_equal((double)coefs[0, 0].value(), 2.0));
+    assert(approx_equal((double)coefs[1, 0].value(), 1.5));
+
+    // 3. Test the default 2-arg overload (should also be Degree 1)
+    auto result_default = polynomials::fit(X, y);
+    assert(result_default.has_value());
+    assert(approx_equal((double)result_default.value()[0, 0].value(), 2.0));
+    
+    // 4. Test Error Case: Mismatched dimensions (e.g., y is 1x5 instead of 5x1)
+    slice::Slice2D y_bad(y_span, 1, 5);
+    auto err_dim = polynomials::fit(X, y_bad, 1);
+    assert(!err_dim.has_value());
+    assert(err_dim.error() == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+
+    // 5. Test Error Case: Sample size too small (trying to fit deg 5 with 5 points -> fails degree >= N check)
+    auto err_sample = polynomials::fit(X, y, 5);
+    assert(!err_sample.has_value());
+    assert(err_sample.error() == TuxedoError::ERR_SAMPLE_TOO_SMALL);
+
+    std::cout << "  Passed fit_test." << std::endl;
+}
+
+void fit_degree_2_test() {
+    std::cout << "Running fit_degree_2_test..." << std::endl;
+
+    auto approx_equal = [](double a, double b, double epsilon = 1e-7) {
+        return std::abs(a - b) < epsilon;
+    };
+
+    // 1. Setup mock data for quadratic: y = 1.5 * x^2 - 2.5 * x + 3.0
+    // x = -2 -> 1.5(4) - 2.5(-2) + 3.0 = 14.0
+    // x = -1 -> 1.5(1) - 2.5(-1) + 3.0 =  7.0
+    // x =  0 -> 1.5(0) - 2.5( 0) + 3.0 =  3.0
+    // x =  1 -> 1.5(1) - 2.5( 1) + 3.0 =  2.0
+    // x =  2 -> 1.5(4) - 2.5( 2) + 3.0 =  4.0
+    std::vector<double> x_data = {-2.0, -1.0, 0.0, 1.0, 2.0};
+    std::vector<double> y_data = {14.0, 7.0, 3.0, 2.0, 4.0};
+    
+    std::span<double> x_span(x_data);
+    std::span<double> y_span(y_data);
+    
+    slice::Slice2D X(x_span, 5, 1);
+    slice::Slice2D y(y_span, 5, 1);
+
+    // 2. Perform Degree 2 fit
+    auto result_exp = polynomials::fit(X, y, 2);
+    assert(result_exp.has_value());
+    
+    auto& coefs = result_exp.value();
+    assert(coefs.rows() == 3);
+    assert(coefs.cols() == 1);
+    
+    // 3. Validate Coefficients (highest degree first)
+    // Expected: c_0 = 1.5, c_1 = -2.5, c_2 = 3.0
+    assert(approx_equal((double)coefs[0, 0].value(), 1.5));
+    assert(approx_equal((double)coefs[1, 0].value(), -2.5));
+    assert(approx_equal((double)coefs[2, 0].value(), 3.0));
+
+    std::cout << "  Passed fit_degree_2_test." << std::endl;
+}
+
 #endif

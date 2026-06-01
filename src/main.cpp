@@ -32,10 +32,12 @@ int main(int argc, char* argv[]) {
     evaluate_horizontally_reversed_vectorized_test();
     slice2D_test();
     mutable_slice2D_test();
-    first_order_diff_test();
     augmented_dickey_fuller_test();
     column_span_test();
     slice_operations_tests();
+    fit_test();
+    fit_degree_2_test(); 
+
     return 0;
 }
 #endif

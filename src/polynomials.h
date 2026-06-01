@@ -7,7 +7,7 @@
 #include "tuxedo-error.h"
 #include <vector>
 #include <tuple>
-
+#include "slice.h"
 namespace polynomials {
     // Keep standard declarations here
     // ==========================================
@@ -174,5 +174,14 @@ namespace polynomials {
         return results;
     }
 
+
+    // Equivalent to `numpy.polyfit(x, y, deg, rcond=None, full=False, w=None, cov=False)[source] -> MutableSlice2D with same shape as X and y.`
+    std::expected<slice::MutableSlice2D, TuxedoError> fit(
+        /* input, shape is (N,1) or (1,N) */ const slice::Span2D & X, 
+        /* input, shape must match X's. */ const slice::Span2D & y,
+        /* input, degree*/ size_t degree
+    );
+
+    std::expected<slice::MutableSlice2D, TuxedoError> fit(const slice::Span2D & X, const slice::Span2D & y);
 }
 #endif

@@ -44,6 +44,33 @@ namespace slice {
         return self - other;
     }
 
+    MutableSlice2D & substract (MutableSlice2D & c, const Span2D & a, const Span2D & b) {
+        auto min_cols = std::min(a.cols(), std::min(b.cols(), c.cols()));
+        auto min_rows = std::min(a.rows(), std::min(b.rows(), c.rows()));
+        for (size_t i = 0; i < min_rows; ++i) {
+            for (size_t j = 0; j < min_cols; ++j) {
+                auto cell = c[i, j];
+                auto s = a[i, j];
+                auto o = b[i, j];
+                if(cell.has_value() && s.has_value() && o.has_value()){
+                    cell.value() = a[i, j].value() - b[i, j].value();
+                }
+                
+            }
+        }
+        return c;
+    }
+
+    MutableSlice2D & substract (MutableSlice2D & c, const Span2D & a, const Span2D && b) {
+        return substract(c, a, b);
+    }
+    MutableSlice2D & substract (MutableSlice2D & c, const Span2D && a, const Span2D & b) {
+        return substract(c, a, b);
+    }
+    MutableSlice2D & substract (MutableSlice2D & c, const Span2D && a, const Span2D && b) {
+        return substract(c, a, b);
+    }
+
     MutableSlice2D operator + (const Span2D & self, const Span2D & other) {
         auto min_cols = std::min(self.cols(), other.cols());
         auto min_rows = std::min(self.rows(), other.rows());
@@ -69,6 +96,33 @@ namespace slice {
     }
     MutableSlice2D operator + (const Span2D && self, const Span2D && other) {
         return self + other;
+    }
+
+    MutableSlice2D & add (MutableSlice2D & c, const Span2D & a, const Span2D & b) {
+        auto min_cols = std::min(a.cols(), std::min(b.cols(), c.cols()));
+        auto min_rows = std::min(a.rows(), std::min(b.rows(), c.rows()));
+        for (size_t i = 0; i < min_rows; ++i) {
+            for (size_t j = 0; j < min_cols; ++j) {
+                auto cell = c[i, j];
+                auto s = a[i, j];
+                auto o = b[i, j];
+                if(cell.has_value() && s.has_value() && o.has_value()){
+                    cell.value() = a[i, j].value() + b[i, j].value();
+                }
+                
+            }
+        }
+        return c;
+    }
+
+    MutableSlice2D & add (MutableSlice2D & c, const Span2D & a, const Span2D && b) {
+        return add(c, a, b);
+    }
+    MutableSlice2D & add (MutableSlice2D & c, const Span2D && a, const Span2D & b) {
+        return add(c, a, b);
+    }
+    MutableSlice2D & add (MutableSlice2D & c, const Span2D && a, const Span2D && b) {
+        return add(c, a, b);
     }
 
     Span2D::~Span2D() {

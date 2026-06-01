@@ -8,8 +8,7 @@
 #include "slice.h"
 
 namespace operations::span2d {
-    std::expected<slice::MutableSlice2D, TuxedoError> first_order_diff(slice::Span2D & span2D);
-    std::expected<slice::MutableSlice2D, TuxedoError> lags_matrix();
+    std::expected<slice::MutableSlice2D, TuxedoError> var_lagged_diffs(const slice::Span2D & ts);
 }
 
 #endif

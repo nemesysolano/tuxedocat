@@ -9,6 +9,6 @@ typedef enum TuxedoErrorEnum {
     ERR_NO_OBSERVATIONS = 4,
     ERR_SAMPLE_TOO_SMALL = 5,
     ERR_BAD_OUTPUT_DIMESNSIONS = 6,
-    ERR_FIRST_ORDER_DIFF_FAILED = 7
+    ERR_BAD_INPUT_DIMESNSIONS = 7,
 } TuxedoError;
 #endif

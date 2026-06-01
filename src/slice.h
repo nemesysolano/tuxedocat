@@ -27,12 +27,20 @@ namespace slice {
             inline size_t rows() const {return rows_;}
             inline size_t cols() const {return cols_;}            
             virtual const double * data_handle() const = 0;
-            // Inside class Span2D { ...
+            bool empty() const { return rows_ == 0 || cols_ == 0; }
             virtual ~Span2D();
     };
 
-    
-
+    class EmptySpan2D: public Span2D {
+        public:
+            EmptySpan2D(): Span2D(0, 0) {}
+            
+            #pragma GCC diagnostic ignored "-Wunused-parameter"
+            std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override {
+                return std::unexpected(TuxedoError::ERR_EMPTY_VECTOR);
+            }
+            const double * data_handle() const override { return nullptr; }
+    };
         
     class MutableSlice2D;
 
@@ -50,10 +58,11 @@ namespace slice {
             Span2D & data_;
             size_t target_col_;
             size_t start_row_;
-        public:
             // Pass the exact slice size (end - start) to the Span2D base class
             ColumnSpan(Span2D & data, size_t target_col, size_t start_row, size_t end_row)
                 : Span2D(end_row - start_row, 1), data_(data), target_col_(target_col), start_row_(start_row) {}
+
+        public:
             
             inline static std::expected<ColumnSpan, TuxedoError> Create(Span2D & data, size_t target_col, size_t start_row, size_t end_row) {
                 // Now strictly validates the target column alongside the row boundaries
@@ -81,6 +90,7 @@ namespace slice {
             std::vector<double> data_;                    
         public:
             // 1. Constructor
+            MutableSlice2D(const std::vector<double> & source, size_t rows, size_t cols): Span2D(rows, cols), data_(source) {}
             MutableSlice2D(size_t rows, size_t cols): Span2D(rows, cols), data_(rows * cols, 0.0) {}
             std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
             std::expected<MutableSlice2DCell, TuxedoError> operator[](size_t row, size_t col);
@@ -97,10 +107,20 @@ namespace slice {
     MutableSlice2D operator - (const Span2D & self, const Span2D && other);
     MutableSlice2D operator - (const Span2D && self, const Span2D && other);
 
+    MutableSlice2D & substract (MutableSlice2D & c, const Span2D & a, const Span2D & b);
+    MutableSlice2D & substract (MutableSlice2D & c, const Span2D & a, const Span2D && b);
+    MutableSlice2D & substract (MutableSlice2D & c, const Span2D && a, const Span2D & b);
+    MutableSlice2D & substract (MutableSlice2D & c, const Span2D && a, const Span2D && b);
+
     MutableSlice2D operator + (const Span2D & self, const Span2D & other);
     MutableSlice2D operator + (const Span2D && self, const Span2D & other);
     MutableSlice2D operator + (const Span2D & self, const Span2D && other);
     MutableSlice2D operator + (const Span2D && self, const Span2D && other);
+
+    MutableSlice2D & add (MutableSlice2D & c, const Span2D & a, const Span2D & b);
+    MutableSlice2D & add (MutableSlice2D & c, const Span2D & a, const Span2D && b);
+    MutableSlice2D & add (MutableSlice2D & c, const Span2D && a, const Span2D & b);
+    MutableSlice2D & add (MutableSlice2D & c, const Span2D && a, const Span2D && b);
 
 }
 #endif // __SLICE_H

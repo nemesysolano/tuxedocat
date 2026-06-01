@@ -1,4 +1,6 @@
 #ifdef __TEST_MAIN__
 #include "operations-span2D.h"
-    void first_order_diff_test();
+
+
+void var_lagged_diffs_tests();
 #endif

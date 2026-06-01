@@ -6,83 +6,45 @@
 #include <cassert>
 #include <iostream>
 
-/* import numpy as np
-    a = np.array(((1,2,3), (5,7,11), (13,17,19)))
-    a
-    array([[ 1,  2,  3],
-           [ 5,  7, 11],
-           [13, 17, 19]])
-    np.diff(a)
-    array([[1, 1],
-           [2, 4],
-           [4, 2]])    
-*/
-// `first_order_diff` is equivalent to `numpy.diff(a, n=1, axis=-1, prepend=<no value>, append=<no value>)` 
-// Ref: https://numpy.org/doc/2.4/reference/generated/numpy.diff.html and python snippet above.
-void first_order_diff_test() {
-    std::cout << "Running first_order_diff_test... " << std::flush;
+/*
+input [2, 3, 5, 7, 11, 13, 17, 19]
+output [1.2133516482134197 1.6]
+*/    
+void var_lagged_diffs_tests() {
+    std::cout << "Running var_lagged_diffs_tests..." << std::endl;
 
-    // ---------------------------------------------------------
-    // Test 1: Valid 3x3 Matrix (The NumPy Example)
-    // ---------------------------------------------------------
-    std::vector<double> raw_data = {
-         1.0,  2.0,  3.0,
-         5.0,  7.0, 11.0,
-        13.0, 17.0, 19.0
+    auto approx_equal = [](double a, double b, double epsilon = 1e-9) {
+        return std::abs(a - b) < epsilon;
     };
-    
-    // Create a read-only view of the data as a 3x3 matrix
-    std::span<double> data_span(raw_data);
-    slice::Slice2D input_matrix(data_span, 3, 3);
 
-    // Perform the diff operation
-    auto result_exp = operations::span2d::first_order_diff(input_matrix);
-    
-    // Validate success
+    // 1. Setup Input Data (N = 8)
+    std::vector<double> input_data = {2.0, 3.0, 5.0, 7.0, 11.0, 13.0, 17.0, 19.0};
+    std::span<double> input_span(input_data);
+    slice::Slice2D ts(input_span, input_data.size(), 1);
+
+    // 2. Setup Expected Output
+    // For ts_len=8, max_lag = 8/2 = 4. 
+    // Lags tested will be 2 and 3.
+    std::vector<double> expected_output = {1.2133516482134197, 1.6};
+
+    // 3. Execute Function
+    auto result_exp = operations::span2d::var_lagged_diffs(ts);
     assert(result_exp.has_value());
     
     auto& result = result_exp.value();
-    
-    // Validate dimensions (should shrink columns by 1)
-    assert(result.rows() == 3);
-    assert(result.cols() == 2);
 
-    // Validate calculations against NumPy output
-    // Note: Extra parentheses are used around the assert condition to prevent 
-    // the C++ preprocessor macro from choking on the comma inside [row, col]
-    assert((result[0, 0].value() == 1.0));
-    assert((result[0, 1].value() == 1.0));
-    
-    assert((result[1, 0].value() == 2.0));
-    assert((result[1, 1].value() == 4.0));
-    
-    assert((result[2, 0].value() == 4.0));
-    assert((result[2, 1].value() == 2.0));
+    // 4. Validate Dimensions
+    assert(result.rows() == expected_output.size());
+    assert(result.cols() == 1);
 
+    // 5. Validate Cell Values (Standard Deviations)
+    for (size_t i = 0; i < expected_output.size(); ++i) {
+        auto cell = result[i, 0];
+        assert(cell.has_value());
+        assert(approx_equal(cell.value(), expected_output[i]));
+    }
 
-    // ---------------------------------------------------------
-    // Test 2: Error Case - Matrix has insufficient columns
-    // ---------------------------------------------------------
-    std::vector<double> narrow_data = {1.0, 2.0, 3.0};
-    slice::Slice2D narrow_matrix(std::span<double>(narrow_data), 3, 1);
-    
-    auto narrow_exp = operations::span2d::first_order_diff(narrow_matrix);
-    
-    assert(!narrow_exp.has_value());
-    assert(narrow_exp.error() == TuxedoError::ERR_SAMPLE_TOO_SMALL);
+    std::cout << "  Passed var_lagged_diffs_tests." << std::endl;
+}
 
-
-    // ---------------------------------------------------------
-    // Test 3: Error Case - Matrix has insufficient rows
-    // ---------------------------------------------------------
-    std::vector<double> empty_data = {};
-    slice::Slice2D empty_matrix(std::span<double>(empty_data), 0, 5);
-    
-    auto empty_exp = operations::span2d::first_order_diff(empty_matrix);
-    
-    assert(!empty_exp.has_value());
-    assert(empty_exp.error() == TuxedoError::ERR_SAMPLE_TOO_SMALL);
-
-    std::cout << "Passed!" << std::endl;
-} 
 #endif

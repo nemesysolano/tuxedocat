@@ -94,14 +94,11 @@ void slice_operations_tests() {
         return std::abs(a - b) < epsilon;
     };
 
-    // Helper lambda to thoroughly verify every single cell of a result matrix
     auto verify_all_cells = [&](const slice::Span2D& result, const std::vector<double>& expected, size_t expected_rows, size_t expected_cols) {
         assert(result.rows() == expected_rows);
         assert(result.cols() == expected_cols);
         for (size_t r = 0; r < expected_rows; ++r) {
             for (size_t c = 0; c < expected_cols; ++c) {
-                // Because 'result' is passed as const Span2D&, this triggers the const operator[]
-                // returning std::expected<double, TuxedoError>
                 auto cell = result[r, c];
                 assert(cell.has_value());
                 assert(approx_equal(cell.value(), expected[r * expected_cols + c]));
@@ -120,7 +117,7 @@ void slice_operations_tests() {
                                  
     std::vector<double> rawC = {1.0, 1.0, 
                                 1.0, 1.0, 
-                                1.0, 1.0}; // 3x2 matrix (for mismatch tests)
+                                1.0, 1.0}; // 3x2 matrix
 
     std::span<double> spanA(rawA);
     std::span<double> spanB(rawB);
@@ -130,74 +127,94 @@ void slice_operations_tests() {
     slice::Slice2D B(spanB, 2, 3);
     slice::Slice2D C(spanC, 3, 2);
 
-    // Expected Result Arrays
     std::vector<double> exp_add = {11.0, 22.0, 33.0, 
                                    44.0, 55.0, 66.0}; // A + B
                                    
     std::vector<double> exp_sub = { 9.0, 18.0, 27.0, 
                                    36.0, 45.0, 54.0}; // B - A
 
-    // For A(2x3) - C(3x2), std::min truncates the bounds to 2x2.
-    // A truncated: {{1, 2}, {4, 5}}
-    // C truncated: {{1, 1}, {1, 1}}
-    // A - C = {{0, 1}, {3, 4}}
     std::vector<double> exp_trunc_sub = {0.0, 1.0, 
-                                         3.0, 4.0}; 
+                                         3.0, 4.0}; // Truncated A - C
 
     // ==============================================================
-    // 2. Test operator + (Addition)
+    // 2. Test operator+ AND slice::add() (3-parameter)
     // ==============================================================
     
-    // A) Lvalue + Lvalue (const Span2D &, const Span2D &)
+    // A) Lvalue & Lvalue
     slice::MutableSlice2D add_ll = A + B;
+    slice::MutableSlice2D func_add_ll(2, 3); // Pre-allocate output span
+    slice::add(func_add_ll, A, B);
     verify_all_cells(add_ll, exp_add, 2, 3);
+    verify_all_cells(func_add_ll, exp_add, 2, 3);
 
-    // B) Rvalue + Lvalue (const Span2D &&, const Span2D &)
+    // B) Rvalue & Lvalue
     slice::MutableSlice2D add_rl = slice::Slice2D(spanA, 2, 3) + B;
+    slice::MutableSlice2D func_add_rl(2, 3);
+    slice::add(func_add_rl, slice::Slice2D(spanA, 2, 3), B);
     verify_all_cells(add_rl, exp_add, 2, 3);
+    verify_all_cells(func_add_rl, exp_add, 2, 3);
 
-    // C) Lvalue + Rvalue (const Span2D &, const Span2D &&)
+    // C) Lvalue & Rvalue
     slice::MutableSlice2D add_lr = A + slice::Slice2D(spanB, 2, 3);
+    slice::MutableSlice2D func_add_lr(2, 3);
+    slice::add(func_add_lr, A, slice::Slice2D(spanB, 2, 3));
     verify_all_cells(add_lr, exp_add, 2, 3);
+    verify_all_cells(func_add_lr, exp_add, 2, 3);
 
-    // D) Rvalue + Rvalue (const Span2D &&, const Span2D &&)
+    // D) Rvalue & Rvalue
     slice::MutableSlice2D add_rr = slice::Slice2D(spanA, 2, 3) + slice::Slice2D(spanB, 2, 3);
+    slice::MutableSlice2D func_add_rr(2, 3);
+    slice::add(func_add_rr, slice::Slice2D(spanA, 2, 3), slice::Slice2D(spanB, 2, 3));
     verify_all_cells(add_rr, exp_add, 2, 3);
+    verify_all_cells(func_add_rr, exp_add, 2, 3);
 
     // ==============================================================
-    // 3. Test operator - (Subtraction)
+    // 3. Test operator- AND slice::substract() (3-parameter)
     // ==============================================================
     
-    // A) Lvalue - Lvalue (const Span2D &, const Span2D &)
+    // A) Lvalue & Lvalue
     slice::MutableSlice2D sub_ll = B - A;
+    slice::MutableSlice2D func_sub_ll(2, 3); // Pre-allocate output span
+    slice::substract(func_sub_ll, B, A);
     verify_all_cells(sub_ll, exp_sub, 2, 3);
+    verify_all_cells(func_sub_ll, exp_sub, 2, 3);
 
-    // B) Rvalue - Lvalue (const Span2D &&, const Span2D &)
+    // B) Rvalue & Lvalue
     slice::MutableSlice2D sub_rl = slice::Slice2D(spanB, 2, 3) - A;
+    slice::MutableSlice2D func_sub_rl(2, 3);
+    slice::substract(func_sub_rl, slice::Slice2D(spanB, 2, 3), A);
     verify_all_cells(sub_rl, exp_sub, 2, 3);
+    verify_all_cells(func_sub_rl, exp_sub, 2, 3);
 
-    // C) Lvalue - Rvalue (const Span2D &, const Span2D &&)
+    // C) Lvalue & Rvalue
     slice::MutableSlice2D sub_lr = B - slice::Slice2D(spanA, 2, 3);
+    slice::MutableSlice2D func_sub_lr(2, 3);
+    slice::substract(func_sub_lr, B, slice::Slice2D(spanA, 2, 3));
     verify_all_cells(sub_lr, exp_sub, 2, 3);
+    verify_all_cells(func_sub_lr, exp_sub, 2, 3);
 
-    // D) Rvalue - Rvalue (const Span2D &&, const Span2D &&)
+    // D) Rvalue & Rvalue
     slice::MutableSlice2D sub_rr = slice::Slice2D(spanB, 2, 3) - slice::Slice2D(spanA, 2, 3);
+    slice::MutableSlice2D func_sub_rr(2, 3);
+    slice::substract(func_sub_rr, slice::Slice2D(spanB, 2, 3), slice::Slice2D(spanA, 2, 3));
     verify_all_cells(sub_rr, exp_sub, 2, 3);
+    verify_all_cells(func_sub_rr, exp_sub, 2, 3);
 
     // ==============================================================
     // 4. Test Truncation on Dimension Mismatch
     // ==============================================================
     
     slice::MutableSlice2D trunc_sub = A - C;
+    slice::MutableSlice2D func_trunc_sub(2, 2); // Output span truncated to min bounds (2x2)
+    slice::substract(func_trunc_sub, A, C);
     
-    // Verify Dimensions Truncated correctly and all cells matched the math
     verify_all_cells(trunc_sub, exp_trunc_sub, 2, 2);
+    verify_all_cells(func_trunc_sub, exp_trunc_sub, 2, 2);
     
-    // Verify bounds checking throws if trying to access the truncated parts
-    auto err_bounds = trunc_sub[0, 2]; // Col 2 no longer exists in a 2x2
+    auto err_bounds = func_trunc_sub[0, 2];
     assert(!err_bounds.has_value());
     assert(err_bounds.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
 
-    std::cout << "  Passed slice_operations_tests (Exhaustive cell-by-cell verification)." << std::endl;
+    std::cout << "  Passed slice_operations_tests (Operators + 3-Param Named Functions exhaustive)." << std::endl;
 }
 #endif
