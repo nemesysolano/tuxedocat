@@ -15,6 +15,52 @@ std::ostream & operator << (std::ostream & out, const std::span<const double> & 
 }
 
 namespace slice {
+    std::expected<std::unique_ptr<Span2D>, TuxedoError> Span2D::operator + (const Span2D & other) {
+        if (this->rows() != other.rows() || this->cols() != other.cols()) {
+            return std::unexpected(TuxedoError::ERR_BAD_OUTPUT_DIMESNSIONS);
+        }
+
+        auto result = std::make_unique<MutableSlice2D>(this->rows(), this->cols());
+        
+        // Actually perform the addition
+        for (size_t r = 0; r < this->rows(); ++r) {
+            for (size_t c = 0; c < this->cols(); ++c) {
+                (*result)[r, c].value() = (*this)[r, c].value() + other[r, c].value();
+            }
+        }
+        return result;
+    }
+
+    // Delegate rvalue addition to lvalue implementation
+    std::expected<std::unique_ptr<Span2D>, TuxedoError> Span2D::operator + (const Span2D && other) {
+        return (*this) + other; 
+    }
+
+    std::expected<std::unique_ptr<Span2D>, TuxedoError> Span2D::operator - (const Span2D & other) {
+        if (this->rows() != other.rows() || this->cols() != other.cols()) {
+            return std::unexpected(TuxedoError::ERR_BAD_OUTPUT_DIMESNSIONS);
+        }
+
+        auto result = std::make_unique<MutableSlice2D>(this->rows(), this->cols());
+        
+        // Actually perform the subtraction
+        for (size_t r = 0; r < this->rows(); ++r) {
+            for (size_t c = 0; c < this->cols(); ++c) {
+                (*result)[r, c].value() = (*this)[r, c].value() - other[r, c].value();
+            }
+        }
+        return result;
+    }
+
+    // Delegate rvalue subtraction to lvalue implementation
+    std::expected<std::unique_ptr<Span2D>, TuxedoError> Span2D::operator - (const Span2D && other) {
+        return (*this) - other; 
+    }
+
+    Span2D::~Span2D() {
+
+    }
+
     std::expected<double, TuxedoError> Slice2D::operator[](size_t row, size_t col) const {
         if(row >= rows_ || col >= cols_) {
             return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
@@ -39,7 +85,6 @@ namespace slice {
         return data_.data_handle(); 
     }
 
-    
     std::expected<double, TuxedoError> MutableSlice2D::operator[](size_t row, size_t col) const {
         if(row >= rows_ || col >= cols_) {
             return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);

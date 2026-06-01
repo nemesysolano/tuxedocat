@@ -8,7 +8,7 @@
 #include "tuxedo-error.h"
 #include <mdspan>
 #include <vector> // <--- Add this
-
+#include <memory>
 #define row_span(matrix_span, row_num) std::span<const double>(matrix_span.data_handle() + (row_num * matrix_span.extent(1)), matrix_span.extent(1))
 #define print_2d_span(matrix_span) \
     for (size_t i = 0; i < matrix_span.extent(0); ++i) { \
@@ -27,7 +27,14 @@ namespace slice {
             inline size_t rows() const {return rows_;}
             inline size_t cols() const {return cols_;}            
             virtual const double * data_handle() const = 0;
+            virtual std::expected<std::unique_ptr<Span2D>, TuxedoError> operator - (const Span2D & other);
+            virtual std::expected<std::unique_ptr<Span2D>, TuxedoError> operator - (const Span2D && other);
+            virtual std::expected<std::unique_ptr<Span2D>, TuxedoError> operator + (const Span2D & other);
+            virtual std::expected<std::unique_ptr<Span2D>, TuxedoError> operator + (const Span2D && other);
+            virtual ~Span2D();
     };
+
+    
 
         
     class MutableSlice2D;
@@ -46,11 +53,10 @@ class ColumnSpan : public Span2D {
             Span2D & data_;
             size_t target_col_;
             size_t start_row_;
-            size_t end_row_;
         public:
             // Pass the exact slice size (end - start) to the Span2D base class
             ColumnSpan(Span2D & data, size_t target_col, size_t start_row, size_t end_row)
-                : Span2D(end_row - start_row, 1), data_(data), target_col_(target_col), start_row_(start_row), end_row_(end_row) {}
+                : Span2D(end_row - start_row, 1), data_(data), target_col_(target_col), start_row_(start_row) {}
             
             inline static std::expected<ColumnSpan, TuxedoError> Create(Span2D & data, size_t target_col, size_t start_row, size_t end_row) {
                 // Now strictly validates the target column alongside the row boundaries
@@ -63,7 +69,7 @@ class ColumnSpan : public Span2D {
             std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
             const double * data_handle() const override;
     };
-    
+
     class MutableSlice2DCell {
         private:
             double & data_;

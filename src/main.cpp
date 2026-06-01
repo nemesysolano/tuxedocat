@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
     first_order_diff_test();
     augmented_dickey_fuller_test();
     column_span_test();
-
+    slice_operations_tests();
     return 0;
 }
 #endif
