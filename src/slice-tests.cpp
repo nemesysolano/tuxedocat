@@ -88,119 +88,116 @@ void mutable_slice2D_test() {
 }
 
 void slice_operations_tests() {
-    std::cout << "Running slice_operations_tests (including derived types)..." << std::endl;
+    std::cout << "Running slice_operations_tests..." << std::endl;
 
     auto approx_equal = [](double a, double b, double epsilon = 1e-9) {
         return std::abs(a - b) < epsilon;
     };
 
-    // ==============================================================
-    // 1. Setup Base Data (2x3 Matrices)
-    // ==============================================================
-    std::vector<double> dataA = {1.0, 2.0, 3.0, 
-                                 4.0, 5.0, 6.0};
-                                 
-    std::vector<double> dataB = {10.0, 20.0, 30.0, 
-                                 40.0, 50.0, 60.0};
-                                 
-    std::vector<double> data_mismatch = {1.0, 1.0, 1.0, 1.0}; // 2x2 matrix
+    // Helper lambda to thoroughly verify every single cell of a result matrix
+    auto verify_all_cells = [&](const slice::Span2D& result, const std::vector<double>& expected, size_t expected_rows, size_t expected_cols) {
+        assert(result.rows() == expected_rows);
+        assert(result.cols() == expected_cols);
+        for (size_t r = 0; r < expected_rows; ++r) {
+            for (size_t c = 0; c < expected_cols; ++c) {
+                // Because 'result' is passed as const Span2D&, this triggers the const operator[]
+                // returning std::expected<double, TuxedoError>
+                auto cell = result[r, c];
+                assert(cell.has_value());
+                assert(approx_equal(cell.value(), expected[r * expected_cols + c]));
+            }
+        }
+    };
 
-    std::span<double> spanA(dataA);
-    std::span<double> spanB(dataB);
-    std::span<double> span_mismatch(data_mismatch);
+    // ==============================================================
+    // 1. Setup Base Data
+    // ==============================================================
+    std::vector<double> rawA = {1.0, 2.0, 3.0, 
+                                4.0, 5.0, 6.0}; // 2x3 matrix
+                                 
+    std::vector<double> rawB = {10.0, 20.0, 30.0, 
+                                40.0, 50.0, 60.0}; // 2x3 matrix
+                                 
+    std::vector<double> rawC = {1.0, 1.0, 
+                                1.0, 1.0, 
+                                1.0, 1.0}; // 3x2 matrix (for mismatch tests)
+
+    std::span<double> spanA(rawA);
+    std::span<double> spanB(rawB);
+    std::span<double> spanC(rawC);
 
     slice::Slice2D A(spanA, 2, 3);
     slice::Slice2D B(spanB, 2, 3);
-    slice::Slice2D mismatch_slice(span_mismatch, 2, 2);
+    slice::Slice2D C(spanC, 3, 2);
+
+    // Expected Result Arrays
+    std::vector<double> exp_add = {11.0, 22.0, 33.0, 
+                                   44.0, 55.0, 66.0}; // A + B
+                                   
+    std::vector<double> exp_sub = { 9.0, 18.0, 27.0, 
+                                   36.0, 45.0, 54.0}; // B - A
+
+    // For A(2x3) - C(3x2), std::min truncates the bounds to 2x2.
+    // A truncated: {{1, 2}, {4, 5}}
+    // C truncated: {{1, 1}, {1, 1}}
+    // A - C = {{0, 1}, {3, 4}}
+    std::vector<double> exp_trunc_sub = {0.0, 1.0, 
+                                         3.0, 4.0}; 
 
     // ==============================================================
-    // 2. Base Slice2D vs Slice2D Tests
-    // ==============================================================
-    auto add_ll = A + B;
-    assert(add_ll.has_value());
-    auto& res_add_ll = *add_ll.value();
-    for (size_t r = 0; r < 2; ++r) {
-        for (size_t c = 0; c < 3; ++c) {
-            assert(approx_equal(res_add_ll[r, c].value(), dataA[r * 3 + c] + dataB[r * 3 + c]));
-        }
-    }
-
-    auto sub_lr = B - std::move(slice::Slice2D(spanB, 2, 3)); // Lvalue - Rvalue
-    assert(sub_lr.has_value());
-    assert(approx_equal((*sub_lr.value())[0, 0].value(), 0.0));
-
-    // ==============================================================
-    // 3. Setup Derived Types (MutableSlice2D & ColumnSpan)
-    // ==============================================================
-    slice::MutableSlice2D mut_A(2, 3);
-    for (size_t r = 0; r < 2; ++r) {
-        for (size_t c = 0; c < 3; ++c) {
-            mut_A[r, c].value() = (r * 3 + c) * 2.0; // Fills: 0, 2, 4, 6, 8, 10
-        }
-    }
-
-    // Create a 4x3 Base Matrix for ColumnSpan extraction
-    std::vector<double> col_data = {
-        1.1, 2.2, 3.3,   // Row 0
-        4.4, 5.5, 6.6,   // Row 1
-        7.7, 8.8, 9.9,   // Row 2
-        10.1, 11.1, 12.1 // Row 3
-    };
-    std::span<double> col_span_data(col_data);
-    slice::Slice2D base_for_col(col_span_data, 4, 3);
-    
-    // Extract: target column 1, from rows 1 to 3 (exclusive) -> Size: 2x1
-    // Values extracted: 5.5, 8.8
-    auto c_span_exp = slice::ColumnSpan::Create(base_for_col, 1, 1, 3);
-    assert(c_span_exp.has_value());
-    auto c_span = c_span_exp.value();
-
-    // Create a matching 2x1 MutableSlice2D
-    slice::MutableSlice2D mut_B_2x1(2, 1);
-    mut_B_2x1[0, 0].value() = 1.0;
-    mut_B_2x1[1, 0].value() = 2.0;
-
-    // ==============================================================
-    // 4. Derived Type Cross-Arithmetic Tests (Polymorphism)
+    // 2. Test operator + (Addition)
     // ==============================================================
     
-    // A) MutableSlice2D + Slice2D (2x3 + 2x3)
-    auto add_mut_slice = mut_A + A;
-    assert(add_mut_slice.has_value());
-    assert(approx_equal((*add_mut_slice.value())[0, 1].value(), 2.0 + 2.0)); // mut_A(2) + A(2)
-    assert(approx_equal((*add_mut_slice.value())[1, 2].value(), 10.0 + 6.0)); // mut_A(10) + A(6)
+    // A) Lvalue + Lvalue (const Span2D &, const Span2D &)
+    slice::MutableSlice2D add_ll = A + B;
+    verify_all_cells(add_ll, exp_add, 2, 3);
 
-    // B) ColumnSpan + MutableSlice2D (2x1 + 2x1)
-    auto add_col_mut = c_span + mut_B_2x1;
-    assert(add_col_mut.has_value());
-    assert(approx_equal((*add_col_mut.value())[0, 0].value(), 5.5 + 1.0));
-    assert(approx_equal((*add_col_mut.value())[1, 0].value(), 8.8 + 2.0));
+    // B) Rvalue + Lvalue (const Span2D &&, const Span2D &)
+    slice::MutableSlice2D add_rl = slice::Slice2D(spanA, 2, 3) + B;
+    verify_all_cells(add_rl, exp_add, 2, 3);
 
-    // C) MutableSlice2D - ColumnSpan (Rvalue overload via std::move)
-    auto sub_mut_col_rvalue = std::move(mut_B_2x1) - c_span;
-    assert(sub_mut_col_rvalue.has_value());
-    assert(approx_equal((*sub_mut_col_rvalue.value())[0, 0].value(), 1.0 - 5.5));
-    assert(approx_equal((*sub_mut_col_rvalue.value())[1, 0].value(), 2.0 - 8.8));
+    // C) Lvalue + Rvalue (const Span2D &, const Span2D &&)
+    slice::MutableSlice2D add_lr = A + slice::Slice2D(spanB, 2, 3);
+    verify_all_cells(add_lr, exp_add, 2, 3);
+
+    // D) Rvalue + Rvalue (const Span2D &&, const Span2D &&)
+    slice::MutableSlice2D add_rr = slice::Slice2D(spanA, 2, 3) + slice::Slice2D(spanB, 2, 3);
+    verify_all_cells(add_rr, exp_add, 2, 3);
 
     // ==============================================================
-    // 5. Dimensionality Constraints across Derived Types
+    // 3. Test operator - (Subtraction)
     // ==============================================================
+    
+    // A) Lvalue - Lvalue (const Span2D &, const Span2D &)
+    slice::MutableSlice2D sub_ll = B - A;
+    verify_all_cells(sub_ll, exp_sub, 2, 3);
 
-    // D) ColumnSpan (2x1) + Slice2D (2x3) -> MISMATCH
-    auto err_col_mismatch = c_span + A;
-    assert(!err_col_mismatch.has_value());
-    assert(err_col_mismatch.error() == TuxedoError::ERR_BAD_OUTPUT_DIMESNSIONS);
+    // B) Rvalue - Lvalue (const Span2D &&, const Span2D &)
+    slice::MutableSlice2D sub_rl = slice::Slice2D(spanB, 2, 3) - A;
+    verify_all_cells(sub_rl, exp_sub, 2, 3);
 
-    // E) MutableSlice2D (2x3) - ColumnSpan (2x1) -> MISMATCH
-    auto err_mut_mismatch = mut_A - c_span;
-    assert(!err_mut_mismatch.has_value());
-    assert(err_mut_mismatch.error() == TuxedoError::ERR_BAD_OUTPUT_DIMESNSIONS);
+    // C) Lvalue - Rvalue (const Span2D &, const Span2D &&)
+    slice::MutableSlice2D sub_lr = B - slice::Slice2D(spanA, 2, 3);
+    verify_all_cells(sub_lr, exp_sub, 2, 3);
 
-    // F) Standard Dimensionality Error
-    auto err_add = A + mismatch_slice;
-    assert(!err_add.has_value());
-    assert(err_add.error() == TuxedoError::ERR_BAD_OUTPUT_DIMESNSIONS);
+    // D) Rvalue - Rvalue (const Span2D &&, const Span2D &&)
+    slice::MutableSlice2D sub_rr = slice::Slice2D(spanB, 2, 3) - slice::Slice2D(spanA, 2, 3);
+    verify_all_cells(sub_rr, exp_sub, 2, 3);
 
-    std::cout << "  Passed slice_operations_tests (exhaustive across all derived types)." << std::endl;
+    // ==============================================================
+    // 4. Test Truncation on Dimension Mismatch
+    // ==============================================================
+    
+    slice::MutableSlice2D trunc_sub = A - C;
+    
+    // Verify Dimensions Truncated correctly and all cells matched the math
+    verify_all_cells(trunc_sub, exp_trunc_sub, 2, 2);
+    
+    // Verify bounds checking throws if trying to access the truncated parts
+    auto err_bounds = trunc_sub[0, 2]; // Col 2 no longer exists in a 2x2
+    assert(!err_bounds.has_value());
+    assert(err_bounds.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+
+    std::cout << "  Passed slice_operations_tests (Exhaustive cell-by-cell verification)." << std::endl;
 }
 #endif

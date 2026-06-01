@@ -27,10 +27,7 @@ namespace slice {
             inline size_t rows() const {return rows_;}
             inline size_t cols() const {return cols_;}            
             virtual const double * data_handle() const = 0;
-            virtual std::expected<std::unique_ptr<Span2D>, TuxedoError> operator - (const Span2D & other);
-            virtual std::expected<std::unique_ptr<Span2D>, TuxedoError> operator - (const Span2D && other);
-            virtual std::expected<std::unique_ptr<Span2D>, TuxedoError> operator + (const Span2D & other);
-            virtual std::expected<std::unique_ptr<Span2D>, TuxedoError> operator + (const Span2D && other);
+            // Inside class Span2D { ...
             virtual ~Span2D();
     };
 
@@ -48,7 +45,7 @@ namespace slice {
             const double * data_handle() const override;
     };
 
-class ColumnSpan : public Span2D {
+    class ColumnSpan : public Span2D {
         private:
             Span2D & data_;
             size_t target_col_;
@@ -94,6 +91,16 @@ class ColumnSpan : public Span2D {
     
     MutableSlice2D column_slice2d(const Span2D & source_span);
     std::expected<size_t, TuxedoError> copy_column(const Span2D & source_span, size_t source_column, MutableSlice2D & target_span, size_t target_column);
+
+    MutableSlice2D operator - (const Span2D & self, const Span2D & other);
+    MutableSlice2D operator - (const Span2D && self, const Span2D & other);
+    MutableSlice2D operator - (const Span2D & self, const Span2D && other);
+    MutableSlice2D operator - (const Span2D && self, const Span2D && other);
+
+    MutableSlice2D operator + (const Span2D & self, const Span2D & other);
+    MutableSlice2D operator + (const Span2D && self, const Span2D & other);
+    MutableSlice2D operator + (const Span2D & self, const Span2D && other);
+    MutableSlice2D operator + (const Span2D && self, const Span2D && other);
 
 }
 #endif // __SLICE_H

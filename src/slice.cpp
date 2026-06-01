@@ -15,46 +15,60 @@ std::ostream & operator << (std::ostream & out, const std::span<const double> & 
 }
 
 namespace slice {
-    std::expected<std::unique_ptr<Span2D>, TuxedoError> Span2D::operator + (const Span2D & other) {
-        if (this->rows() != other.rows() || this->cols() != other.cols()) {
-            return std::unexpected(TuxedoError::ERR_BAD_OUTPUT_DIMESNSIONS);
-        }
+    MutableSlice2D operator - (const Span2D & self, const Span2D & other){
+        auto min_cols = std::min(self.cols(), other.cols());
+        auto min_rows = std::min(self.rows(), other.rows());
+        MutableSlice2D result(min_rows, min_cols);
 
-        auto result = std::make_unique<MutableSlice2D>(this->rows(), this->cols());
-        
-        // Actually perform the addition
-        for (size_t r = 0; r < this->rows(); ++r) {
-            for (size_t c = 0; c < this->cols(); ++c) {
-                (*result)[r, c].value() = (*this)[r, c].value() + other[r, c].value();
+        for (size_t i = 0; i < min_rows; ++i) {
+            for (size_t j = 0; j < min_cols; ++j) {
+                auto cell = result[i, j];
+                auto s = self[i, j];
+                auto o = other[i, j];
+                if(cell.has_value() && s.has_value() && o.has_value()){
+                    cell.value() = self[i, j].value() - other[i, j].value();
+                }
+                
             }
         }
         return result;
     }
-
-    // Delegate rvalue addition to lvalue implementation
-    std::expected<std::unique_ptr<Span2D>, TuxedoError> Span2D::operator + (const Span2D && other) {
-        return (*this) + other; 
+    
+    MutableSlice2D operator - (const Span2D && self, const Span2D & other) {
+        return self - other;
+    }
+    MutableSlice2D operator - (const Span2D & self, const Span2D && other) {
+        return self - other;
+    }
+    MutableSlice2D operator - (const Span2D && self, const Span2D && other) {
+        return self - other;
     }
 
-    std::expected<std::unique_ptr<Span2D>, TuxedoError> Span2D::operator - (const Span2D & other) {
-        if (this->rows() != other.rows() || this->cols() != other.cols()) {
-            return std::unexpected(TuxedoError::ERR_BAD_OUTPUT_DIMESNSIONS);
-        }
+    MutableSlice2D operator + (const Span2D & self, const Span2D & other) {
+        auto min_cols = std::min(self.cols(), other.cols());
+        auto min_rows = std::min(self.rows(), other.rows());
+        MutableSlice2D result(min_rows, min_cols);
 
-        auto result = std::make_unique<MutableSlice2D>(this->rows(), this->cols());
-        
-        // Actually perform the subtraction
-        for (size_t r = 0; r < this->rows(); ++r) {
-            for (size_t c = 0; c < this->cols(); ++c) {
-                (*result)[r, c].value() = (*this)[r, c].value() - other[r, c].value();
+        for (size_t i = 0; i < min_rows; ++i) {
+            for (size_t j = 0; j < min_cols; ++j) {
+                auto cell = result[i, j];
+                auto s = self[i, j];
+                auto o = other[i, j];
+                if(cell.has_value() && s.has_value() && o.has_value()){
+                    cell.value() = s.value() + o.value();
+                }
             }
         }
         return result;
     }
-
-    // Delegate rvalue subtraction to lvalue implementation
-    std::expected<std::unique_ptr<Span2D>, TuxedoError> Span2D::operator - (const Span2D && other) {
-        return (*this) - other; 
+    MutableSlice2D operator + (const Span2D && self, const Span2D & other) {
+        return self + other;
+    }
+    MutableSlice2D operator + (const Span2D & self, const Span2D && other) {
+        return self + other;
+    }
+    MutableSlice2D operator + (const Span2D && self, const Span2D && other) {
+        return self + other;
     }
 
     Span2D::~Span2D() {
