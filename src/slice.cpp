@@ -26,6 +26,20 @@ namespace slice {
         return data_.data();
     }
 
+    std::expected<double, TuxedoError> ColumnSpan::operator[](size_t row, size_t col) const {
+        // rows_ is now exactly (end_row - start_row) thanks to the new inheritance
+        if(row >= rows_ || col != 0) {
+            return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+        }
+        // Dynamically fetch from the requested target column
+        return data_[start_row_ + row, target_col_];        
+    }
+
+    const double * ColumnSpan::data_handle() const {
+        return data_.data_handle(); 
+    }
+
+    
     std::expected<double, TuxedoError> MutableSlice2D::operator[](size_t row, size_t col) const {
         if(row >= rows_ || col >= cols_) {
             return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
@@ -50,7 +64,7 @@ namespace slice {
 
     }
 
-    MutableSlice2D create_mutable_column_slice2d(const Span2D & source_span) {
+    MutableSlice2D column_slice2d(const Span2D & source_span) {
         MutableSlice2D result(source_span.rows(), 1);      
         return result;
     }
@@ -67,4 +81,9 @@ namespace slice {
         }
         return source_span.rows();
     }
+
+    std::expected<MutableSlice2D, TuxedoError> row_slice2d(const Span2D & source_span, size_t start, size_t end);    /* extact from `start` to `end -1` */
+    std::expected<MutableSlice2D, TuxedoError> column_slice2d(const Span2D & source_span, size_t start, size_t end); /* extact from `start` to `end -1` */
+
+
 }

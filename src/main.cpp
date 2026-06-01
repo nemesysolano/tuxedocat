@@ -34,6 +34,8 @@ int main(int argc, char* argv[]) {
     mutable_slice2D_test();
     first_order_diff_test();
     augmented_dickey_fuller_test();
+    column_span_test();
+
     return 0;
 }
 #endif

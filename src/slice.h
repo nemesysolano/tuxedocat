@@ -28,7 +28,8 @@ namespace slice {
             inline size_t cols() const {return cols_;}            
             virtual const double * data_handle() const = 0;
     };
-    
+
+        
     class MutableSlice2D;
 
     class Slice2D: public Span2D {
@@ -36,10 +37,33 @@ namespace slice {
             std::span<double> data_;
         public:
             Slice2D(std::span<double> data, size_t rows, size_t cols): Span2D(rows, cols), data_(data) {}
-            std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
+            virtual std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
             const double * data_handle() const override;
     };
 
+class ColumnSpan : public Span2D {
+        private:
+            Span2D & data_;
+            size_t target_col_;
+            size_t start_row_;
+            size_t end_row_;
+        public:
+            // Pass the exact slice size (end - start) to the Span2D base class
+            ColumnSpan(Span2D & data, size_t target_col, size_t start_row, size_t end_row)
+                : Span2D(end_row - start_row, 1), data_(data), target_col_(target_col), start_row_(start_row), end_row_(end_row) {}
+            
+            inline static std::expected<ColumnSpan, TuxedoError> Create(Span2D & data, size_t target_col, size_t start_row, size_t end_row) {
+                // Now strictly validates the target column alongside the row boundaries
+                if (target_col >= data.cols() || start_row >= data.rows() || end_row > data.rows() || start_row >= end_row) {
+                    return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+                }
+                return ColumnSpan(data, target_col, start_row, end_row);
+            }
+
+            std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
+            const double * data_handle() const override;
+    };
+    
     class MutableSlice2DCell {
         private:
             double & data_;
@@ -62,7 +86,7 @@ namespace slice {
             virtual ~MutableSlice2D();
     };  
     
-    MutableSlice2D create_mutable_column_slice2d(const Span2D & source_span);
+    MutableSlice2D column_slice2d(const Span2D & source_span);
     std::expected<size_t, TuxedoError> copy_column(const Span2D & source_span, size_t source_column, MutableSlice2D & target_span, size_t target_column);
 
 }

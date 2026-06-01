@@ -260,7 +260,7 @@ void augmented_dickey_fuller_test() {
     )   ;
 
     slice::Slice2D X(std::span<double>(augmented_dickey_fuller_test_data), 30, 2);
-    auto x = create_mutable_column_slice2d(X);
+    auto x = column_slice2d(X);
 
     for(size_t index = 0; index < X.cols(); index++) {
         const auto& current_regression_map = (index == 0) ? regression_types_1 : regression_types_2;
@@ -269,9 +269,6 @@ void augmented_dickey_fuller_test() {
         assert(copy_result.has_value());
 
         for(const auto& [regression_type, expected_result] : current_regression_map) {
-            // Create an (N, 1) matrix (Column Vector) as required by the univariate constraint
-            
-
             // Run the ADF test (AutoLagType is passed but ignored internally per your constraint)
             auto result_exp = timeseries::adf::augmented_dickey_fuller(
                 x, 
@@ -303,6 +300,46 @@ void augmented_dickey_fuller_test() {
     }
 
     std::cout << "  Passed!" << std::endl;
+}
+
+void column_span_test() {
+    std::cout << "Running column_span_test (testing fixed ColumnSpan::create)..." << std::endl;
+
+    std::vector<double> raw_data = {
+        1.1, 2.2, 3.3,   // Row 0
+        4.4, 5.5, 6.6,   // Row 1
+        7.7, 8.8, 9.9,   // Row 2
+        10.1, 11.1, 12.1 // Row 3
+    };
+    std::span<double> data_span(raw_data);
+    slice::Slice2D s2d(data_span, 4, 3);
+
+    // Loop through every available column dynamically
+    for (size_t c = 0; c < s2d.cols(); ++c) {
+        
+        // Target: column c, from row 1 to 3 (exclusive)
+        auto col_span_exp = slice::ColumnSpan::Create(s2d, c, 1, 3);
+        assert(col_span_exp.has_value());
+        auto col_span = col_span_exp.value();
+
+        // 1. Verify Row Count Leak is fixed
+        assert(col_span.rows() == 2); 
+        assert(col_span.cols() == 1);
+
+        // 2. Verify Hardcoded Column is fixed
+        auto val0 = col_span[0, 0];
+        assert(val0.has_value() && val0.value() == raw_data[1 * s2d.cols() + c]);
+
+        auto val1 = col_span[1, 0];
+        assert(val1.has_value() && val1.value() == raw_data[2 * s2d.cols() + c]);
+
+        // 3. Verify exact boundary cutoffs on the new row size
+        auto err_row = col_span[2, 0]; // Index 2 is now out of bounds (max is 1)
+        assert(!err_row.has_value());
+        assert(err_row.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+    }
+
+    std::cout << "  Passed column_span_test for all columns." << std::endl;
 }
 
 #endif
