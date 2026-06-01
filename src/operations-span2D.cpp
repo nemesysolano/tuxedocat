@@ -46,6 +46,7 @@ namespace operations::span2d {
         
         return result;
     }
-   
+
+    
 
 }

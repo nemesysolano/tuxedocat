@@ -12,6 +12,7 @@
 #include "timeseries-adf-tests.h"
 #include "slice-tests.h"
 #include "operations-span2D-tests.h"
+#include "timeseries-hurst-tests.h"
 using namespace std;
 
 
@@ -37,7 +38,7 @@ int main(int argc, char* argv[]) {
     slice_operations_tests();
     fit_test();
     fit_degree_2_test(); 
-
+    hurst_exponent_tests();
     return 0;
 }
 #endif

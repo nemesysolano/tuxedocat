@@ -4,7 +4,7 @@
 
 namespace timeseries::hurst {
     std::expected<double, TuxedoError> exponent(
-        slice::Span2D & ts // Must be (N,1)
+        slice::Span2D & ts // Must be (N,1) or (1,N)
     );
 }
 #endif

@@ -308,5 +308,4 @@ void fit_degree_2_test() {
 
     std::cout << "  Passed fit_degree_2_test." << std::endl;
 }
-
 #endif

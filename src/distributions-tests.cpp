@@ -1,5 +1,4 @@
 #ifdef __TEST_MAIN__
-
 #include "distributions-tests.h"
 void standard_cdf_test() {
     std::cout << "Running standard_cdf_test..." << std::endl;
