@@ -19,8 +19,8 @@ std::ostream & operator << (std::ostream & out, const std::span<const double> & 
 namespace slice {  
     class Span2D {
         protected:
-            const size_t rows_;
-            const size_t cols_;
+            size_t rows_;
+            size_t cols_;
         public:
             Span2D(size_t rows, size_t cols): rows_(rows), cols_(cols) {}
             virtual std::expected<double, TuxedoError> operator[](size_t row, size_t col) const = 0;             
@@ -86,14 +86,14 @@ namespace slice {
     };
    
     class MutableSlice2D: public Span2D {
-        private:
+        protected:
             std::vector<double> data_;                    
         public:
             // 1. Constructor
             MutableSlice2D(const std::vector<double> & source, size_t rows, size_t cols): Span2D(rows, cols), data_(source) {}
             MutableSlice2D(size_t rows, size_t cols): Span2D(rows, cols), data_(rows * cols, 0.0) {}
             std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
-            std::expected<MutableSlice2DCell, TuxedoError> operator[](size_t row, size_t col);
+            virtual std::expected<MutableSlice2DCell, TuxedoError> operator[](size_t row, size_t col);
             const double * data_handle() const override;
             inline double * mutable_data_handle() { return data_.data(); }
             virtual ~MutableSlice2D();

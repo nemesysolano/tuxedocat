@@ -3,6 +3,9 @@
 #include <vector>
 #include <span>
 #include <cmath>
+#include <map>
+#include <chrono>
+#include <iostream>
 
 namespace timeseries {
     enum class RegressionType {
@@ -11,5 +14,6 @@ namespace timeseries {
         CONSTANT_PLUS_LINEAR_AND_CUADRATIC,
         NO_CONSTANT 
     };    
+
 }
 #endif
