@@ -1,27 +1,57 @@
 #ifndef __TIMESERIES_DATAFRAME_H__
 #define __TIMESERIES_DATAFRAME_H__
+
 #include <iostream>
 #include <map>
 #include <chrono>
 #include <vector>
+#include <string>
+#include <set>
 #include "slice.h"
-#include <iostream>
 #include <memory>
 #include <expected>
-
+#include "tuxedo-error.h"
+#include "timeseries-dataframe.h"
+#include <sstream>
+#include <set>
+#include <iomanip> // <-- Add this for std::get_time
+#include <ctime>   // <-- Add this for timegm
 namespace timeseries::dataframe {
-    class DataFrame: public slice::Span2D{
+    class DataFrame: public slice::Span2D {
         private:
-            std::vector<double> data;
-            // 1. Accept by value (creates a local instance)
-            DataFrame(size_t rows, size_t cols, std::vector<double> data_) 
+            std::vector<double> data_;
+            std::map<std::string, size_t> column_name_to_column_index_;
+            std::map<std::chrono::sys_seconds, size_t> timestamp_to_row_index_;
+
+            // Pass by value and move idiom for safe ownership transfer
+            DataFrame(size_t rows, size_t cols, 
+                      std::vector<double> data,
+                      std::map<std::string, size_t> column_name_to_column_index,
+                      std::map<std::chrono::sys_seconds, size_t> timestamp_to_row_index) 
                 : Span2D(rows, cols), 
-                data(std::move(data_)) // 2. Move the local instance into the member
+                  data_(std::move(data)),
+                  column_name_to_column_index_(std::move(column_name_to_column_index)),
+                  timestamp_to_row_index_(std::move(timestamp_to_row_index))
             {}             
+            
         public:
-            static std::expected<DataFrame, TuxedoError> Create(std::istream &input);
-            std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;             
+            // 1. FIX: Add the missing declaration to prevent it from being an abstract class
             const double * data_handle() const override;
+
+            // 2. OPTIMIZATION: Explicitly enable the move constructor.
+            // Since you have a virtual destructor, C++ disables implicit moves.
+            // Defaulting it ensures the vector and maps move safely without copying.
+            DataFrame(DataFrame&&) = default;
+
+            static std::expected<DataFrame, TuxedoError> Create(std::istream &input, char field_delimiter);
+            static std::expected<DataFrame, TuxedoError> Create(std::istream &input);
+            
+            std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;             
+            std::expected<double, TuxedoError> operator[](std::chrono::sys_seconds timestamp, const std::string & col_name) const;  
+            std::expected<double, TuxedoError> operator[](std::string timestamp, const std::string & col_name) const;
+            // Highly Recommended Addition:
+            // Let the user get the index so they don't have to do expensive string lookups inside loops!
+            std::expected<size_t, TuxedoError> column_index(const std::string& col_name) const;
             virtual ~DataFrame();
     };
 }

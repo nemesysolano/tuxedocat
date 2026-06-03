@@ -13,6 +13,7 @@
 #include "slice-tests.h"
 #include "operations-span2D-tests.h"
 #include "timeseries-hurst-tests.h"
+#include "timeseries-dataframe-tests.h"
 using namespace std;
 
 
@@ -39,6 +40,21 @@ int main(int argc, char* argv[]) {
     fit_test();
     fit_degree_2_test(); 
     hurst_exponent_tests();
+
+    test_dataframe_creation_valid_input();
+    test_dataframe_creation_invalid_timestamp();
+    test_dataframe_creation_inconsistent_row_length();
+    test_dataframe_creation_non_numeric_value();
+    test_dataframe_creation_empty_input();
+    test_dataframe_access_by_index_valid();
+    test_dataframe_access_by_index_out_of_bounds();
+    test_dataframe_access_by_timestamp_and_column_valid();
+    test_dataframe_access_by_timestamp_and_column_invalid_timestamp();
+    test_dataframe_access_by_timestamp_and_column_invalid_column();
+    test_dataframe_column_index_valid();
+    test_dataframe_column_index_invalid();
+    test_dataframe_access_by_string_timestamp_valid();
+    test_dataframe_access_by_string_timestamp_invalid_format() ;
     return 0;
 }
 #endif
