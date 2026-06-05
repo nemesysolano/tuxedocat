@@ -16,5 +16,10 @@ void test_dataframe_column_index_valid();
 void test_dataframe_column_index_invalid();
 void test_dataframe_access_by_string_timestamp_valid();
 void test_dataframe_access_by_string_timestamp_invalid_format() ;
+void test_dataframe_access_string_combinations_valid();
+void test_dataframe_access_string_invalid_column();
+void common_timestamps_test();
+void test_dataframe_create_from_column_index(); // convers const std::expected<DataFrame, TuxedoError> DataFrame::CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, size_t column_index);
+void test_dataframe_create_from_column_name(); // covers const std::expected<DataFrame, TuxedoError> DataFrame::CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, std::string & column_name);
 #endif
 #endif

@@ -14,6 +14,7 @@
 #include "operations-span2D-tests.h"
 #include "timeseries-hurst-tests.h"
 #include "timeseries-dataframe-tests.h"
+#include "ols-tests.h"
 using namespace std;
 
 
@@ -55,6 +56,12 @@ int main(int argc, char* argv[]) {
     test_dataframe_column_index_invalid();
     test_dataframe_access_by_string_timestamp_valid();
     test_dataframe_access_by_string_timestamp_invalid_format() ;
+    test_dataframe_access_string_combinations_valid();
+    test_dataframe_access_string_invalid_column();
+    common_timestamps_test();
+    ols_flat_tests();
+    test_dataframe_create_from_column_index();
+    test_dataframe_create_from_column_name();
     return 0;
 }
 #endif

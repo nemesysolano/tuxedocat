@@ -1,6 +1,9 @@
 #include "timeseries-dataframe.h"
 #include <sstream>
 #include <set>
+#include <cassert>
+#include <algorithm> // <-- Required for std::set_intersection
+#include <iterator>  // <-- Required for std::inserter
 
 namespace timeseries::dataframe {
     
@@ -8,6 +11,7 @@ namespace timeseries::dataframe {
         std::vector<double> data;
         std::map<std::string, size_t> column_name_to_column_index_;
         std::map<std::chrono::sys_seconds, size_t> timestamp_to_row_index_;
+        std::set<std::chrono::sys_seconds> timestamps_;
         
         size_t rows = 0;
         size_t expected_cols = 0;
@@ -71,6 +75,7 @@ namespace timeseries::dataframe {
                     row_time = std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::from_time_t(tt));
                     
                     timestamp_to_row_index_[row_time] = rows;
+                    timestamps_.insert(row_time);
                 } else {
                     // Parse Numbers (Subsequent columns)
                     try {
@@ -98,7 +103,7 @@ namespace timeseries::dataframe {
         }
 
         // The Span2D bounds cover only the numeric data grid (expected_cols - 1)
-        return DataFrame(rows, expected_cols - 1, std::move(data), std::move(column_name_to_column_index_), std::move(timestamp_to_row_index_));
+        return DataFrame(rows, expected_cols - 1, std::move(data), std::move(column_name_to_column_index_), std::move(timestamp_to_row_index_), std::move(timestamps_));
      }
 
     std::expected<DataFrame, TuxedoError> DataFrame::Create(std::istream &input) {
@@ -133,7 +138,7 @@ namespace timeseries::dataframe {
         return operator[](row, col);
     }
 
-     std::expected<double, TuxedoError> DataFrame::operator[](std::string timestamp, const std::string & col_name) const {
+     std::expected<double, TuxedoError> DataFrame::operator[](const std::string & timestamp, const std::string & col_name) const {
         // Parse the timestamp string into std::chrono::sys_seconds
         std::tm t = {};
         std::istringstream iss(timestamp);
@@ -163,5 +168,119 @@ namespace timeseries::dataframe {
         return data_.data();
     }
 
+const std::expected<DataFrame, TuxedoError> DataFrame::CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, size_t column_index) {
+        // 1. Validate the column index
+        if (column_index >= cols_) {
+            return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+        }
+
+        // 2. Find the original column name so we can preserve it
+        std::string col_name = "Unknown";
+        for (const auto& pair : column_name_to_column_index_) {
+            if (pair.second == column_index) {
+                col_name = pair.first;
+                break;
+            }
+        }
+
+        // 3. Prepare the new internal structures
+        std::vector<double> new_data;
+        new_data.reserve(timestamps.size()); // Pre-allocate memory for speed
+        
+        std::map<std::string, size_t> new_col_map;
+        new_col_map[col_name] = 0; // The new DataFrame will have exactly 1 column
+        
+        std::map<std::chrono::sys_seconds, size_t> new_row_map;
+        std::set<std::chrono::sys_seconds> new_timestamps;
+
+        // 4. Iterate through the target timestamps (std::set keeps them ordered chronologically)
+        size_t current_row = 0;
+        for (const auto& ts : timestamps) {
+            auto it = timestamp_to_row_index_.find(ts);
+            
+            // If the timestamp doesn't exist in THIS dataframe, we cannot extract it.
+            // (If you used common_timestamps() beforehand, this should never trigger).
+            if (it == timestamp_to_row_index_.end()) {
+                return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+            }
+
+            size_t original_row = it->second;
+            
+            // Extract the data point directly from the 1D vector
+            new_data.push_back(data_[original_row * cols_ + column_index]);
+            
+            // Record the new mapping
+            new_row_map[ts] = current_row;
+            new_timestamps.insert(ts);
+            
+            current_row++;
+        }
+
+        // 5. Use the private constructor to build and return the aligned DataFrame
+        return DataFrame(
+            new_timestamps.size(), 
+            1, 
+            std::move(new_data), 
+            std::move(new_col_map), 
+            std::move(new_row_map), 
+            std::move(new_timestamps)
+        );
+    }
+
+    // String overload implementation
+    const std::expected<DataFrame, TuxedoError> DataFrame::CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, std::string & column_name) {
+        auto it = column_name_to_column_index_.find(column_name);
+        if (it == column_name_to_column_index_.end()) {
+            return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+        }
+        
+        // Route to the size_t implementation
+        return CreateFromColumn(timestamps, it->second);
+    }
+
     DataFrame::~DataFrame() {}
+
+    // 1. Implement the missing getter declared in the header
+    const std::set<std::chrono::sys_seconds>& DataFrame::timestamps() const {
+        return timestamps_;
+    }
+
+// 2. Implement the common_timestamps intersection logic
+    std::set<std::chrono::sys_seconds> common_timestamps(std::list<std::reference_wrapper<const DataFrame>> data_frames) {
+        std::set<std::chrono::sys_seconds> result;
+
+        if (data_frames.empty()) {
+            return result; // Return empty set if the list is empty
+        }
+
+        // Initialize the result set with the timestamps of the first dataframe
+        auto it = data_frames.begin();
+        result = it->get().timestamps();
+        ++it;
+
+        // Iteratively intersect with the remaining dataframes
+        for (; it != data_frames.end(); ++it) {
+            // Early exit optimization: if intersection is ever empty, we are done.
+            if (result.empty()) {
+                break;
+            }
+
+            const auto& current_timestamps = it->get().timestamps();
+            std::set<std::chrono::sys_seconds> intersection;
+
+            // Compute the intersection of the current result and the next dataframe's timestamps
+            std::set_intersection(
+                result.begin(), result.end(),
+                current_timestamps.begin(), current_timestamps.end(),
+                std::inserter(intersection, intersection.begin())
+            );
+
+            // Update the result for the next iteration
+            result = std::move(intersection);
+        }
+
+        return result;
+    }
+
+
 }

@@ -49,6 +49,7 @@ namespace slice {
             std::span<double> data_;
         public:
             Slice2D(std::span<double> data, size_t rows, size_t cols): Span2D(rows, cols), data_(data) {}
+            Slice2D(double * data, size_t rows, size_t cols): Span2D(rows, cols), data_(std::span<double>(data, rows * cols)) {}
             virtual std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
             const double * data_handle() const override;
     };

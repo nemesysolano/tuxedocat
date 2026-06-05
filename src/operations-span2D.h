@@ -7,7 +7,7 @@
 #include "slice.h"
 
 namespace operations::span2d {
-    std::expected<slice::MutableSlice2D, TuxedoError> var_lagged_diffs(const slice::Span2D & ts);
+    std::expected<slice::MutableSlice2D, TuxedoError> var_lagged_diffs(const slice::Span2D & ts);    
 }
 
 #endif
