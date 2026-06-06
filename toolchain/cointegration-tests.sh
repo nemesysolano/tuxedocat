@@ -69,10 +69,10 @@ if __name__ == "__main__":
     df["NVO"] = nvo_data["Close"]
     
     # Plot the two time series
-    plot_price_series(df, "BDX", "NVO")
+ #  plot_price_series(df, "BDX", "NVO")
     
     # Display a scatter plot of the two time series
-    plot_scatter_series(df, "BDX", "NVO")
+ #  plot_scatter_series(df, "BDX", "NVO")
     
     
     # Calculate optimal hedge ratio "beta" using statsmodels OLS
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     df["res"] = results.resid
     
     # Plot the residuals
-    plot_residuals(df)
+#   plot_residuals(df)
     
     # Calculate and output the CADF test on the residuals
     cadf = ts.adfuller(df["res"],regression= "n", autolag=None)

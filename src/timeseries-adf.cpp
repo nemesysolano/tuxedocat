@@ -105,6 +105,19 @@ namespace timeseries::adf{
 
     }
 
+    // Matches Python's: int(np.ceil(12.0 * np.power(nobs / 100.0, 1 / 4.0)))
+    int calculate_max_lag_schwert(size_t nobs, int ntrend) {
+        // 1. Schwert Criterion
+        double n = static_cast<double>(nobs);
+        int maxlag = static_cast<int>(std::ceil(12.0 * std::pow(n / 100.0, 0.25)));
+        
+        // 2. Safety Cap (Matches statsmodels line 290)
+        // nobs // 2 - ntrend - 1
+        int cap = static_cast<int>(nobs / 2) - ntrend - 1;
+        
+        return std::max(0, std::min(maxlag, cap));
+    }
+
     std::expected<std::unique_ptr<AugmentedDickeyFullerStruct>, TuxedoError> augmented_dickey_fuller(
         slice::Span2D & x,
         RegressionType regression_type
@@ -116,14 +129,20 @@ namespace timeseries::adf{
             return std::unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL); // ADF is for 1D series
         }
 
-        // 1. Calculate maxlag constraint (Statsmodels line 288-291)
-        int maxlag = static_cast<int>(std::round(12.0 * std::pow(static_cast<double>(nobs) / 100.0, 0.25)));
+        // 1. Setup Trend Columns
+        int K_trend = 0;
+        if (regression_type == RegressionType::CONSTANT) K_trend = 1;
+        else if (regression_type == RegressionType::CONSTANT_PLUS_LINEAR) K_trend = 2;
+        else if (regression_type == RegressionType::CONSTANT_PLUS_LINEAR_AND_CUADRATIC) K_trend = 3;
+
+        // 2. Calculate maxlag constraint (Statsmodels line 288-291)
+        int maxlag = calculate_max_lag_schwert(nobs, K_trend);
         
         if (maxlag < 0) {
             return std::unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL);
         }
 
-        // 2. Prepare differences
+        // 3. Prepare differences
         int N_eff = nobs - 1 - maxlag;
         if (N_eff <= 0) {
             return std::unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL);
@@ -133,11 +152,6 @@ namespace timeseries::adf{
         Eigen::Map<const Eigen::VectorXd> x_vec(data, nobs);
         Eigen::VectorXd xdiff = x_vec.tail(nobs - 1) - x_vec.head(nobs - 1);
 
-        // 3. Setup Trend Columns
-        int K_trend = 0;
-        if (regression_type == RegressionType::CONSTANT) K_trend = 1;
-        else if (regression_type == RegressionType::CONSTANT_PLUS_LINEAR) K_trend = 2;
-        else if (regression_type == RegressionType::CONSTANT_PLUS_LINEAR_AND_CUADRATIC) K_trend = 3;
 
         int K = 1 + maxlag + K_trend; // 1 (lagged level) + maxlag (lagged diffs) + trend
         if (N_eff <= K) {
