@@ -76,6 +76,7 @@ if __name__ == "__main__":
     
     
     # Calculate optimal hedge ratio "beta" using statsmodels OLS
+    
     model = sm.OLS(df["BDX"], df["NVO"])
     results = model.fit()
     
@@ -85,15 +86,10 @@ if __name__ == "__main__":
     # Plot the residuals
 #   plot_residuals(df)
     
-    # Calculate and output the CADF test on the residuals
-    cadf = ts.adfuller(df["res"],regression= "n", autolag=None)
-    nobs = len(bdx_data)
-    calculated_maxlag = int(np.ceil(12.0 * np.power(nobs / 100.0, 0.25)))
-
     # 2. Run adfuller forcing that exact lag
     adf_result = ts.adfuller(
         df["res"], 
-        maxlag=calculated_maxlag, 
+        maxlag=None, 
         regression='n', # Ensure this matches your NO_CONSTANT setting
         autolag=None    # Setting autolag=None forces the use of maxlag
     )

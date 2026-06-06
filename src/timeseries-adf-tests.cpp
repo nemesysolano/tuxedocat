@@ -382,16 +382,21 @@ void augmented_dickey_fuller_cointegration_test(const char * current_program_pat
     assert(close_2_result.has_value());
 
 
-    auto & x = close_1_result.value();
-    auto & y = close_2_result.value();
+    auto & bdx = close_1_result.value(); // Previously 'x'
+    auto & nvo = close_2_result.value(); // Previously 'y'
 
-    auto ols_result = ols::flat(x, y);
+    // Match Python: Regress BDX (Y) on NVO (X)
+    // Since ols::flat expects (X, Y), we pass (nvo, bdx)
+    auto ols_result = ols::flat(nvo, bdx);
     assert(ols_result.has_value());
 
-    auto & ols = * ols_result.value();
+    auto & ols = *ols_result.value();
     auto beta = ols.coefficients[0];
-    auto residuals = y - (beta * x);
 
+    // Residuals = Y - (beta * X)
+    auto residuals = bdx - (beta * nvo);
+
+    // Pass to your existing, fully functional ADF engine
     auto adf_result = augmented_dickey_fuller(residuals, timeseries::adf::RegressionType::NO_CONSTANT);
     assert(adf_result.has_value());
     auto & adf = adf_result.value();

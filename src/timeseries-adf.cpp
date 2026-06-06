@@ -122,7 +122,7 @@ namespace timeseries::adf{
         slice::Span2D & x,
         RegressionType regression_type
     ) {
-        size_t nobs = x.rows();
+        int  nobs = x.rows();
         if (nobs == 0) {
             return std::unexpected(TuxedoError::ERR_NO_OBSERVATIONS);
         } else if (x.cols() != 1) {
@@ -136,24 +136,26 @@ namespace timeseries::adf{
         else if (regression_type == RegressionType::CONSTANT_PLUS_LINEAR_AND_CUADRATIC) K_trend = 3;
 
         // 2. Calculate maxlag constraint (Statsmodels line 288-291)
-        int maxlag = calculate_max_lag_schwert(nobs, K_trend);
+        size_t  maxlag = calculate_max_lag_schwert(nobs, K_trend);
         
         if (maxlag < 0) {
             return std::unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL);
         }
 
         // 3. Prepare differences
-        int N_eff = nobs - 1 - maxlag;
+        size_t p = static_cast<size_t>(maxlag);
+        auto N = nobs;
+        size_t N_eff = N - p - 1;
         if (N_eff <= 0) {
             return std::unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL);
         }
-
+        std::cout << "DEBUG: X_mat rows should be: " << N_eff << std::endl;
         const double* data = x.data_handle(); // Requires slice::Span2D to return a valid pointer
         Eigen::Map<const Eigen::VectorXd> x_vec(data, nobs);
         Eigen::VectorXd xdiff = x_vec.tail(nobs - 1) - x_vec.head(nobs - 1);
+        
 
-
-        int K = 1 + maxlag + K_trend; // 1 (lagged level) + maxlag (lagged diffs) + trend
+        size_t K = 1 + maxlag + K_trend; // 1 (lagged level) + maxlag (lagged diffs) + trend
         if (N_eff <= K) {
             return std::unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL);
         }
@@ -165,7 +167,7 @@ namespace timeseries::adf{
         X.col(0) = x_vec.segment(maxlag, N_eff);
         
         // 4b. lagged differences
-        for (int i = 0; i < maxlag; ++i) {
+        for (size_t i = 0; i < maxlag; ++i) {
             X.col(1 + i) = xdiff.segment(maxlag - 1 - i, N_eff);
         }
 
@@ -174,10 +176,10 @@ namespace timeseries::adf{
             X.col(1 + maxlag).setOnes();
         }
         if (K_trend >= 2) {
-            for (int i = 0; i < N_eff; ++i) X(i, 1 + maxlag + 1) = static_cast<double>(i + 1);
+            for (size_t i = 0; i < N_eff; ++i) X(i, 1 + maxlag + 1) = static_cast<double>(i + 1);
         }
         if (K_trend >= 3) {
-            for (int i = 0; i < N_eff; ++i) X(i, 1 + maxlag + 2) = std::pow(static_cast<double>(i + 1), 2);
+            for (size_t i = 0; i < N_eff; ++i) X(i, 1 + maxlag + 2) = std::pow(static_cast<double>(i + 1), 2);
         }
 
         // 4d. the Dependent Variable
@@ -224,6 +226,13 @@ namespace timeseries::adf{
             result->ten_pct = crit_vals[2];
         }
 
+        // 1. How many rows are actually going into your OLS solver?
+std::cout << "DEBUG: X rows: " << X.rows() << std::endl;
+std::cout << "DEBUG: N_eff: " << N_eff << std::endl;
+
+// 2. How many rows does Python use?
+// In your cointegration-tests.sh script, print:
+// print(f"Python regression matrix rows: {len(results.resid)}")
         return result;
     }
 }
