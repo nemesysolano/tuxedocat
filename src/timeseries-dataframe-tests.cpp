@@ -8,6 +8,12 @@
 #include <functional>
 #include <iomanip> // For get_time
 #include <ctime>   // For timegm
+#include "timeseries-adf.h"
+
+
+using namespace timeseries::dataframe;
+using namespace slice;
+using namespace timeseries::adf;
 
 // Helper to keep test output consistent
 void print_status(const std::string& test_name, bool success) {
@@ -355,6 +361,7 @@ void test_dataframe_create_from_column_name() {
     auto invalid_col_res = df.CreateFromColumn(target_ts, bad_col);
     success = success && !invalid_col_res.has_value() && invalid_col_res.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS;
 
+    
     print_status("test_dataframe_create_from_column_name", success);
     assert(success);
 }

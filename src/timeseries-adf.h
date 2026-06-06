@@ -132,6 +132,11 @@ namespace timeseries::adf{
         slice::Span2D & x,
         RegressionType regression_type
     );
+
+    inline std::ostream & operator << (std::ostream & out, const AugmentedDickeyFullerStruct & adf) {
+        out << "adf=" << adf.adf << ", pvalue=" << adf.pvalue << "(1%, 5%, 10%) = (" << adf.one_pct << ", " << adf.five_pct << ", " << adf.ten_pct << ')';
+        return out;
+    }
 }
 
 

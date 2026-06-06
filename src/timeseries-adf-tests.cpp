@@ -1,6 +1,14 @@
 #ifdef __TEST_MAIN__
 #include "timeseries-adf-tests.h"
+#include <fstream>
+#include <iostream>
+#include <filesystem>
+#include "timeseries-dataframe.h"
+#include "ols.h"
 using namespace std;
+using namespace timeseries::adf;
+using namespace timeseries::dataframe;
+using namespace slice;
 
 vector<double> mac_kinnon_p_expeted_results = {
     9.443579625324582e-06, 0.004987837276744353, 0.1252400584846753, 0.6842796360469544, 0.9404706143181764, 
@@ -340,6 +348,57 @@ void column_span_test() {
     }
 
     std::cout << "  Passed column_span_test for all columns." << std::endl;
+}
+
+void augmented_dickey_fuller_cointegration_test(const char * current_program_path) {
+    std::cout << "Running augmented_dickey_fuller_cointegration_test... " << std::endl;
+    std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
+    std::string file_1_path = (exe_path / "bdx.csv").string();
+    std::string file_2_path = (exe_path / "nvo.csv").string();
+    
+    cout << "opening " << file_1_path << " and " << file_2_path << endl;
+
+    auto stream1 = ifstream(file_1_path);
+    assert(stream1.is_open());
+
+    auto stream2 = ifstream(file_2_path);
+    assert(stream2.is_open());
+
+    auto data_frame1_result = DataFrame::Create(stream1);
+    assert(data_frame1_result.has_value());
+    
+    auto data_frame2_result= DataFrame::Create(stream2);
+    assert(data_frame2_result.has_value());  
+
+    auto & data_frame1 = data_frame1_result.value();
+    auto & data_frame2 = data_frame2_result.value();
+
+    auto timestamps = common_timestamps({data_frame1, data_frame2});
+    
+    auto close_1_result = data_frame1.CreateFromColumn(timestamps, "Close");
+    assert(close_1_result.has_value());
+
+    auto close_2_result = data_frame2.CreateFromColumn(timestamps, "Close");
+    assert(close_2_result.has_value());
+
+
+    auto & x = close_1_result.value();
+    auto & y = close_2_result.value();
+
+    auto ols_result = ols::flat(x, y);
+    assert(ols_result.has_value());
+
+    auto & ols = * ols_result.value();
+    auto beta = ols.coefficients[0];
+    auto residuals = y - (beta * x);
+
+    auto adf_result = augmented_dickey_fuller(residuals, timeseries::adf::RegressionType::NO_CONSTANT);
+    assert(adf_result.has_value());
+    auto & adf = adf_result.value();
+    cout << std::fixed << std::setprecision(7) << "ADF Statistic= " << adf->adf << ", p-value = " << adf->pvalue 
+         << ", 1% = " << adf->one_pct << ", 5% = " << adf->five_pct 
+         << ", 10% = " << adf->ten_pct << std::defaultfloat << endl;
+
 }
 
 #endif

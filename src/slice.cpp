@@ -1,5 +1,6 @@
 #include "slice.h"
 #include <expected>
+#include <Eigen/Dense>
 
 std::ostream & operator << (std::ostream & out, const std::span<const double> & v) {
     out << '[';
@@ -123,6 +124,29 @@ namespace slice {
     }
     MutableSlice2D & add (MutableSlice2D & c, const Span2D && a, const Span2D && b) {
         return add(c, a, b);
+    }
+
+    MutableSlice2D operator * (double scalar, const Span2D & other) {
+        MutableSlice2D result(other.rows(), other.cols());
+        if (other.empty()) return result;
+
+        const double* src = other.data_handle();
+        if (src) {
+            Eigen::Map<const Eigen::VectorXd> src_vec(src, other.rows() * other.cols());
+            Eigen::Map<Eigen::VectorXd> dst_vec(result.mutable_data_handle(), other.rows() * other.cols());
+            dst_vec = src_vec * scalar;
+        }
+        return result;
+    }
+    
+    MutableSlice2D operator * (const Span2D & other, double scalar) {
+        return scalar * other;    
+    }
+    MutableSlice2D operator * (double scalar, const Span2D && other) {
+        return scalar * other;
+    }
+    MutableSlice2D operator * (const Span2D && other, double scalar) {
+        return scalar * other;
     }
 
     Span2D::~Span2D() {

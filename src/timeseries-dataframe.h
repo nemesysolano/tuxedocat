@@ -66,6 +66,9 @@ namespace timeseries::dataframe {
             const std::set<std::chrono::sys_seconds>& timestamps() const;
             const std::expected<DataFrame, TuxedoError> CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, size_t column_index);            
             const std::expected<DataFrame, TuxedoError> CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, std::string & column_name);
+            inline const std::expected<DataFrame, TuxedoError> CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, std::string && column_name) {
+                return CreateFromColumn(timestamps, column_name);
+            }
             virtual ~DataFrame();
     };
 

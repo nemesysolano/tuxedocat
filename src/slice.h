@@ -123,5 +123,11 @@ namespace slice {
     MutableSlice2D & add (MutableSlice2D & c, const Span2D && a, const Span2D & b);
     MutableSlice2D & add (MutableSlice2D & c, const Span2D && a, const Span2D && b);
 
+    MutableSlice2D operator * (double scalar, const Span2D & other);
+    MutableSlice2D operator * (const Span2D & other, double scalar);
+    MutableSlice2D operator * (double scalar, const Span2D && other);
+    MutableSlice2D operator * (const Span2D && other, double scalar);
+
+
 }
 #endif // __SLICE_H

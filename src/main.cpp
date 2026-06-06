@@ -62,6 +62,8 @@ int main(int argc, char* argv[]) {
     ols_flat_tests();
     test_dataframe_create_from_column_index();
     test_dataframe_create_from_column_name();
+    augmented_dickey_fuller_cointegration_test(argv[0]);
+
     return 0;
 }
 #endif
