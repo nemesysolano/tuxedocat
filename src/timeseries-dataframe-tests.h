@@ -22,5 +22,9 @@ void common_timestamps_test();
 void test_dataframe_create_from_column_index(); // convers const std::expected<DataFrame, TuxedoError> DataFrame::CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, size_t column_index);
 void test_dataframe_create_from_column_name(); // covers const std::expected<DataFrame, TuxedoError> DataFrame::CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, std::string & column_name);
 void augmented_dickey_fuller_cointegration_test(const char * current_program_path);
+void copy_column_test();
+void shift_test();
+void pct_change_test();
+void append_column_test();
 #endif
 #endif

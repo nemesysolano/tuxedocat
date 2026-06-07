@@ -15,6 +15,7 @@
 #include "timeseries-hurst-tests.h"
 #include "timeseries-dataframe-tests.h"
 #include "ols-tests.h"
+
 using namespace std;
 
 
@@ -63,7 +64,10 @@ int main(int argc, char* argv[]) {
     test_dataframe_create_from_column_index();
     test_dataframe_create_from_column_name();
     augmented_dickey_fuller_cointegration_test(argv[0]);
-
+    copy_column_test();
+    shift_test();
+    pct_change_test();
+    append_column_test();
     return 0;
 }
 #endif

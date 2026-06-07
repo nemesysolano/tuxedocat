@@ -9,6 +9,7 @@
 #include <iomanip> // For get_time
 #include <ctime>   // For timegm
 #include "timeseries-adf.h"
+#include <cmath> // Required for std::isnan and std::abs
 
 
 using namespace timeseries::dataframe;
@@ -298,7 +299,7 @@ void test_dataframe_create_from_column_index() {
     };
 
     // 2. Test valid extraction for Column 'B' (index 1)
-    auto sub_df_res = df.CreateFromColumn(target_ts, (size_t)1);
+    auto sub_df_res = df.copy(target_ts, (size_t)1);
     
     bool success = sub_df_res.has_value();
     if (success) {
@@ -309,12 +310,12 @@ void test_dataframe_create_from_column_index() {
     }
 
     // 3. Test Invalid Column Index
-    auto invalid_col_res = df.CreateFromColumn(target_ts, (size_t)99);
+    auto invalid_col_res = df.copy(target_ts, (size_t)99);
     success = success && !invalid_col_res.has_value() && invalid_col_res.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS;
 
     // 4. Test Missing Timestamp (Requesting a date not in the DataFrame)
     std::set<std::chrono::sys_seconds> bad_ts = { make_ts("2025-01-01 10:00:00") };
-    auto invalid_ts_res = df.CreateFromColumn(bad_ts, (size_t)1);
+    auto invalid_ts_res = df.copy(bad_ts, (size_t)1);
     success = success && !invalid_ts_res.has_value() && invalid_ts_res.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS;
 
     print_status("test_dataframe_create_from_column_index", success);
@@ -346,7 +347,7 @@ void test_dataframe_create_from_column_name() {
     std::string target_col = "A";
 
     // 1. Test Valid Extraction
-    auto sub_df_res = df.CreateFromColumn(target_ts, target_col);
+    auto sub_df_res = df.copy(target_ts, target_col);
     
     bool success = sub_df_res.has_value();
     if (success) {
@@ -358,11 +359,259 @@ void test_dataframe_create_from_column_name() {
 
     // 2. Test Invalid Column Name
     std::string bad_col = "NonExistent";
-    auto invalid_col_res = df.CreateFromColumn(target_ts, bad_col);
+    auto invalid_col_res = df.copy(target_ts, bad_col);
     success = success && !invalid_col_res.has_value() && invalid_col_res.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS;
 
     
     print_status("test_dataframe_create_from_column_name", success);
     assert(success);
 }
+
+void copy_column_test() {
+    // 1. Setup a test dataframe with multiple columns
+    std::string csv = "Date,A,B,C\n2023-01-01 10:00:00,1.0,2.0,3.0\n2023-01-01 11:00:00,4.0,5.0,6.0";
+    std::istringstream iss(csv);
+    auto df_exp = timeseries::dataframe::DataFrame::Create(iss);
+    assert(df_exp.has_value());
+    auto& df = df_exp.value();
+
+    bool success = true;
+
+    // Test 1: Lvalue Source & Lvalue Target
+    std::vector<std::string> src1 = {"A", "B"};
+    std::vector<std::string> tgt1 = {"A_copy", "B_copy"};
+    auto res1 = df.copy(src1, tgt1);
+    success = success && res1.has_value() && res1->cols() == 2;
+    if (res1.has_value()) {
+        success = success && (res1.value()["2023-01-01 10:00:00", "A_copy"].value() == 1.0);
+        success = success && (res1.value()["2023-01-01 11:00:00", "B_copy"].value() == 5.0);
+    }
+
+    // Test 2: Lvalue Source & Rvalue Target
+    std::vector<std::string> src2 = {"B"};
+    auto res2 = df.copy(src2, std::vector<std::string>{"B_new"});
+    success = success && res2.has_value() && res2->cols() == 1;
+    if (res2.has_value()) {
+        success = success && (res2.value()["2023-01-01 10:00:00", "B_new"].value() == 2.0);
+    }
+
+    // Test 3: Rvalue Source & Lvalue Target
+    std::vector<std::string> tgt3 = {"C_new"};
+    auto res3 = df.copy(std::vector<std::string>{"C"}, tgt3);
+    success = success && res3.has_value() && res3->cols() == 1;
+    if (res3.has_value()) {
+        success = success && (res3.value()["2023-01-01 11:00:00", "C_new"].value() == 6.0);
+    }
+
+    // Test 4: Rvalue Source & Rvalue Target
+    auto res4 = df.copy(std::vector<std::string>{"A", "C"}, std::vector<std::string>{"A_r", "C_r"});
+    success = success && res4.has_value() && res4->cols() == 2;
+    if (res4.has_value()) {
+        success = success && (res4.value()["2023-01-01 10:00:00", "A_r"].value() == 1.0);
+        success = success && (res4.value()["2023-01-01 11:00:00", "C_r"].value() == 6.0);
+    }
+
+    // Test 5: Constraint Validation - Dimension Mismatch
+    std::vector<std::string> src_dim = {"A"};
+    std::vector<std::string> tgt_dim = {"A1", "A2"};
+    auto res_dim = df.copy(src_dim, tgt_dim);
+    success = success && !res_dim.has_value();
+
+    // Test 6: Constraint Validation - Missing Source Column
+    auto res_missing = df.copy(std::vector<std::string>{"Z"}, std::vector<std::string>{"Z_new"});
+    success = success && !res_missing.has_value();
+
+    // Test 7: Constraint Validation - Duplicate Target Names
+    auto res_dup = df.copy(std::vector<std::string>{"A", "B"}, std::vector<std::string>{"Dup", "Dup"});
+    success = success && !res_dup.has_value();
+
+    print_status("copy_column_test", success);
+    assert(success);
+}
+
+void shift_test() {
+    // 1. Setup the exact dataframe from slicing-tests.py
+    std::string csv = 
+        "Date,a,b,c\n"
+        "2026-06-07 11:30:16,0.694262,0.581117,0.199776\n"
+        "2026-06-08 11:30:16,0.804125,0.715407,0.738984\n"
+        "2026-06-09 11:30:16,0.131058,0.123754,0.927563\n"
+        "2026-06-10 11:30:16,0.397578,0.300949,0.488584\n"
+        "2026-06-11 11:30:16,0.662864,0.955623,0.286446";
+        
+    std::istringstream iss(csv);
+    auto df_exp = timeseries::dataframe::DataFrame::Create(iss);
+    assert(df_exp.has_value());
+    auto& df = df_exp.value();
+
+    bool success = true;
+    double tolerance = 1e-5;
+
+    // --- TEST 1: Shift down by 2 (count = 2) ---
+    // Expected: First two rows become NaN. Row 2 inherits Row 0.
+    auto shift_down_res = df.shift(2, std::nan(""));
+    success = success && shift_down_res.has_value();
+    
+    if (shift_down_res.has_value()) {
+        auto& sd = shift_down_res.value();
+        
+        // Assert first two rows are filled with NaN
+        success = success && std::isnan(sd["2026-06-07 11:30:16", "a"].value());
+        success = success && std::isnan(sd["2026-06-08 11:30:16", "c"].value());
+        
+        // Assert Row 2 (06-09) correctly pulled data from Row 0 (06-07)
+        success = success && (std::abs(sd["2026-06-09 11:30:16", "a"].value() - 0.694262) < tolerance);
+        success = success && (std::abs(sd["2026-06-09 11:30:16", "b"].value() - 0.581117) < tolerance);
+        
+        // Assert Row 4 (06-11) correctly pulled data from Row 2 (06-09)
+        success = success && (std::abs(sd["2026-06-11 11:30:16", "c"].value() - 0.927563) < tolerance);
+    }
+
+    // --- TEST 2: Shift up by 2 (count = -2) ---
+    // Expected: Last two rows become NaN. Row 0 inherits Row 2.
+    auto shift_up_res = df.shift(-2, std::nan(""));
+    success = success && shift_up_res.has_value();
+    
+    if (shift_up_res.has_value()) {
+        auto& su = shift_up_res.value();
+        
+        // Assert Row 0 (06-07) correctly pulled data from Row 2 (06-09)
+        success = success && (std::abs(su["2026-06-07 11:30:16", "a"].value() - 0.131058) < tolerance);
+        success = success && (std::abs(su["2026-06-07 11:30:16", "b"].value() - 0.123754) < tolerance);
+        
+        // Assert Row 2 (06-09) correctly pulled data from Row 4 (06-11)
+        success = success && (std::abs(su["2026-06-09 11:30:16", "c"].value() - 0.286446) < tolerance);
+        
+        // Assert last two rows are filled with NaN
+        success = success && std::isnan(su["2026-06-10 11:30:16", "a"].value());
+        success = success && std::isnan(su["2026-06-11 11:30:16", "c"].value());
+    }
+
+    print_status("shift_test", success);
+    assert(success);
+}
+
+void pct_change_test() {
+    // 1. Setup the exact dataframe from slicing-tests.py
+    std::string csv = 
+        "Date,a,b,c\n"
+        "2026-06-07 11:30:16,0.694262,0.581117,0.199776\n"
+        "2026-06-08 11:30:16,0.804125,0.715407,0.738984\n"
+        "2026-06-09 11:30:16,0.131058,0.123754,0.927563\n"
+        "2026-06-10 11:30:16,0.397578,0.300949,0.488584\n"
+        "2026-06-11 11:30:16,0.662864,0.955623,0.286446";
+        
+    std::istringstream iss(csv);
+    auto df_exp = timeseries::dataframe::DataFrame::Create(iss);
+    assert(df_exp.has_value());
+    auto& df = df_exp.value();
+
+    bool success = true;
+    double tolerance = 1e-5; // Match 6 decimal places
+
+    // Execute pct_change()
+    auto pct_res = df.pct_change();
+    success = success && pct_res.has_value();
+
+    if (pct_res.has_value()) {
+        auto& pct = pct_res.value();
+        
+        // --- Row 0: 2026-06-07 (Expected: NaN) ---
+        success = success && std::isnan(pct["2026-06-07 11:30:16", "a"].value());
+        success = success && std::isnan(pct["2026-06-07 11:30:16", "b"].value());
+        success = success && std::isnan(pct["2026-06-07 11:30:16", "c"].value());
+
+        // --- Row 1: 2026-06-08 ---
+        success = success && (std::abs(pct["2026-06-08 11:30:16", "a"].value() - 0.158243) < tolerance);
+        success = success && (std::abs(pct["2026-06-08 11:30:16", "b"].value() - 0.231090) < tolerance);
+        success = success && (std::abs(pct["2026-06-08 11:30:16", "c"].value() - 2.699069) < tolerance);
+
+        // --- Row 2: 2026-06-09 ---
+        success = success && (std::abs(pct["2026-06-09 11:30:16", "a"].value() - (-0.837018)) < tolerance);
+        success = success && (std::abs(pct["2026-06-09 11:30:16", "b"].value() - (-0.827015)) < tolerance);
+        success = success && (std::abs(pct["2026-06-09 11:30:16", "c"].value() - 0.255186) < tolerance);
+
+        // --- Row 3: 2026-06-10 ---
+        success = success && (std::abs(pct["2026-06-10 11:30:16", "a"].value() - 2.033612) < tolerance);
+        success = success && (std::abs(pct["2026-06-10 11:30:16", "b"].value() - 1.431835) < tolerance);
+        success = success && (std::abs(pct["2026-06-10 11:30:16", "c"].value() - (-0.473260)) < tolerance);
+
+        // --- Row 4: 2026-06-11 ---
+        success = success && (std::abs(pct["2026-06-11 11:30:16", "a"].value() - 0.667254) < tolerance);
+        success = success && (std::abs(pct["2026-06-11 11:30:16", "b"].value() - 2.175364) < tolerance);
+        success = success && (std::abs(pct["2026-06-11 11:30:16", "c"].value() - (-0.413722)) < tolerance);
+    }
+
+    print_status("pct_change_test", success);
+    assert(success);
+}
+
+void append_column_test() {
+    // 1. Setup Base Target DataFrame (df_target)
+    std::string csv_target = 
+        "Date,A,B\n"
+        "2023-01-01 10:00:00,1.0,2.0\n"
+        "2023-01-01 11:00:00,3.0,4.0";
+    std::istringstream iss_target(csv_target);
+    auto df_target_exp = timeseries::dataframe::DataFrame::Create(iss_target);
+    assert(df_target_exp.has_value());
+    auto& df_target = df_target_exp.value();
+
+    // 2. Setup Source DataFrame with a matching timeline (df_source)
+    std::string csv_source = 
+        "Date,C,D\n"
+        "2023-01-01 10:00:00,5.0,6.0\n"
+        "2023-01-01 11:00:00,7.0,8.0";
+    std::istringstream iss_source(csv_source);
+    auto df_source_exp = timeseries::dataframe::DataFrame::Create(iss_source);
+    assert(df_source_exp.has_value());
+    auto& df_source = df_source_exp.value();
+
+    // 3. Setup Source DataFrame with a mismatched timeline (df_bad_time)
+    // The second row has a different timestamp (12:00:00 instead of 11:00:00)
+    std::string csv_bad = 
+        "Date,E\n"
+        "2023-01-01 10:00:00,9.0\n"
+        "2023-01-01 12:00:00,10.0";
+    std::istringstream iss_bad(csv_bad);
+    auto df_bad_exp = timeseries::dataframe::DataFrame::Create(iss_bad);
+    assert(df_bad_exp.has_value());
+    auto& df_bad_time = df_bad_exp.value();
+
+    bool success = true;
+
+    // --- TEST 1: Successful Column Append ---
+    // Extract column "C" from df_source and append it to df_target as "C_new"
+    TuxedoError err1 = df_target.append_column(df_source, "C", "C_new");
+    success = success && (err1 == TuxedoError::NO_ERROR);
+    success = success && (df_target.cols() == 3);
+    
+    // Verify the data was correctly interleaved
+    if (df_target.cols() == 3) {
+        success = success && (df_target["2023-01-01 10:00:00", "C_new"].value() == 5.0);
+        success = success && (df_target["2023-01-01 11:00:00", "C_new"].value() == 7.0);
+    }
+
+    // --- TEST 2: Constraint - Source Column Does Not Exist ---
+    // Try to append column "Z" which isn't in df_source
+    TuxedoError err2 = df_target.append_column(df_source, "Z", "Z_new");
+    success = success && (err2 == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+    success = success && (df_target.cols() == 3); // Ensure state was not mutated
+
+    // --- TEST 3: Constraint - Target Column Already Exists ---
+    // Try to append column "D" but name it "A", which df_target already has
+    TuxedoError err3 = df_target.append_column(df_source, "D", "A");
+    success = success && (err3 == TuxedoError::ERR_INVALID_DATA_FORMAT);
+    success = success && (df_target.cols() == 3);
+
+    // --- TEST 4: Constraint - Timeline Mismatch ---
+    // Try to append column "E" from a dataframe that has different dates
+    TuxedoError err4 = df_target.append_column(df_bad_time, "E", "E_new");
+    success = success && (err4 == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+    success = success && (df_target.cols() == 3);
+
+    print_status("append_column_test", success);
+    assert(success);
+}
+
 #endif

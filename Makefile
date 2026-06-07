@@ -1,11 +1,11 @@
 CC := clang++
-CFLAGS := -Wall -Wextra -Iinclude -O3 -I/opt/homebrew/include/eigen3 -DEIGEN_USE_BLAS -fno-elide-constructors -std=c++23 
+CFLAGS := -Wall -Wextra -Iinclude -O3 -I/opt/homebrew/include/eigen3 -DEIGEN_USE_BLAS -std=c++23 
 SRC_DIR := src
 OBJ_DIR := obj
 BIN_DIR := bin
 SRCS := $(shell find $(SRC_DIR) -type f -name "*.cpp")
 OBJS := $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
-LDFLAGS := -framework Accelerate 
+LDFLAGS := -framework Accelerate
 
 ifdef __TEST_MAIN__
     TARGET := $(BIN_DIR)/tuxedocat    

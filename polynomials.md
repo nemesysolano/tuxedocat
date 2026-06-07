@@ -49,3 +49,6 @@ $
 τ^0
 \end{bmatrix}
 $
+
+$P(Y=U|L_1, L_2) = \frac{z}{1+z}$ where 
+$z =  \mathbf {e}^{β_0 + L_1β_1+L_2β_2}$

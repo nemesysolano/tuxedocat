@@ -4,6 +4,7 @@
 #include <cassert>
 #include <algorithm> // <-- Required for std::set_intersection
 #include <iterator>  // <-- Required for std::inserter
+#include <cmath>
 
 namespace timeseries::dataframe {
     
@@ -104,11 +105,177 @@ namespace timeseries::dataframe {
 
         // The Span2D bounds cover only the numeric data grid (expected_cols - 1)
         return DataFrame(rows, expected_cols - 1, std::move(data), std::move(column_name_to_column_index_), std::move(timestamp_to_row_index_), std::move(timestamps_));
-     }
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(std::vector<std::string> & source_columns, std::vector<std::string> & target_columns) {
+        // 2. source_columns and target_columns must have the same size
+        if (source_columns.size() != target_columns.size()) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        size_t new_cols = source_columns.size();
+        size_t new_rows = this->rows();
+
+        // 1. All names in source_columns must exist in this data frame
+        std::vector<size_t> source_indices;
+        source_indices.reserve(new_cols);
+        
+        for (const auto& src_col : source_columns) {
+            auto it = column_name_to_column_index_.find(src_col);
+            if (it == column_name_to_column_index_.end()) {
+                // If a requested column doesn't exist, fail gracefully
+                return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS); 
+            }
+            source_indices.push_back(it->second);
+        }
+
+        // Prepare the new column map
+        std::map<std::string, size_t> new_col_map;
+        for (size_t i = 0; i < new_cols; ++i) {
+            // Prevent duplicate target column names
+            if (new_col_map.find(target_columns[i]) != new_col_map.end()) {
+                return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
+            }
+            new_col_map[target_columns[i]] = i;
+        }
+
+        // 3. source_column[i] copied to target_column[i] for every row
+        std::vector<double> new_data;
+        new_data.reserve(new_rows * new_cols);
+
+        for (size_t r = 0; r < new_rows; ++r) {
+            for (size_t c = 0; c < new_cols; ++c) {
+                // Extract from the flat 1D array using the cached source indices
+                size_t original_index = r * this->cols() + source_indices[c];
+                new_data.push_back(this->data_[original_index]);
+            }
+        }
+
+        // The timestamp mappings remain structurally identical, just clone them
+        std::map<std::chrono::sys_seconds, size_t> new_row_map = this->timestamp_to_row_index_;
+        std::set<std::chrono::sys_seconds> new_timestamps = this->timestamps_;
+
+        // Use the internal constructor to emit the newly sliced DataFrame
+        return DataFrame(
+            new_rows, 
+            new_cols, 
+            std::move(new_data), 
+            std::move(new_col_map), 
+            std::move(new_row_map), 
+            std::move(new_timestamps)
+        );
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(std::vector<std::string> & source_columns, std::vector<std::string> && target_columns) {
+        // target_columns is an rvalue reference, but as a named variable, it acts as an lvalue.
+        return this->copy(source_columns, target_columns);
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(std::vector<std::string> && source_columns, std::vector<std::string> & target_columns) {
+        // source_columns acts as an lvalue here.
+        return this->copy(source_columns, target_columns);
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(std::vector<std::string> && source_columns, std::vector<std::string> && target_columns) {
+        // Both act as lvalues.
+        return this->copy(source_columns, target_columns);
+    }
+
+std::expected<DataFrame, TuxedoError> DataFrame::shift(int count, double filler) {
+        size_t num_rows = this->rows();
+        size_t num_cols = this->cols();
+
+        std::vector<double> new_data;
+        new_data.reserve(num_rows * num_cols);
+
+        // We use an integer for row iteration to safely handle negative counts (shifts up)
+        int total_rows = static_cast<int>(num_rows);
+
+        for (int r = 0; r < total_rows; ++r) {
+            // The row index we want to pull data FROM
+            // If count > 0 (shift down), source_r is smaller (pulls from past)
+            // If count < 0 (shift up), source_r is larger (pulls from future)
+            int source_r = r - count;
+
+            for (size_t c = 0; c < num_cols; ++c) {
+                // If the source row is outside the boundaries of our original dataset,
+                // it means the shift pushed it off the edge. Apply the filler.
+                if (source_r < 0 || source_r >= total_rows) {
+                    new_data.push_back(filler);
+                } else {
+                    // Otherwise, safely extract the value from the flat 1D array
+                    size_t original_index = static_cast<size_t>(source_r) * num_cols + c;
+                    new_data.push_back(this->data_[original_index]);
+                }
+            }
+        }
+
+        // Timeline and metadata are completely untouched. The values shift, but the index stays static.
+        std::map<std::string, size_t> new_col_map = this->column_name_to_column_index_;
+        std::map<std::chrono::sys_seconds, size_t> new_row_map = this->timestamp_to_row_index_;
+        std::set<std::chrono::sys_seconds> new_timestamps = this->timestamps_;
+
+        // Emit the newly shifted DataFrame
+        return DataFrame(
+            num_rows, 
+            num_cols, 
+            std::move(new_data), 
+            std::move(new_col_map), 
+            std::move(new_row_map), 
+            std::move(new_timestamps)
+        );
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::shift(int count) {
+        return shift(count, NAN);
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::pct_change() {
+        size_t num_rows = this->rows();
+        size_t num_cols = this->cols();
+
+        std::vector<double> new_data;
+        new_data.reserve(num_rows * num_cols);
+
+        for (size_t r = 0; r < num_rows; ++r) {
+            for (size_t c = 0; c < num_cols; ++c) {
+                if (r == 0) {
+                    // The first row has no history to calculate a percentage change from
+                    new_data.push_back(std::nan(""));
+                } else {
+                    // Calculate flat array indices for current and previous rows
+                    size_t current_index = r * num_cols + c;
+                    size_t prev_index = (r - 1) * num_cols + c;
+
+                    double current_val = this->data_[current_index];
+                    double prev_val = this->data_[prev_index];
+
+                    // Standard Pandas calculation: (Current - Previous) / Previous
+                    double pct = (current_val - prev_val) / prev_val;
+                    new_data.push_back(pct);
+                }
+            }
+        }
+
+        // Timeline and metadata are completely untouched. 
+        std::map<std::string, size_t> new_col_map = this->column_name_to_column_index_;
+        std::map<std::chrono::sys_seconds, size_t> new_row_map = this->timestamp_to_row_index_;
+        std::set<std::chrono::sys_seconds> new_timestamps = this->timestamps_;
+
+        // Emit the newly calculated DataFrame
+        return DataFrame(
+            num_rows, 
+            num_cols, 
+            std::move(new_data), 
+            std::move(new_col_map), 
+            std::move(new_row_map), 
+            std::move(new_timestamps)
+        );
+    }
 
     std::expected<DataFrame, TuxedoError> DataFrame::Create(std::istream &input) {
         return DataFrame::Create(input, ',');
-     }
+    }
 
     // Optional but highly recommended: expose the index lookup
     std::expected<size_t, TuxedoError> DataFrame::column_index(const std::string& col_name) const {
@@ -168,7 +335,7 @@ namespace timeseries::dataframe {
         return data_.data();
     }
 
-const std::expected<DataFrame, TuxedoError> DataFrame::CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, size_t column_index) {
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(std::set<std::chrono::sys_seconds> & timestamps, size_t column_index) {
         // 1. Validate the column index
         if (column_index >= cols_) {
             return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
@@ -228,14 +395,74 @@ const std::expected<DataFrame, TuxedoError> DataFrame::CreateFromColumn(std::set
     }
 
     // String overload implementation
-    const std::expected<DataFrame, TuxedoError> DataFrame::CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, std::string & column_name) {
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(std::set<std::chrono::sys_seconds> & timestamps, std::string & column_name) {
         auto it = column_name_to_column_index_.find(column_name);
         if (it == column_name_to_column_index_.end()) {
             return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
         }
         
         // Route to the size_t implementation
-        return CreateFromColumn(timestamps, it->second);
+        return copy(timestamps, it->second);
+    }
+
+
+TuxedoError DataFrame::append_column(DataFrame & source, const std::string & source_column_name, const std::string & target_column_name) {
+        // 1. Validate that the source column actually exists
+        auto src_it = source.column_name_to_column_index_.find(source_column_name);
+        if (src_it == source.column_name_to_column_index_.end()) {
+            return TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS; 
+        }
+        size_t src_col_idx = src_it->second;
+
+        // 2. Validate that the target column does NOT already exist in this dataframe
+        if (this->column_name_to_column_index_.find(target_column_name) != this->column_name_to_column_index_.end()) {
+            return TuxedoError::ERR_INVALID_DATA_FORMAT; 
+        }
+
+        // 3. Ensure both dataframes have identically aligned timelines
+        if (this->rows() != source.rows() || this->timestamps_ != source.timestamps_) {
+            return TuxedoError::ERR_BAD_INPUT_DIMESNSIONS;
+        }
+
+        size_t num_rows = this->rows();
+        size_t old_cols = this->cols();
+        size_t new_cols = old_cols + 1;
+        size_t source_cols = source.cols();
+
+        // 4. Rebuild the flat 1D data array (Row-Major Order)
+        std::vector<double> new_data;
+        new_data.reserve(num_rows * new_cols);
+
+        for (size_t r = 0; r < num_rows; ++r) {
+            // Copy the existing row cells for this dataframe
+            for (size_t c = 0; c < old_cols; ++c) {
+                new_data.push_back(this->data_[r * old_cols + c]);
+            }
+            // Interleave the new cell from the source dataframe
+            new_data.push_back(source.data_[r * source_cols + src_col_idx]);
+        }
+
+        // 5. Mutate the internal state directly in place
+        this->data_ = std::move(new_data);
+        this->column_name_to_column_index_[target_column_name] = old_cols;
+        
+        // Increment the private member tracking the column dimension!
+        // Adjust the variable name below if it differs in your header file.
+        this->cols_ = new_cols;
+
+        return TuxedoError::NO_ERROR; 
+    }
+
+    TuxedoError DataFrame::append_column(DataFrame & source, const std::string & source_column_name, const std::string && target_column_name) {
+        return append_column(source, source_column_name, target_column_name);
+    }
+
+    TuxedoError DataFrame::append_column(DataFrame & source, const std::string && source_column_name, const std::string & target_column_name) {
+        return append_column(source, source_column_name, target_column_name);
+    }
+
+    TuxedoError DataFrame::append_column(DataFrame & source, const std::string && source_column_name, const std::string && target_column_name) {
+        return append_column(source, source_column_name, target_column_name);
     }
 
     DataFrame::~DataFrame() {}

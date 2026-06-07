@@ -41,17 +41,28 @@ namespace timeseries::dataframe {
             {}             
             
         public:
-            // 1. FIX: Add the missing declaration to prevent it from being an abstract class
             const double * data_handle() const override;
-
-            // 2. OPTIMIZATION: Explicitly enable the move constructor.
-            // Since you have a virtual destructor, C++ disables implicit moves.
-            // Defaulting it ensures the vector and maps move safely without copying.
             DataFrame(DataFrame&&) = default;
 
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input, char field_delimiter);
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input);
-            
+            std::expected<DataFrame, TuxedoError> copy(std::vector<std::string> & source_columns, std::vector<std::string> & target_columns);
+            std::expected<DataFrame, TuxedoError> copy(std::vector<std::string> & source_columns, std::vector<std::string> && target_columns);
+            std::expected<DataFrame, TuxedoError> copy(std::vector<std::string> && source_columns, std::vector<std::string> & target_columns);
+            std::expected<DataFrame, TuxedoError> copy(std::vector<std::string> && source_columns, std::vector<std::string> && target_columns);
+            std::expected<DataFrame, TuxedoError> copy(std::set<std::chrono::sys_seconds> & timestamps, size_t column_index);            
+            std::expected<DataFrame, TuxedoError> copy(std::set<std::chrono::sys_seconds> & timestamps, std::string & column_name);
+            inline std::expected<DataFrame, TuxedoError> copy(std::set<std::chrono::sys_seconds> & timestamps, std::string && column_name) {return copy(timestamps, column_name);}            
+
+            TuxedoError append_column(DataFrame & source, const std::string & source_column_name, const std::string & target_column_name);
+            TuxedoError append_column(DataFrame & source, const std::string & source_column_name, const std::string && target_column_name);
+            TuxedoError append_column(DataFrame & source, const std::string && source_column_name, const std::string & target_column_name);
+            TuxedoError append_column(DataFrame & source, const std::string && source_column_name, const std::string && target_column_name);
+
+            std::expected<DataFrame, TuxedoError> shift(int count, double filler);
+            std::expected<DataFrame, TuxedoError> shift(int count);
+            std::expected<DataFrame, TuxedoError> pct_change();
+
             std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;             
             std::expected<double, TuxedoError> operator[](std::chrono::sys_seconds timestamp, const std::string & col_name) const;  
             std::expected<double, TuxedoError> operator[](const std::string & timestamp, const std::string & col_name) const;
@@ -59,16 +70,9 @@ namespace timeseries::dataframe {
             inline std::expected<double, TuxedoError> operator[](const std::string & timestamp, const std::string && col_name) const { return operator[](timestamp, col_name); }
             inline std::expected<double, TuxedoError> operator[](const std::string && timestamp, const std::string && col_name) const { return operator[](timestamp, col_name); }
             
-            // Highly Recommended Addition:
-            // Let the user get the index so they don't have to do expensive string lookups inside loops!
             std::expected<size_t, TuxedoError> column_index(const std::string& col_name) const;
 
             const std::set<std::chrono::sys_seconds>& timestamps() const;
-            const std::expected<DataFrame, TuxedoError> CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, size_t column_index);            
-            const std::expected<DataFrame, TuxedoError> CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, std::string & column_name);
-            inline const std::expected<DataFrame, TuxedoError> CreateFromColumn(std::set<std::chrono::sys_seconds> & timestamps, std::string && column_name) {
-                return CreateFromColumn(timestamps, column_name);
-            }
             virtual ~DataFrame();
     };
 

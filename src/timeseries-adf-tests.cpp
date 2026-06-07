@@ -375,12 +375,11 @@ void augmented_dickey_fuller_cointegration_test(const char * current_program_pat
 
     auto timestamps = common_timestamps({data_frame1, data_frame2});
     
-    auto close_1_result = data_frame1.CreateFromColumn(timestamps, "Close");
+    auto close_1_result = data_frame1.copy(timestamps, "Close");
     assert(close_1_result.has_value());
 
-    auto close_2_result = data_frame2.CreateFromColumn(timestamps, "Close");
+    auto close_2_result = data_frame2.copy(timestamps, "Close");
     assert(close_2_result.has_value());
-
 
     auto & bdx = close_1_result.value(); // Previously 'x'
     auto & nvo = close_2_result.value(); // Previously 'y'
