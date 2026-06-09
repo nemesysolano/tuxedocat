@@ -13,13 +13,28 @@
 #include <memory>
 #include <expected>
 #include "timeseries.h"
-
+#include "timeseries-dataframe.h"
 namespace forecast {
-    class Forecaster {
+
+    class BinaryForecast {
+        private:
+            const double hit_rate_;
+            slice::MutableSlice2D confusion_matrix_;
         public:
-            virtual void fit(slice::Span2D & X, slice::Span2D & y) = 0;
-            virtual std::expected<timeseries::BinaryForecast, TuxedoError> forecast(slice::Span2D & X) = 0;
-    
+            BinaryForecast(
+                double hit_rate,
+                int true_positives,
+                int false_positives,
+                int true_negatives,
+                int false_negatives
+            ) : hit_rate_(hit_rate), confusion_matrix_(std::vector<double>({(double)true_positives, (double)false_positives, (double)true_negatives, (double)false_negatives}), 2, 2) {}
+            inline double hit_rate() const { return hit_rate_; }
+            inline slice::Span2D & confusion_matrix() { return confusion_matrix_; }            
     };
+
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source, const std::string & volume_column_name, const std::string & price_column_name, size_t lags);
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source,const std::string & volume_column_name, const std::string && price_column_name, size_t lags);
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source,const std::string && volume_column_name, const std::string & price_column_name, size_t lags);
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source,const std::string && volume_column_name, const std::string && price_column_name, size_t lags);
 };
 #endif

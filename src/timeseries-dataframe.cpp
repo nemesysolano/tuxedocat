@@ -509,5 +509,62 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
         return result;
     }
 
+std::ostream & operator<< (std::ostream & out, DataFrame & df) {
+        // 1. Reconstruct the ordered column names based on their physical index
+        std::vector<std::string> ordered_cols(df.cols());
+        for (const auto& [name, idx] : df.column_name_to_column_index_) {
+            ordered_cols[idx] = name;
+        }
 
+        // 2. Print the Header Row (matches Pandas standard single-line output)
+        // We use a 22-character width for the timestamp to safely accommodate "%Y-%m-%d %H:%M:%S"
+        out << std::left << std::setw(22) << "timestamp";
+        for (const auto& col_name : ordered_cols) {
+            out << std::right << std::setw(12) << col_name;
+        }
+        out << "\n";
+
+        // 3. Print Data Rows
+        std::set<std::chrono::sys_seconds> sorted_ts(df.timestamps_.begin(), df.timestamps_.end());
+
+        for (const auto& ts : sorted_ts) {
+            // Format Timestamp
+            std::time_t tt = std::chrono::system_clock::to_time_t(ts);
+            std::tm tm = *std::gmtime(&tt);
+            
+            // Write timestamp to a string stream so it can be padded as a single block
+            std::ostringstream time_out;
+            time_out << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+            out << std::left << std::setw(22) << time_out.str();
+
+            // Print Data Cells
+            size_t row_idx = df.timestamp_to_row_index_.at(ts);
+            for (size_t c = 0; c < df.cols(); ++c) {
+                double val = df.data_[row_idx * df.cols() + c];
+                
+                if (std::isnan(val)) {
+                    out << std::right << std::setw(12) << "NaN";
+                } else {
+                    // Dynamically switch formatting: Integers get 0 decimals, floats get 6.
+                    if (std::floor(val) == val && std::abs(val) < 1e11) {
+                        out << std::right << std::setw(12) << std::fixed << std::setprecision(0) << val;
+                    } else {
+                        out << std::right << std::setw(12) << std::fixed << std::setprecision(6) << val;
+                    }
+                }
+            }
+            out << "\n";
+        }
+        return out;
+    }
 }
+
+/* 
+
+timestamp       Volume     Today      Lag1      Lag2      Lag3      Lag4      Lag5  Direction
+2025-12-23  3820560000  0.455039  0.643650  0.881806  0.793426 -1.159214 -0.238392        1.0
+2025-12-24  1798270000  0.322148  0.455039  0.643650  0.881806  0.793426 -1.159214        1.0
+2025-12-26  2586550000 -0.030436  0.322148  0.455039  0.643650  0.881806  0.793426       -1.0
+2025-12-29  3541750000 -0.349205 -0.030436  0.322148  0.455039  0.643650  0.881806       -1.0
+2025-12-30  3309930000 -0.137567 -0.349205 -0.030436  0.322148  0.455039  0.643650       -1.0
+*/

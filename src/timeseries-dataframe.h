@@ -42,7 +42,24 @@ namespace timeseries::dataframe {
             
         public:
             const double * data_handle() const override;
-            DataFrame(DataFrame&&) = default;
+            
+            DataFrame(const DataFrame& other)
+                : slice::Span2D(other.rows_, other.cols_),
+                  data_(other.data_),
+                  column_name_to_column_index_(other.column_name_to_column_index_),
+                  timestamp_to_row_index_(other.timestamp_to_row_index_),
+                  timestamps_(other.timestamps_)
+            {}
+
+            DataFrame(DataFrame&& other) noexcept
+                : slice::Span2D(other.rows_, other.cols_),
+                  data_(std::move(other.data_)),
+                  column_name_to_column_index_(std::move(other.column_name_to_column_index_)),
+                  timestamp_to_row_index_(std::move(other.timestamp_to_row_index_)),
+                  timestamps_(std::move(other.timestamps_)) {
+                other.rows_ = 0;
+                other.cols_ = 0;
+            }
 
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input, char field_delimiter);
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input);
@@ -51,7 +68,7 @@ namespace timeseries::dataframe {
             std::expected<DataFrame, TuxedoError> copy(std::vector<std::string> && source_columns, std::vector<std::string> & target_columns);
             std::expected<DataFrame, TuxedoError> copy(std::vector<std::string> && source_columns, std::vector<std::string> && target_columns);
             std::expected<DataFrame, TuxedoError> copy(std::set<std::chrono::sys_seconds> & timestamps, size_t column_index);            
-            std::expected<DataFrame, TuxedoError> copy(std::set<std::chrono::sys_seconds> & timestamps, std::string & column_name);
+            std::expected<DataFrame, TuxedoError> copy(std::set<std::chrono::sys_seconds> & timestamps, std::string & column_name);            
             inline std::expected<DataFrame, TuxedoError> copy(std::set<std::chrono::sys_seconds> & timestamps, std::string && column_name) {return copy(timestamps, column_name);}            
 
             TuxedoError append_column(DataFrame & source, const std::string & source_column_name, const std::string & target_column_name);
@@ -66,17 +83,34 @@ namespace timeseries::dataframe {
             std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;             
             std::expected<double, TuxedoError> operator[](std::chrono::sys_seconds timestamp, const std::string & col_name) const;  
             std::expected<double, TuxedoError> operator[](const std::string & timestamp, const std::string & col_name) const;
+            
             inline std::expected<double, TuxedoError> operator[](const std::string && timestamp, const std::string & col_name) const { return operator[](timestamp, col_name); }
             inline std::expected<double, TuxedoError> operator[](const std::string & timestamp, const std::string && col_name) const { return operator[](timestamp, col_name); }
             inline std::expected<double, TuxedoError> operator[](const std::string && timestamp, const std::string && col_name) const { return operator[](timestamp, col_name); }
             
-            std::expected<size_t, TuxedoError> column_index(const std::string& col_name) const;
+            inline TuxedoError set (size_t row, size_t col, double value) {
+                if (row >= this->rows() || col >= this->cols()) {
+                    return TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS;
+                }
+                // Calculate the index in the 1D data vector
+                size_t index = row * this->cols() + col;
+                this->data_[index] = value;
+                return TuxedoError::NO_ERROR;
+            }
 
+            std::expected<size_t, TuxedoError> column_index(const std::string& col_name) const;
+    
             const std::set<std::chrono::sys_seconds>& timestamps() const;
+
+            friend std::ostream & operator << (std::ostream & out, DataFrame & df);
             virtual ~DataFrame();
     };
 
+    std::ostream & operator << (std::ostream & out, DataFrame & df);
+
     std::set<std::chrono::sys_seconds> common_timestamps(std::list<std::reference_wrapper<const DataFrame>> data_frame);
+
+    
 }
 
 #endif
