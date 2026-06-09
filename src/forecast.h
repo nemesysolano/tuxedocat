@@ -33,8 +33,8 @@ namespace forecast {
     };
 
     std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source, const std::string & volume_column_name, const std::string & price_column_name, size_t lags);
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source,const std::string & volume_column_name, const std::string && price_column_name, size_t lags);
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source,const std::string && volume_column_name, const std::string & price_column_name, size_t lags);
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source,const std::string && volume_column_name, const std::string && price_column_name, size_t lags);
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source,const std::string & volume_column_name, std::string && price_column_name, size_t lags);
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source,std::string && volume_column_name, const std::string & price_column_name, size_t lags);
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source,std::string && volume_column_name, std::string && price_column_name, size_t lags);
 };
 #endif

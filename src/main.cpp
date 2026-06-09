@@ -15,13 +15,14 @@
 #include "timeseries-hurst-tests.h"
 #include "timeseries-dataframe-tests.h"
 #include "ols-tests.h"
-
+#include "forecast-tests.h"
 using namespace std;
 
 
 int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
+    /**
     evaluate_test();
     evaluate_reversed_test();
     mac_kinnon_p_test();
@@ -68,6 +69,8 @@ int main(int argc, char* argv[]) {
     shift_test();
     pct_change_test();
     append_column_test();
+    */
+    created_lagged_timeseries_tests(argv[0]);
     return 0;
 }
 #endif

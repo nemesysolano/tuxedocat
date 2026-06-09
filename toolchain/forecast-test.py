@@ -10,6 +10,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis as QDA
 from sklearn.svm import LinearSVC, SVC
 import yfinance as yf
+import os
 
 def create_lagged_series(symbol, start_date, end_date, lags=5):
     """
@@ -23,7 +24,6 @@ def create_lagged_series(symbol, start_date, end_date, lags=5):
     # Obtain stock information from Yahoo Finance
     ts = yf.Ticker(symbol)
     ts = ts.history(start=start_date, end=end_date, interval="1d")
-    print(ts)
     # ADD THIS LINE: Strip the timezone from the index
     ts.index = ts.index.tz_localize(None)
     
@@ -60,8 +60,9 @@ def create_lagged_series(symbol, start_date, end_date, lags=5):
 
 if __name__== "__main__":
     # Create a lagged series of the S&P500 US stock market index
-    snpret = create_lagged_series("^GSPC", datetime.datetime(2016,1,1), datetime.datetime(2025,12,31), lags=5 )
-    print(snpret)
+    snpret = create_lagged_series("^GSPC", datetime.datetime(2016,1,1), datetime.datetime(2026,1,10), lags=5 )
+    print(snpret.head(10))
+
     exit()
 
     # Use the prior two days of returns as predictor

@@ -373,9 +373,6 @@ void augmented_dickey_fuller_cointegration_test(const char * current_program_pat
     auto & data_frame1 = data_frame1_result.value();
     auto & data_frame2 = data_frame2_result.value();
 
-    cout << data_frame1 << endl;
-    cout << data_frame2 << endl;
-    
     auto timestamps = common_timestamps({data_frame1, data_frame2});
     
     auto close_1_result = data_frame1.copy(timestamps, "Close");
