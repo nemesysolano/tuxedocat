@@ -105,6 +105,7 @@ namespace timeseries::dataframe {
             TuxedoError set (const std::chrono::sys_seconds timestamp, const std::string & col_name, double value);
             TuxedoError set (const std::chrono::sys_seconds timestamp, const std::string && col_name, double value);
             
+            std::expected<DataFrame, TuxedoError> dropna();
             std::expected<size_t, TuxedoError> column_index(const std::string& col_name) const;
     
             const std::set<std::chrono::sys_seconds>& timestamps() const;

@@ -416,6 +416,60 @@ std::expected<DataFrame, TuxedoError> DataFrame::direction(const std::string & s
         return set(timestamp, col_name, value);
     }
 
+  std::expected<DataFrame, TuxedoError> DataFrame::dropna() {
+        size_t num_cols = this->cols();
+
+        std::vector<double> new_data;
+        std::map<std::chrono::sys_seconds, size_t> new_row_map;
+        std::set<std::chrono::sys_seconds> new_timestamps;
+
+        size_t new_row_idx = 0;
+
+        // Iterate over timestamps to guarantee the new timeline is chronologically sorted
+        for (const auto& ts : this->timestamps_) {
+            size_t old_r = this->timestamp_to_row_index_.at(ts);
+            
+            // 1. Inspect the row for any NaN values
+            bool has_nan = false;
+            for (size_t c = 0; c < num_cols; ++c) {
+                if (std::isnan(this->data_[old_r * num_cols + c])) {
+                    has_nan = true;
+                    break;
+                }
+            }
+            
+            // 2. If the row is clean, append it to the new data structure
+            if (!has_nan) {
+                for (size_t c = 0; c < num_cols; ++c) {
+                    new_data.push_back(this->data_[old_r * num_cols + c]);
+                }
+                
+                // Track the new metadata indices
+                new_timestamps.insert(ts);
+                new_row_map[ts] = new_row_idx;
+                new_row_idx++;
+            }
+        }
+
+        // 3. Reject operation if the resulting DataFrame is completely empty
+        if (new_row_idx == 0) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS); 
+        }
+
+        // 4. The column layout remains unchanged
+        std::map<std::string, size_t> new_col_map = this->column_name_to_column_index_;
+
+        // 5. Emit the newly filtered DataFrame
+        return DataFrame(
+            new_row_idx, 
+            num_cols, 
+            std::move(new_data), 
+            std::move(new_col_map), 
+            std::move(new_row_map), 
+            std::move(new_timestamps)
+        );
+    }
+
     const double * DataFrame::data_handle() const {
         return data_.data();
     }

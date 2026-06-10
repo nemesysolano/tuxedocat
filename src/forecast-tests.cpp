@@ -50,10 +50,18 @@ void created_lagged_timeseries_tests(const char * current_program_path) {
     }
 
     cout << lagged << endl;
-}
 
-/* 
-                Volume     Today      Lag1      Lag2      Lag3      Lag4      Lag5  Direction
+    auto lagged_without_nans_result = lagged.dropna();
+    assert(lagged_without_nans_result.has_value());
+    
+    auto & lagged_without_nans = lagged_without_nans_result.value();
+    cout << lagged_without_nans << endl;
+
+    /* Insert validation code underneath this comment 
+    `Today`, `Lag1`, `Lag2`, `Lag3`, `Lag4`, `Lag5` and `Direction` columns in `lagged_without_nans`
+    must match those table below:
+
+                    Volume     Today      Lag1      Lag2      Lag3      Lag4      Lag5  Direction
 Date                                                                                         
 2016-01-04  4304880000       NaN       NaN       NaN       NaN       NaN       NaN        NaN
 2016-01-05  3706620000  0.201223       NaN       NaN       NaN       NaN       NaN        1.0
@@ -65,5 +73,63 @@ Date
 2016-01-13  5087030000 -2.496545  0.780280  0.085327 -1.083837 -2.370044 -1.311540       -1.0
 2016-01-14  5241110000  1.669591 -2.496545  0.780280  0.085327 -1.083837 -2.370044        1.0
 2016-01-15  5468460000 -2.159910  1.669591 -2.496545  0.780280  0.085327 -1.083837       -1.0
-*/
+
+    */
+
+    // 1. Verify dropna() successfully stripped rows containing NaNs
+    assert((!lagged_without_nans["2016-01-04 00:00:00", "Today"].has_value()));
+    assert((!lagged_without_nans["2016-01-11 00:00:00", "Today"].has_value()));
+
+    // 2. Validation Helper against Expected Pandas Output
+    auto check_val = [&](const std::string& dt_str, const std::string& col, double expected) {
+        auto res = lagged_without_nans[dt_str, col];
+        assert(res.has_value());
+        double actual = res.value();
+        
+        if (std::isnan(expected)) {
+            assert(std::isnan(actual));
+        } else {
+            assert(std::abs(actual - expected) < 1e-4); // 4-decimal tolerance
+        }
+    };
+
+    // Yahoo Finance daily data typically defaults to midnight
+    std::string t12 = "2016-01-12 00:00:00";
+    std::string t13 = "2016-01-13 00:00:00";
+    std::string t14 = "2016-01-14 00:00:00";
+
+    // --- Assert 2016-01-12 ---
+    check_val(t12, "Volume", 4887260000.0);
+    check_val(t12, "Today", 0.780280);
+    check_val(t12, "Lag1", 0.085327);
+    check_val(t12, "Lag2", -1.083837);
+    check_val(t12, "Lag3", -2.370044);
+    check_val(t12, "Lag4", -1.311540);
+    check_val(t12, "Lag5", 0.201223);
+    check_val(t12, "Direction", 1.0);
+
+    // --- Assert 2016-01-13 ---
+    check_val(t13, "Volume", 5087030000.0);
+    check_val(t13, "Today", -2.496545);
+    check_val(t13, "Lag1", 0.780280);
+    check_val(t13, "Lag2", 0.085327);
+    check_val(t13, "Lag3", -1.083837);
+    check_val(t13, "Lag4", -2.370044);
+    check_val(t13, "Lag5", -1.311540);
+    check_val(t13, "Direction", -1.0);
+
+    // --- Assert 2016-01-14 ---
+    check_val(t14, "Volume", 5241110000.0);
+    check_val(t14, "Today", 1.669591);
+    check_val(t14, "Lag1", -2.496545);
+    check_val(t14, "Lag2", 0.780280);
+    check_val(t14, "Lag3", 0.085327);
+    check_val(t14, "Lag4", -1.083837);
+    check_val(t14, "Lag5", -2.370044);
+    check_val(t14, "Direction", 1.0);
+
+    cout << "[PASSED] created_lagged_timeseries_tests (dropna validation)" << endl;
+}
+
+
 #endif
