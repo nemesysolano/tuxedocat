@@ -230,34 +230,42 @@ std::expected<DataFrame, TuxedoError> DataFrame::shift(int count, double filler)
         return shift(count, NAN);
     }
 
-    std::expected<DataFrame, TuxedoError> DataFrame::pct_change() {
+    std::expected<DataFrame, TuxedoError> DataFrame::pct_change(size_t count) {
         size_t num_rows = this->rows();
         size_t num_cols = this->cols();
+
+        // 1. Boundary and Validity Checks
+        // count must be at least 1 (to compare to a past row) 
+        // and cannot exceed or equal the total number of rows.
+        if (count < 1 || count >= num_rows) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
 
         std::vector<double> new_data;
         new_data.reserve(num_rows * num_cols);
 
         for (size_t r = 0; r < num_rows; ++r) {
             for (size_t c = 0; c < num_cols; ++c) {
-                if (r == 0) {
-                    // The first row has no history to calculate a percentage change from
+                // 2. The dynamic offset window
+                if (r < count) {
+                    // Any row before the 'count' threshold has no history to look back at
                     new_data.push_back(std::nan(""));
                 } else {
-                    // Calculate flat array indices for current and previous rows
+                    // 3. Extract values using the offset
                     size_t current_index = r * num_cols + c;
-                    size_t prev_index = (r - 1) * num_cols + c;
+                    size_t prev_index = (r - count) * num_cols + c;
 
                     double current_val = this->data_[current_index];
                     double prev_val = this->data_[prev_index];
 
-                    // Standard Pandas calculation: (Current - Previous) / Previous
+                    // Calculate: (Current - Previous) / Previous
                     double pct = (current_val - prev_val) / prev_val;
                     new_data.push_back(pct);
                 }
             }
         }
 
-        // Timeline and metadata are completely untouched. 
+        // Timeline and metadata remain completely untouched
         std::map<std::string, size_t> new_col_map = this->column_name_to_column_index_;
         std::map<std::chrono::sys_seconds, size_t> new_row_map = this->timestamp_to_row_index_;
         std::set<std::chrono::sys_seconds> new_timestamps = this->timestamps_;
@@ -266,6 +274,53 @@ std::expected<DataFrame, TuxedoError> DataFrame::shift(int count, double filler)
         return DataFrame(
             num_rows, 
             num_cols, 
+            std::move(new_data), 
+            std::move(new_col_map), 
+            std::move(new_row_map), 
+            std::move(new_timestamps)
+        );
+    }
+
+std::expected<DataFrame, TuxedoError> DataFrame::direction(const std::string & source_column_name, const std::string & target_column_name) {
+        // 1. Validate that the source column exists
+        auto src_it = this->column_name_to_column_index_.find(source_column_name);
+        if (src_it == this->column_name_to_column_index_.end()) {
+            return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+        }
+        
+        size_t src_col_idx = src_it->second;
+        size_t num_rows = this->rows();
+        size_t num_cols = this->cols();
+
+        // 2. We are building a single-column DataFrame
+        std::vector<double> new_data;
+        new_data.reserve(num_rows);
+        new_data.push_back(NAN);
+
+        for (size_t r = 1; r < num_rows; ++r) {
+            double val = this->data_[r * num_cols + src_col_idx] - this->data_[(r - 1) * num_cols  + src_col_idx];
+            
+             if (val > 0.0) {
+                new_data.push_back(1.0);
+            } else if (val < 0.0) {
+                new_data.push_back(-1.0);
+            } else {
+                new_data.push_back(0.0);
+            }
+        }
+
+        // 3. Setup the new metadata structure for the 1-column DataFrame
+        std::map<std::string, size_t> new_col_map;
+        new_col_map[target_column_name] = 0;
+
+        // 4. The timeline remains completely untouched
+        std::map<std::chrono::sys_seconds, size_t> new_row_map = this->timestamp_to_row_index_;
+        std::set<std::chrono::sys_seconds> new_timestamps = this->timestamps_;
+
+        // 5. Emit the newly calculated DataFrame
+        return DataFrame(
+            num_rows, 
+            1, 
             std::move(new_data), 
             std::move(new_col_map), 
             std::move(new_row_map), 
@@ -559,12 +614,4 @@ std::ostream & operator<< (std::ostream & out, DataFrame & df) {
     }
 }
 
-/* 
-
-timestamp       Volume     Today      Lag1      Lag2      Lag3      Lag4      Lag5  Direction
-2025-12-23  3820560000  0.455039  0.643650  0.881806  0.793426 -1.159214 -0.238392        1.0
-2025-12-24  1798270000  0.322148  0.455039  0.643650  0.881806  0.793426 -1.159214        1.0
-2025-12-26  2586550000 -0.030436  0.322148  0.455039  0.643650  0.881806  0.793426       -1.0
-2025-12-29  3541750000 -0.349205 -0.030436  0.322148  0.455039  0.643650  0.881806       -1.0
-2025-12-30  3309930000 -0.137567 -0.349205 -0.030436  0.322148  0.455039  0.643650       -1.0
-*/
+ 

@@ -22,7 +22,7 @@ using namespace std;
 int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
-    /**
+    /**/
     evaluate_test();
     evaluate_reversed_test();
     mac_kinnon_p_test();
@@ -68,8 +68,7 @@ int main(int argc, char* argv[]) {
     copy_column_test();
     shift_test();
     pct_change_test();
-    append_column_test();
-    */
+    append_column_test();    
     created_lagged_timeseries_tests(argv[0]);
     return 0;
 }

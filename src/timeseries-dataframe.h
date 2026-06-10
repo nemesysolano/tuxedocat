@@ -78,7 +78,20 @@ namespace timeseries::dataframe {
 
             std::expected<DataFrame, TuxedoError> shift(int count, double filler);
             std::expected<DataFrame, TuxedoError> shift(int count);
-            std::expected<DataFrame, TuxedoError> pct_change();
+
+            std::expected<DataFrame, TuxedoError> pct_change(size_t count);            
+            inline std::expected<DataFrame, TuxedoError> pct_change() { return pct_change(1);}
+            
+            std::expected<DataFrame, TuxedoError> direction(const std::string & source_column_name, const std::string & target_column_name);            
+            inline std::expected<DataFrame, TuxedoError> direction(const std::string && source_column_name, const std::string && target_column_name) {
+                return direction(source_column_name, target_column_name);
+            }
+            inline std::expected<DataFrame, TuxedoError> direction(const std::string & source_column_name, const std::string && target_column_name) {
+                return direction(source_column_name, target_column_name);
+            }
+            inline std::expected<DataFrame, TuxedoError> direction(const std::string && source_column_name, const std::string & target_column_name) {
+                return direction(source_column_name, target_column_name);
+            }
 
             std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;             
             std::expected<double, TuxedoError> operator[](std::chrono::sys_seconds timestamp, const std::string & col_name) const;  
@@ -87,6 +100,7 @@ namespace timeseries::dataframe {
             inline std::expected<double, TuxedoError> operator[](const std::string && timestamp, const std::string & col_name) const { return operator[](timestamp, col_name); }
             inline std::expected<double, TuxedoError> operator[](const std::string & timestamp, const std::string && col_name) const { return operator[](timestamp, col_name); }
             inline std::expected<double, TuxedoError> operator[](const std::string && timestamp, const std::string && col_name) const { return operator[](timestamp, col_name); }
+            
             
             inline TuxedoError set (size_t row, size_t col, double value) {
                 if (row >= this->rows() || col >= this->cols()) {
