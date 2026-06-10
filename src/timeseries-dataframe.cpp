@@ -5,6 +5,7 @@
 #include <algorithm> // <-- Required for std::set_intersection
 #include <iterator>  // <-- Required for std::inserter
 #include <cmath>
+using namespace std;
 
 namespace timeseries::dataframe {
     
@@ -384,6 +385,35 @@ std::expected<DataFrame, TuxedoError> DataFrame::direction(const std::string & s
         // Calculate the index in the 1D data vector
         size_t index = row * this->cols() + col;
         return data_[index];
+    }
+
+    TuxedoError DataFrame::set (size_t row, size_t col, double value) {
+        if (row >= this->rows() || col >= this->cols()) {
+            return TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS;
+        }
+        // Calculate the index in the 1D data vector        
+        size_t index = row * this->cols() + col;
+        this->data_[index] = value;
+        // cout << __FUNCTION__ << ' ' << __LINE__ << ' ' << this->data_[index] << ' ' << value << endl;
+        return TuxedoError::NO_ERROR;
+    }
+
+    TuxedoError DataFrame::set(const std::chrono::sys_seconds timestamp, const std::string & col_name, double value) {
+        auto row_it = timestamp_to_row_index_.find(timestamp);
+        if (row_it == timestamp_to_row_index_.end()) {
+            return TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS;
+        }
+
+        auto col_it = column_name_to_column_index_.find(col_name);
+        if (col_it == column_name_to_column_index_.end()) {
+            return TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS;
+        }
+
+        return set(row_it->second, col_it->second, value);
+    }
+
+    TuxedoError DataFrame::set(const std::chrono::sys_seconds timestamp, const std::string && col_name, double value) {
+        return set(timestamp, col_name, value);
     }
 
     const double * DataFrame::data_handle() const {

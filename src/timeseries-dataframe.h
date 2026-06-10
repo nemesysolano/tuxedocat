@@ -101,17 +101,10 @@ namespace timeseries::dataframe {
             inline std::expected<double, TuxedoError> operator[](const std::string & timestamp, const std::string && col_name) const { return operator[](timestamp, col_name); }
             inline std::expected<double, TuxedoError> operator[](const std::string && timestamp, const std::string && col_name) const { return operator[](timestamp, col_name); }
             
+            TuxedoError set (size_t row, size_t col, double value);
+            TuxedoError set (const std::chrono::sys_seconds timestamp, const std::string & col_name, double value);
+            TuxedoError set (const std::chrono::sys_seconds timestamp, const std::string && col_name, double value);
             
-            inline TuxedoError set (size_t row, size_t col, double value) {
-                if (row >= this->rows() || col >= this->cols()) {
-                    return TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS;
-                }
-                // Calculate the index in the 1D data vector
-                size_t index = row * this->cols() + col;
-                this->data_[index] = value;
-                return TuxedoError::NO_ERROR;
-            }
-
             std::expected<size_t, TuxedoError> column_index(const std::string& col_name) const;
     
             const std::set<std::chrono::sys_seconds>& timestamps() const;

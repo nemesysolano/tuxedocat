@@ -8,8 +8,10 @@
 using namespace std;
 using namespace timeseries::dataframe;
 using namespace forecast;
+using namespace std::chrono;
 
 void created_lagged_timeseries_tests(const char * current_program_path) {
+    const size_t lags = 5;
     std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
     std::string file_path = (exe_path / "^GSPC.csv").string();
     
@@ -19,15 +21,35 @@ void created_lagged_timeseries_tests(const char * current_program_path) {
     auto dataframe_result = DataFrame::Create(input_stream);
     assert(dataframe_result.has_value());
     auto & df = dataframe_result.value();
-    cout << df << endl;
 
-    auto lagged_result = created_lagged_timeseries(df, "Volume", "Close", 5);
+    auto lagged_result = created_lagged_timeseries(df, "Volume", "Close", lags);
     assert(lagged_result.has_value());
     auto & lagged = lagged_result.value();
+    vector<string> lag_names;
+
+    lag_names.push_back("Today");
+    for (size_t i = 0; i < lags; ++i) {
+        lag_names.push_back("Lag" + to_string(i + 1));
+    }
+
+    for (const auto& timestamp : lagged.timestamps()) {
+        for(const auto & lag_name : lag_names) {
+            auto cell_result = lagged[timestamp, lag_name];
+            assert(cell_result.has_value());
+            double cell = cell_result.value();
+            
+            // 1. Use the standard C++ NaN check
+            if(!std::isnan(cell)) {
+                double pct = cell * 100.0;
+                
+                // 2. Extract the mutation from the assert macro
+                TuxedoError err = lagged.set(timestamp, lag_name, pct);
+                assert(err == TuxedoError::NO_ERROR);
+            }
+        }
+    }
+
     cout << lagged << endl;
-
-    
-
 }
 
 /* 
