@@ -260,7 +260,7 @@ std::expected<DataFrame, TuxedoError> DataFrame::shift(int count, double filler)
                     double prev_val = this->data_[prev_index];
 
                     // Calculate: (Current - Previous) / Previous
-                    double pct = (current_val - prev_val) / prev_val;
+                    double pct = (current_val - prev_val) / (prev_val + 1e-10); // Avoid division by zero
                     new_data.push_back(pct);
                 }
             }
@@ -282,7 +282,69 @@ std::expected<DataFrame, TuxedoError> DataFrame::shift(int count, double filler)
         );
     }
 
-std::expected<DataFrame, TuxedoError> DataFrame::direction(const std::string & source_column_name, const std::string & target_column_name) {
+    std::expected<DataFrame, TuxedoError> DataFrame::log_change(size_t periods) {
+        size_t num_cols = this->cols();
+        size_t num_rows = this->rows();
+
+        if (num_rows <= periods) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        std::vector<double> new_data;
+        new_data.reserve(num_rows * num_cols);
+
+        // 1. First 'periods' rows will inherently be NaN since there is no sufficient lookback
+        for (size_t r = 0; r < periods; ++r) {
+            for (size_t c = 0; c < num_cols; ++c) {
+                new_data.push_back(std::nan(""));
+            }
+        }
+
+        // 2. Iterate chronologically over timestamps
+        auto ts_it = this->timestamps_.begin();
+        auto prev_ts_it = this->timestamps_.begin();
+        std::advance(ts_it, periods);
+
+        for (; ts_it != this->timestamps_.end(); ++ts_it, ++prev_ts_it) {
+            size_t curr_r = this->timestamp_to_row_index_.at(*ts_it);
+            size_t prev_r = this->timestamp_to_row_index_.at(*prev_ts_it);
+
+            for (size_t c = 0; c < num_cols; ++c) {
+                double curr_val = this->data_[curr_r * num_cols + c];
+                double prev_val = this->data_[prev_r * num_cols + c];
+                
+                // Ensure mathematical safety: guard against NaNs and non-positive domain limits
+                if (std::isnan(curr_val) || std::isnan(prev_val) || prev_val <= 0.0 || curr_val <= 0.0) {
+                    new_data.push_back(std::nan(""));
+                } else {
+                    new_data.push_back(std::log(curr_val / (prev_val + 1e-10)));
+                }
+            }
+        }
+
+        // 3. Metadata cloning (shape, timestamps, and mapping remain identical)
+        std::map<std::string, size_t> new_col_map = this->column_name_to_column_index_;
+        
+        // Rebuild row map in linear order for the new data array
+        std::map<std::chrono::sys_seconds, size_t> new_row_map;
+        std::set<std::chrono::sys_seconds> new_timestamps = this->timestamps_;
+        
+        size_t new_idx = 0;
+        for (const auto& ts : new_timestamps) {
+            new_row_map[ts] = new_idx++;
+        }
+
+        return DataFrame(
+            num_rows, 
+            num_cols, 
+            std::move(new_data), 
+            std::move(new_col_map), 
+            std::move(new_row_map), 
+            std::move(new_timestamps)
+        );
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::direction(const std::string & source_column_name, const std::string & target_column_name) {
         // 1. Validate that the source column exists
         auto src_it = this->column_name_to_column_index_.find(source_column_name);
         if (src_it == this->column_name_to_column_index_.end()) {
@@ -611,6 +673,32 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
         return timestamps_;
     }
 
+    std::expected<slice::Slice2D, TuxedoError> DataFrame::slice(size_t start_row, size_t end_row) {
+        // 1. Boundary Checks
+        if (start_row >= end_row || end_row > this->rows()) {
+            return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+        }
+
+        // 2. Calculate offsets
+        // We calculate the start pointer in the underlying vector
+        size_t row_count = end_row - start_row;
+        size_t cols = this->cols();
+        
+        // Ensure data_ is not empty if accessing
+        if (this->data_.empty()) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        // 3. Construct the slice
+        // Assuming Slice2D constructor takes (pointer, rows, cols, stride/data_handle)
+        // or equivalent to establish the view. 
+        // We use the underlying data_ pointer offset by the start row.
+        double* start_ptr = const_cast<double*>(this->data_.data() + (start_row * cols));
+        
+        // Return the Slice2D view
+        return slice::Slice2D(start_ptr, row_count, cols);
+    }
+
 // 2. Implement the common_timestamps intersection logic
     std::set<std::chrono::sys_seconds> common_timestamps(std::list<std::reference_wrapper<const DataFrame>> data_frames) {
         std::set<std::chrono::sys_seconds> result;
@@ -648,7 +736,8 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
         return result;
     }
 
-std::ostream & operator<< (std::ostream & out, DataFrame & df) {
+
+    std::ostream & operator<< (std::ostream & out, DataFrame & df) {
         // 1. Reconstruct the ordered column names based on their physical index
         std::vector<std::string> ordered_cols(df.cols());
         for (const auto& [name, idx] : df.column_name_to_column_index_) {

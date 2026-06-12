@@ -43,14 +43,14 @@ namespace forecast
         }
 
         auto & today = today_result.value();
-        auto today_pct_change_result = today.pct_change(1);
-        if (!today_pct_change_result)
+        auto today_log_change_result = today.log_change(1);
+        if (!today_log_change_result)
         {
-            return std::unexpected(today_pct_change_result.error());
+            return std::unexpected(today_log_change_result.error());
         }
 
-        auto & today_pct_change = today_pct_change_result.value();
-        tslag.append_column(today_pct_change, {"Today"}, {"Today"});
+        auto & today_log_change = today_log_change_result.value();
+        tslag.append_column(today_log_change, {"Today"}, {"Today"});
 
 
         /*
@@ -67,15 +67,15 @@ namespace forecast
         std::vector<string> target_column(1);
         for (size_t i = 0; i < lags; i++)
         {
-            auto price_column_pct_change_result = price_column.pct_change( 1);
-            if (!price_column_pct_change_result)
+            auto price_column_log_change_result = price_column.log_change( 1);
+            if (!price_column_log_change_result)
             {
-                return std::unexpected(price_column_pct_change_result.error());
+                return std::unexpected(price_column_log_change_result.error());
             }
-            auto & price_column_pct_change = price_column_pct_change_result.value();
+            auto & price_column_log_change = price_column_log_change_result.value();
 
             target_column[0] = "Lag" + std::to_string(i + 1);
-            auto lagged_result = price_column_pct_change.shift(i + 1);
+            auto lagged_result = price_column_log_change.shift(i + 1);
             if (!lagged_result)
             {
                 return std::unexpected(lagged_result.error());
@@ -94,23 +94,6 @@ namespace forecast
         auto & direction = direction_result.value();
         tslag.append_column(direction, "Direction", "Direction");
         
-
-        /* 
-        
-                Volume     Today      Lag1      Lag2      Lag3      Lag4      Lag5  Direction
-Date                                                                                         
-2016-01-04  4304880000       NaN       NaN       NaN       NaN       NaN       NaN        NaN
-2016-01-05  3706620000  0.201223       NaN       NaN       NaN       NaN       NaN        1.0
-2016-01-06  4336660000 -1.311540  0.201223       NaN       NaN       NaN       NaN       -1.0
-2016-01-07  5076590000 -2.370044 -1.311540  0.201223       NaN       NaN       NaN       -1.0
-2016-01-08  4664940000 -1.083837 -2.370044 -1.311540  0.201223       NaN       NaN       -1.0
-2016-01-11  4607290000  0.085327 -1.083837 -2.370044 -1.311540  0.201223       NaN        1.0
-2016-01-12  4887260000  0.780280  0.085327 -1.083837 -2.370044 -1.311540  0.201223        1.0
-2016-01-13  5087030000 -2.496545  0.780280  0.085327 -1.083837 -2.370044 -1.311540       -1.0
-2016-01-14  5241110000  1.669591 -2.496545  0.780280  0.085327 -1.083837 -2.370044        1.0
-2016-01-15  5468460000 -2.159910  1.669591 -2.496545  0.780280  0.085327 -1.083837       -1.0
-
-        */
         return tslag;
     }
 
@@ -129,4 +112,33 @@ Date
         return created_lagged_timeseries(source, static_cast<const std::string &>(volume_column_name), static_cast<const std::string &>(price_column_name), lags);
     }
 
+    std::expected<DataFrame, TuxedoError> get_nth_momentum(DataFrame & source, const std::string  & price_column_name, size_t momentum) {
+        // 1. Strict Boundary Validations
+        if (!source.column_index(price_column_name).has_value()) {
+            return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);        
+        } 
+        
+        // A momentum window of 0 is mathematically meaningless (ln(P/P) = 0).
+        // The total rows must be strictly greater than the momentum lookback.
+        if (momentum == 0 || source.rows() <= momentum) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);        
+        }
+
+        // 2. Isolate the price column and rename it to reflect the feature
+        std::string feature_name = "Momentum_" + std::to_string(momentum);
+        auto price_slice_result = source.copy({price_column_name}, {feature_name});
+        
+        if (!price_slice_result) {
+            return std::unexpected(price_slice_result.error());
+        }
+
+        // 3. Leverage the previously built `log_change` method.
+        // log_change(M) inherently computes ln(P_t / P_{t-M}), which is perfectly 
+        // time-additive and acts as our aggregated horizon feature.
+        return price_slice_result.value().log_change(momentum);
+    }
+
+    std::expected<DataFrame, TuxedoError> get_nth_momentum(DataFrame & source, const std::string && price_column_name, size_t momentum) {
+        return get_nth_momentum(source, static_cast<const std::string &>(price_column_name), momentum);
+    }
 }

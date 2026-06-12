@@ -82,6 +82,9 @@ namespace timeseries::dataframe {
             std::expected<DataFrame, TuxedoError> pct_change(size_t count);            
             inline std::expected<DataFrame, TuxedoError> pct_change() { return pct_change(1);}
             
+            std::expected<DataFrame, TuxedoError> log_change(size_t count);            
+            inline std::expected<DataFrame, TuxedoError> log_change() { return log_change(1);}
+
             std::expected<DataFrame, TuxedoError> direction(const std::string & source_column_name, const std::string & target_column_name);            
             inline std::expected<DataFrame, TuxedoError> direction(const std::string && source_column_name, const std::string && target_column_name) {
                 return direction(source_column_name, target_column_name);
@@ -109,6 +112,21 @@ namespace timeseries::dataframe {
             std::expected<size_t, TuxedoError> column_index(const std::string& col_name) const;
     
             const std::set<std::chrono::sys_seconds>& timestamps() const;
+            
+            std::expected<slice::Slice2D, TuxedoError>  slice(
+                size_t start_row, /* inclusive */
+                size_t end_row /* exclusive */
+            ); // returns rows in `[start_row, end_row)` range
+            
+            inline std::expected<slice::Slice2D, TuxedoError> slice_from(size_t start_row) {
+                // Range [start_row, this->rows())
+                return slice(start_row, this->rows());
+            }
+
+            inline std::expected<slice::Slice2D, TuxedoError> slice_to(size_t end_row) {
+                // Range [0, end_row)
+                return slice(0, end_row);
+            }
 
             friend std::ostream & operator << (std::ostream & out, DataFrame & df);
             virtual ~DataFrame();

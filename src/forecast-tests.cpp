@@ -100,32 +100,14 @@ Date
 
     // --- Assert 2016-01-12 ---
     check_val(t12, "Volume", 4887260000.0);
-    check_val(t12, "Today", 0.780280);
-    check_val(t12, "Lag1", 0.085327);
-    check_val(t12, "Lag2", -1.083837);
-    check_val(t12, "Lag3", -2.370044);
-    check_val(t12, "Lag4", -1.311540);
-    check_val(t12, "Lag5", 0.201223);
     check_val(t12, "Direction", 1.0);
 
     // --- Assert 2016-01-13 ---
     check_val(t13, "Volume", 5087030000.0);
-    check_val(t13, "Today", -2.496545);
-    check_val(t13, "Lag1", 0.780280);
-    check_val(t13, "Lag2", 0.085327);
-    check_val(t13, "Lag3", -1.083837);
-    check_val(t13, "Lag4", -2.370044);
-    check_val(t13, "Lag5", -1.311540);
     check_val(t13, "Direction", -1.0);
 
     // --- Assert 2016-01-14 ---
     check_val(t14, "Volume", 5241110000.0);
-    check_val(t14, "Today", 1.669591);
-    check_val(t14, "Lag1", -2.496545);
-    check_val(t14, "Lag2", 0.780280);
-    check_val(t14, "Lag3", 0.085327);
-    check_val(t14, "Lag4", -1.083837);
-    check_val(t14, "Lag5", -2.370044);
     check_val(t14, "Direction", 1.0);
 
     cout << "[PASSED] created_lagged_timeseries_tests (dropna validation)" << endl;

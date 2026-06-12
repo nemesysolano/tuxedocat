@@ -1,6 +1,8 @@
 #include "slice.h"
 #include <expected>
 #include <Eigen/Dense>
+#include <iomanip>
+using namespace std;
 
 std::ostream & operator << (std::ostream & out, const std::span<const double> & v) {
     out << '[';
@@ -223,4 +225,35 @@ namespace slice {
     std::expected<MutableSlice2D, TuxedoError> column_slice2d(const Span2D & source_span, size_t start, size_t end); /* extact from `start` to `end -1` */
 
 
+    std::ostream & operator << (std::ostream & out, const Span2D & span) {
+        if (span.empty()) return out;
+
+        auto old_precision = out.precision();
+        auto old_flags = out.flags();
+        out << std::fixed << std::setprecision(6);
+
+        // Header
+        out << '|';
+        for (size_t j = 0; j < span.cols(); ++j) {
+            out << std::setw(10) << j << '|';
+        }
+        out << endl << '|';
+        for (size_t j = 0; j < span.cols(); ++j) {
+            out << "----------|";
+        }
+        out << endl;
+
+        // Data
+        for (size_t i = 0; i < span.rows(); ++i) {
+            out << '|';
+            for (size_t j = 0; j < span.cols(); ++j) {
+                out << std::setw(10) << span[i, j].value() << '|';
+            }
+            out << endl;
+        }
+
+        out.precision(old_precision);
+        out.flags(old_flags);
+        return out;
+    }
 }

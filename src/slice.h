@@ -14,7 +14,8 @@
     for (size_t i = 0; i < matrix_span.extent(0); ++i) { \
         std::cout << row_span(matrix_span, i) << std::endl; \
     }
-std::ostream & operator << (std::ostream & out, const std::span<const double> & v);
+    
+// std::ostream & operator << (std::ostream & out, const std::span<const double> & v);
 
 namespace slice {  
     class Span2D {
@@ -30,6 +31,8 @@ namespace slice {
             bool empty() const { return rows_ == 0 || cols_ == 0; }
             virtual ~Span2D();
     };
+
+    std::ostream & operator << (std::ostream & out, const Span2D & span);
 
     class EmptySpan2D: public Span2D {
         public:

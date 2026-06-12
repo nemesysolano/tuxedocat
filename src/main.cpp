@@ -16,6 +16,8 @@
 #include "timeseries-dataframe-tests.h"
 #include "ols-tests.h"
 #include "forecast-tests.h"
+#include "timeseries-classifiers-tests.h"
+
 using namespace std;
 
 
@@ -70,6 +72,9 @@ int main(int argc, char* argv[]) {
     pct_change_test();
     append_column_test();    
     created_lagged_timeseries_tests(argv[0]);
+    print_binary_confusion_matrix_test();
+    logistic_regression_daily_timeframe_test(argv[0]);
+    logistic_regression_different_time_frames_test(argv[0]);
     return 0;
 }
 #endif
