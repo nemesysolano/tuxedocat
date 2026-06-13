@@ -80,6 +80,27 @@ namespace slice {
             const double * data_handle() const override;
     };
 
+    class RowSpan : public Span2D {
+        private:
+            Span2D & data_;
+            size_t target_row_;
+            size_t start_col_;
+            RowSpan(Span2D & data, size_t target_row, size_t start_col, size_t end_col)
+                : Span2D(1, end_col - start_col), data_(data), target_row_(target_row), start_col_(start_col) {}
+
+        public:
+            inline static std::expected<RowSpan, TuxedoError> Create(Span2D & data, size_t target_row, size_t start_col, size_t end_col) {
+                // Now strictly validates the target row alongside the column boundaries
+                if (target_row >= data.rows() || start_col >= data.cols() || end_col > data.cols() || start_col >= end_col) {
+                    return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS) ;
+                }
+                return RowSpan(data, target_row, start_col, end_col);
+            }
+            std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
+            const double * data_handle() const override;
+    };
+
+
     class MutableSlice2DCell {
         private:
             double & data_;
@@ -104,6 +125,10 @@ namespace slice {
             
             std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
             virtual std::expected<MutableSlice2DCell, TuxedoError> operator[](size_t row, size_t col);
+
+            std::expected<std::reference_wrapper<MutableSlice2D>, TuxedoError> operator += (const slice::Span2D & rhs);
+            std::expected<std::reference_wrapper<MutableSlice2D>, TuxedoError> operator += (const slice::Span2D && rhs);
+
             const double * data_handle() const override;
             inline double * mutable_data_handle() { return data_.data(); }
             virtual ~MutableSlice2D();
@@ -150,9 +175,14 @@ namespace slice {
     std::expected<MutableSlice2D, TuxedoError> outer_product(const Span2D & A, const Span2D && B);
     std::expected<MutableSlice2D, TuxedoError> outer_product(const Span2D && A, const Span2D && B);
 
-    std::expected<MutableSlice2D, TuxedoError> covariance(const Span2D & A, const Span2D & B);
-    std::expected<MutableSlice2D, TuxedoError> covariance(const Span2D && A, const Span2D & B);
-    std::expected<MutableSlice2D, TuxedoError> covariance(const Span2D & A, const Span2D && B);
-    std::expected<MutableSlice2D, TuxedoError> covariance(const Span2D && A, const Span2D && B);
+    std::expected<std::vector<MutableSlice2D>, TuxedoError> covariances(
+        const Span2D & X, // (M×N)
+        const Span2D & μ // (Nx1)
+    ); /* returns a list of covariances calculated as ${(X[0]-μ)⋅(X[0]-μ)^T,...,(X[M-1]-μ)⋅(X[0]-μ)^T}$ 
+        where $X[i]$ is the i-eth row of $Xs$
+    */
+    std::expected<std::vector<MutableSlice2D>, TuxedoError> covariances(const Span2D && X, const Span2D & μ);
+    std::expected<std::vector<MutableSlice2D>, TuxedoError>  covariances(const Span2D & X, const Span2D && μ);
+    std::expected<std::vector<MutableSlice2D>, TuxedoError>  covariances(const Span2D && X, const Span2D && μ);
 }
 #endif // __SLICE_H

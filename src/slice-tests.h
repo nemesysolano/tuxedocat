@@ -10,5 +10,6 @@ void slice_operations_tests();
 void matrix_multiplication_test();
 void transpose_test();
 void outer_product_test();
+void covariances_test();
 #endif
 #endif

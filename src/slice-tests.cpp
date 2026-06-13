@@ -368,4 +368,68 @@ void outer_product_test() {
 
     std::cout << "outer_product_test passed." << std::endl;
 }
+
+void covariances_test() {
+    // 1. Setup X Feature Matrix: M=2 days, N=3 timeframes
+    // Day 0: [1.0, 2.0, 3.0]
+    // Day 1: [4.0, 5.0, 6.0]
+    std::vector<double> X_data = {
+        1.0, 2.0, 3.0, 
+        4.0, 5.0, 6.0
+    };
+    slice::Slice2D X(std::span<double>(X_data), 2, 3);
+
+    // 2. Setup Mean Vector μ: (Nx1) column vector
+    // Let's set it perfectly equal to Day 0. 
+    std::vector<double> mu_data = {1.0, 2.0, 3.0};
+    slice::Slice2D mu(std::span<double>(mu_data), 3, 1);
+
+    // 3. Test Successful Execution
+    auto result_exp = slice::covariances(X, mu);
+    assert(result_exp.has_value());
+    auto & cov_matrices = result_exp.value();
+
+    // Verify exactly M matrices were produced
+    assert(cov_matrices.size() == 2);
+
+    // 4. Verify Day 0 Covariance
+    // Deviation is (Day 0 - μ) = [0.0, 0.0, 0.0]
+    // Outer product must be a 3x3 matrix of purely 0.0s
+    auto & cov0 = cov_matrices[0];
+    assert(cov0.rows() == 3 && cov0.cols() == 3);
+    for (size_t i = 0; i < 3; ++i) {
+        for (size_t j = 0; j < 3; ++j) {
+            assert(std::abs(cov0[i, j].value() - 0.0) < 1e-6);
+        }
+    }
+
+    // 5. Verify Day 1 Covariance
+    // Deviation is (Day 1 - μ) = [3.0, 3.0, 3.0]
+    // Outer product: [3, 3, 3]^T * [3, 3, 3] must be a 3x3 matrix of purely 9.0s
+    auto & cov1 = cov_matrices[1];
+    assert(cov1.rows() == 3 && cov1.cols() == 3);
+    for (size_t i = 0; i < 3; ++i) {
+        for (size_t j = 0; j < 3; ++j) {
+            assert(std::abs(cov1[i, j].value() - 9.0) < 1e-6);
+        }
+    }
+
+    // 6. Test Guard Rails: Mismatched Length
+    // μ is only 2x1, while X expects 3 features
+    std::vector<double> short_mu_data = {1.0, 2.0};
+    slice::Slice2D short_mu(std::span<double>(short_mu_data), 2, 1);
+    
+    auto err_len = slice::covariances(X, short_mu);
+    assert(!err_len.has_value());
+    assert(err_len.error() == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+
+    // 7. Test Guard Rails: Row Vector passed instead of Column Vector
+    // μ is 1x3, which breaks the geometric contract.
+    slice::Slice2D row_mu(std::span<double>(mu_data), 1, 3);
+    auto err_shape = slice::covariances(X, row_mu);
+    assert(!err_shape.has_value());
+    assert(err_shape.error() == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+
+    std::cout << "covariances_test passed." << std::endl;
+}
 #endif

@@ -19,7 +19,7 @@ std::ostream & operator << (std::ostream & out, const std::span<const double> & 
 }
 
 namespace slice {
-    MutableSlice2D operator - (const Span2D & self, const Span2D & other){
+MutableSlice2D operator - (const Span2D & self, const Span2D & other){
         auto min_cols = std::min(self.cols(), other.cols());
         auto min_rows = std::min(self.rows(), other.rows());
         MutableSlice2D result(min_rows, min_cols);
@@ -31,22 +31,17 @@ namespace slice {
                 auto o = other[i, j];
                 if(cell.has_value() && s.has_value() && o.has_value()){
                     cell.value() = self[i, j].value() - other[i, j].value();
-                }
+                    }
                 
             }
         }
         return result;
     }
-    
-    MutableSlice2D operator - (const Span2D && self, const Span2D & other) {
-        return self - other;
-    }
-    MutableSlice2D operator - (const Span2D & self, const Span2D && other) {
-        return self - other;
-    }
-    MutableSlice2D operator - (const Span2D && self, const Span2D && other) {
-        return self - other;
-    }
+
+    // Apply the exact same correction pattern to your rvalue overloads
+    MutableSlice2D operator - (const Span2D && self, const Span2D & other) { return self - other; }
+    MutableSlice2D operator - (const Span2D & self, const Span2D && other) { return self - other; }
+    MutableSlice2D operator - (const Span2D && self, const Span2D && other) { return self - other; }
 
     MutableSlice2D & substract (MutableSlice2D & c, const Span2D & a, const Span2D & b) {
         auto min_cols = std::min(a.cols(), std::min(b.cols(), c.cols()));
@@ -180,6 +175,19 @@ namespace slice {
         return data_.data_handle(); 
     }
 
+    std::expected<double, TuxedoError> RowSpan::operator[](size_t row, size_t col) const {
+        // cols_ is now exactly (end_col - start_col) thanks to the new inheritance
+        if(col >= cols_ || row != 0) {
+            return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+        }
+        // Dynamically fetch from the requested target row
+        return data_[start_col_ + col, target_row_];
+    }
+    const double * RowSpan::data_handle() const {
+        return data_.data_handle(); 
+    }
+
+
     std::expected<double, TuxedoError> MutableSlice2D::operator[](size_t row, size_t col) const {
         if(row >= rows_ || col >= cols_) {
             return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
@@ -194,6 +202,39 @@ namespace slice {
         }
         return MutableSlice2DCell(*(data_.data()+(row * cols_ + col)));
 
+    }
+
+std::expected<std::reference_wrapper<MutableSlice2D>, TuxedoError> MutableSlice2D::operator += (const Span2D & other) {
+        // 1. Strict Dimension Validation
+        if (this->rows() != other.rows() || this->cols() != other.cols()) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        // 2. Element-wise accumulation using safe proxy cell wrappers
+        for (size_t i = 0; i < this->rows(); ++i) {
+            for (size_t j = 0; j < this->cols(); ++j) {
+                auto current_cell = (*this)[i, j];
+                auto other_val = other[i, j];
+
+                if (current_cell.has_value() && other_val.has_value()) {
+                    // Accumulate directly into the proxy cell assignment reference
+                    current_cell.value() = current_cell.value() + other_val.value();
+                } else {
+                    // Propagate a boundary check failure or data gap safely
+                    if (current_cell.has_value()) {
+                        current_cell.value() = std::nan("");
+                    }
+                }
+            }
+        }
+
+        // 3. Return a reference wrapper to self on success
+        return std::ref(*this);
+    }
+
+    // Sibling for rvalue reference handling
+    std::expected<std::reference_wrapper<MutableSlice2D>, TuxedoError> MutableSlice2D::operator += (const Span2D && other) {
+        return *this += other;
     }
 
     const double * MutableSlice2D::data_handle() const { 
@@ -300,19 +341,24 @@ namespace slice {
     std::expected<MutableSlice2D, TuxedoError> operator * (const Span2D && A, const Span2D && B) { return A * B; }
 
     std::expected<MutableSlice2D, TuxedoError> transpose(const Span2D & A) {
+        // 1. Initialize the destination matrix with swapped dimensions
         MutableSlice2D result(A.cols(), A.rows());
         if (A.empty()) return result;
 
-        const double* src = A.data_handle();
-        if (src) {
-            // Explicitly use Eigen::RowMajor for both Maps
-            Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> 
-                src_mat(src, A.rows(), A.cols());
-            
-            Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> 
-                dst_mat(result.mutable_data_handle(), result.rows(), result.cols());
-            
-            dst_mat = src_mat.transpose();
+        // 2. Safe element-by-element traversal via proxy accessors
+        for (size_t i = 0; i < A.rows(); ++i) {
+            for (size_t j = 0; j < A.cols(); ++j) {
+                auto val = A[i, j];
+                auto target = result[j, i]; // Notice coordinates are inverted: (i,j) -> (j,i)
+                
+                if (val.has_value() && target.has_value()) {
+                    target.value() = val.value();
+                } else {
+                    if (target.has_value()) {
+                        target.value() = std::nan("");
+                    }
+                }
+            }
         }
         return result;
     }
@@ -348,4 +394,62 @@ namespace slice {
     std::expected<MutableSlice2D, TuxedoError> outer_product(const Span2D && A, const Span2D && B) {
         return outer_product(A, B);
     }
+
+    std::expected<std::vector<MutableSlice2D>, TuxedoError> covariances(
+        const Span2D & X, 
+        const Span2D & μ 
+    ) {
+        size_t M = X.rows();
+        size_t N = X.cols();
+
+        // 1. Validation
+        if (M == 0 || N == 0 || μ.rows() != N || μ.cols() != 1) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        std::vector<MutableSlice2D> result;
+        result.reserve(M);
+
+        for (size_t i = 0; i < M; ++i) {
+            // 2. Safe, Explicit extraction: x_i is an (N x 1) Column Vector
+            MutableSlice2D x_i(N, 1);
+            for (size_t j = 0; j < N; ++j) {
+                auto val = X[i, j];
+                if (!val.has_value()) {
+                    return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+                }
+                x_i[j, 0].value() = val.value();
+            }
+
+            // 3. Row-Major Deviation Computation: (N x 1) - (N x 1)
+            auto dev_col = x_i - μ;
+
+            // 4. Generate the corresponding Transposed Row Vector: (1 x N)
+            auto dev_row_exp = transpose(dev_col);
+            if (!dev_row_exp) return std::unexpected(dev_row_exp.error());
+            auto & dev_row = dev_row_exp.value();
+
+            // 5. Outer Product calculation: (N x 1) * (1 x N) = (N x N)
+            auto cov_exp = outer_product(dev_col, dev_row);
+            if (!cov_exp) return std::unexpected(cov_exp.error());
+
+            result.push_back(std::move(cov_exp.value()));
+        }
+
+        return result;
+    }
+
+    // Siblings for rvalue/lvalue combinations
+    std::expected<std::vector<MutableSlice2D>, TuxedoError> covariances(const Span2D && X, const Span2D & μ) {
+        return covariances(X, μ);
+    }
+
+    std::expected<std::vector<MutableSlice2D>, TuxedoError> covariances(const Span2D & X, const Span2D && μ) {
+        return covariances(X, μ);
+    }
+
+    std::expected<std::vector<MutableSlice2D>, TuxedoError> covariances(const Span2D && X, const Span2D && μ) {
+        return covariances(X, μ);
+    }
 }
+

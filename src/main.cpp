@@ -80,6 +80,7 @@ int main(int argc, char* argv[]) {
     matrix_multiplication_test() ;
     transpose_test();
     outer_product_test();
+    covariances_test();
     return 0;
 }
 #endif

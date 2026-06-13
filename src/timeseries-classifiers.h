@@ -97,8 +97,9 @@ namespace timeseries::classifiers {
 
     class DirectionalAverage {
         private:
-            slice::MutableSlice2D avg_; // The resulting $μ^+$ or $ μ^-$ must have (Nx1) shape
+            slice::MutableSlice2D μ_; // The resulting $μ^+$ or $ μ^-$ must have (Nx1) shape
             slice::MutableSlice2D X_; // Rows from original $X$ with the same direction of resulting $μ^+$ or $ μ^-$ 
+            slice::MutableSlice2D σ_; //Within-class scatter: How spread out is the data within its own class
         public:
             DirectionalAverage(DirectionalAverage&&) = default;
             DirectionalAverage& operator=(DirectionalAverage&&) = default;
@@ -107,12 +108,15 @@ namespace timeseries::classifiers {
             DirectionalAverage& operator=(const DirectionalAverage&) = delete;
 
             inline DirectionalAverage(
-                slice::MutableSlice2D avg,
-                slice::MutableSlice2D X
-            ): avg_(avg), X_(X) {}
+                slice::MutableSlice2D μ,
+                slice::MutableSlice2D X,
+                slice::MutableSlice2D σ
+            ): μ_(μ), X_(X), σ_(σ) {}
 
-            inline const slice::Span2D & avg() const { return avg_; }
+            inline const slice::Span2D & μ() const { return μ_; }
             inline const slice::Span2D & X() const { return X_; }
+            inline const slice::Span2D & σ() const { return σ_; }
+
 
             ~DirectionalAverage() {
             }

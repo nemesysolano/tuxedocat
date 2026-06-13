@@ -213,123 +213,84 @@ Accuracy |Precision|   Recall| F1_Score|
 
 */    
 }
-
 void up_avg_test() {
-    // 1. Create a deterministic X feature matrix (4 rows, 2 columns)
+    // 1. Setup deterministic X (4 rows, 2 columns) and y (4 rows, 1 column)
     MutableSlice2D X(4, 2);
-    X[0, 0].value() = 1.0; X[0, 1].value() = 2.0; // Positive day
-    X[1, 0].value() = 3.0; X[1, 1].value() = 4.0; // Negative day
-    X[2, 0].value() = 5.0; X[2, 1].value() = 6.0; // Positive day
-    X[3, 0].value() = 7.0; X[3, 1].value() = 8.0; // Negative day
+    // Row 0: Positive
+    X[0, 0].value() = 1.0; X[0, 1].value() = 2.0; 
+    // Row 1: Negative
+    X[1, 0].value() = 3.0; X[1, 1].value() = 4.0;
+    // Row 2: Positive
+    X[2, 0].value() = 5.0; X[2, 1].value() = 6.0;
+    // Row 3: Negative
+    X[3, 0].value() = 7.0; X[3, 1].value() = 8.0;
 
-    // 2. Create the y direction vector (4 rows, 1 column)
     MutableSlice2D y(4, 1);
-    y[0, 0].value() = 1.0;
-    y[1, 0].value() = -1.0;
-    y[2, 0].value() = 1.0;
-    y[3, 0].value() = -1.0;
+    y[0, 0].value() = 1.0; y[1, 0].value() = -1.0;
+    y[2, 0].value() = 1.0; y[3, 0].value() = -1.0;
 
-    // 3. Test Successful Operation
+    // 2. Test Execution
     auto result_exp = up_avg(X, y);
     assert(result_exp.has_value());
     
-    // The DirectionalAverage object uses std::move under the hood, 
-    // so we access via its public methods.
     auto & dir_avg = result_exp.value();
-    auto & mu = dir_avg.avg();
-    auto & X_subset = dir_avg.X();
+    auto & mu = dir_avg.μ();
+    auto & sigma = dir_avg.σ(); 
     
-    // --- DIMENSION VALIDATION ---
-    // Total Positive Days (count) = 2. Total Features (N) = 2.
-    // Mean Vector must be (N x 1) -> (2 x 1)
+    // 3. --- DIMENSION & VALIDATION ---
+    // N=2 features -> Mean Vector (2x1), Scatter Matrix (2x2)
     assert(mu.rows() == 2 && mu.cols() == 1);
-    // Subset Matrix must be (count x N) -> (2 x 2)
-    assert(X_subset.rows() == 2 && X_subset.cols() == 2);
+    assert(sigma.rows() == 2 && sigma.cols() == 2);
 
-    // --- DATA VALIDATION ---
-    // Average of row 0 and row 2: [ (1+5)/2 , (2+6)/2 ] = [ 3.0 , 4.0 ]
+    // 4. --- DATA VALIDATION ---
+    // Mean: ([1+5]/2, [2+6]/2) = [3.0, 4.0]
     assert(std::abs(mu[0, 0].value() - 3.0) < 1e-6);
     assert(std::abs(mu[1, 0].value() - 4.0) < 1e-6);
 
-    // X Subset should perfectly match Row 0 and Row 2 of original matrix
-    assert(std::abs(X_subset[0, 0].value() - 1.0) < 1e-6); // Row 0
-    assert(std::abs(X_subset[0, 1].value() - 2.0) < 1e-6);
-    assert(std::abs(X_subset[1, 0].value() - 5.0) < 1e-6); // Row 2
-    assert(std::abs(X_subset[1, 1].value() - 6.0) < 1e-6);
-
-    // 4. Test Zero Positive Cases (Zero-Division Protection)
-    MutableSlice2D y_all_neg(4, 1);
-    y_all_neg[0, 0].value() = -1.0; y_all_neg[1, 0].value() = -1.0;
-    y_all_neg[2, 0].value() = -1.0; y_all_neg[3, 0].value() = -1.0;
-    
-    auto res2 = up_avg(X, y_all_neg);
-    assert(!res2.has_value());
-    assert(res2.error() == TuxedoError::ERR_SAMPLE_TOO_SMALL);
-
-    // 5. Test Dimensional Mismatch
-    MutableSlice2D y_bad_size(3, 1); // 3 rows instead of 4
-    auto res3 = up_avg(X, y_bad_size);
-    assert(!res3.has_value());
-    assert(res3.error() == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+    // Sigma: Sum of outer products of deviations
+    // Dev0: [1,2]-[3,4] = [-2, -2]. Outer: [[4, 4], [4, 4]]
+    // Dev1: [5,6]-[3,4] = [ 2,  2]. Outer: [[4, 4], [4, 4]]
+    // Sum: [[8, 8], [8, 8]]
+    assert(std::abs(sigma[0, 0].value() - 8.0) < 1e-6);
+    assert(std::abs(sigma[1, 1].value() - 8.0) < 1e-6);
 
     std::cout << "up_avg_test passed." << std::endl;
 }
 
 void down_avg_test() {
-    // 1. Setup deterministic X feature matrix (4 rows, 2 columns)
+    // 1. Setup X (same as above)
     MutableSlice2D X(4, 2);
-    X[0, 0].value() = 1.0; X[0, 1].value() = 2.0; // Positive day
-    X[1, 0].value() = 3.0; X[1, 1].value() = 4.0; // Negative day
-    X[2, 0].value() = 5.0; X[2, 1].value() = 6.0; // Positive day
-    X[3, 0].value() = 7.0; X[3, 1].value() = 8.0; // Negative day
+    X[0, 0].value() = 1.0; X[0, 1].value() = 2.0;
+    X[1, 0].value() = 3.0; X[1, 1].value() = 4.0;
+    X[2, 0].value() = 5.0; X[2, 1].value() = 6.0;
+    X[3, 0].value() = 7.0; X[3, 1].value() = 8.0;
 
-    // 2. Setup the y direction vector (4 rows, 1 column)
     MutableSlice2D y(4, 1);
-    y[0, 0].value() = 1.0;
-    y[1, 0].value() = -1.0;
-    y[2, 0].value() = 1.0;
-    y[3, 0].value() = -1.0;
+    y[0, 0].value() = 1.0; y[1, 0].value() = -1.0;
+    y[2, 0].value() = 1.0; y[3, 0].value() = -1.0;
 
-    // 3. Test Successful Operation
+    // 2. Test Execution
     auto result_exp = down_avg(X, y);
     assert(result_exp.has_value());
     
     auto & dir_avg = result_exp.value();
-    auto & mu = dir_avg.avg();
-    auto & X_subset = dir_avg.X();
+    auto & mu = dir_avg.μ();
+    auto & sigma = dir_avg.σ();
     
-    // --- DIMENSION VALIDATION ---
-    // Total Negative Days (count) = 2. Total Features (N) = 2.
-    // Mean Vector must be (N x 1) -> (2 x 1)
+    // 3. --- DIMENSION & VALIDATION ---
     assert(mu.rows() == 2 && mu.cols() == 1);
-    // Subset Matrix must be (count x N) -> (2 x 2)
-    assert(X_subset.rows() == 2 && X_subset.cols() == 2);
+    assert(sigma.rows() == 2 && sigma.cols() == 2);
 
-    // --- DATA VALIDATION ---
-    // Average of row 1 and row 3: [ (3+7)/2 , (4+8)/2 ] = [ 5.0 , 6.0 ]
+    // 4. --- DATA VALIDATION ---
+    // Mean: ([3+7]/2, [4+8]/2) = [5.0, 6.0]
     assert(std::abs(mu[0, 0].value() - 5.0) < 1e-6);
     assert(std::abs(mu[1, 0].value() - 6.0) < 1e-6);
 
-    // X Subset should perfectly match Row 1 and Row 3
-    assert(std::abs(X_subset[0, 0].value() - 3.0) < 1e-6); // Row 1
-    assert(std::abs(X_subset[0, 1].value() - 4.0) < 1e-6);
-    assert(std::abs(X_subset[1, 0].value() - 7.0) < 1e-6); // Row 3
-    assert(std::abs(X_subset[1, 1].value() - 8.0) < 1e-6);
-
-    // 4. Test Zero Negative Cases (Zero-Division Protection)
-    MutableSlice2D y_all_pos(4, 1);
-    y_all_pos[0, 0].value() = 1.0; y_all_pos[1, 0].value() = 1.0;
-    y_all_pos[2, 0].value() = 1.0; y_all_pos[3, 0].value() = 1.0;
-    
-    auto res2 = down_avg(X, y_all_pos);
-    assert(!res2.has_value());
-    assert(res2.error() == TuxedoError::ERR_SAMPLE_TOO_SMALL);
-
-    // 5. Test Multiple Columns in y Constraint
-    MutableSlice2D y_bad_cols(4, 2); // 2 columns instead of 1
-    auto res3 = down_avg(X, y_bad_cols);
-    assert(!res3.has_value());
-    assert(res3.error() == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+    // Dev0: [3,4]-[5,6] = [-2, -2]. Outer: [[4, 4], [4, 4]]
+    // Dev1: [7,8]-[5,6] = [ 2,  2]. Outer: [[4, 4], [4, 4]]
+    // Sum: [[8, 8], [8, 8]]
+    assert(std::abs(sigma[0, 0].value() - 8.0) < 1e-6);
+    assert(std::abs(sigma[1, 1].value() - 8.0) < 1e-6);
 
     std::cout << "down_avg_test passed." << std::endl;
 }

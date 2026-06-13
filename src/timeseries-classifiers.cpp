@@ -246,20 +246,28 @@ namespace timeseries::classifiers {
                 subset_row++;
             }
         }
-
+        
         // 5. Divide sum by N^+ to get the mean
         for (size_t j = 0; j < N; ++j) {
             μ_up[j, 0].value() /= static_cast<double>(count);
         }
 
-        // Package and return using std::move to prevent heavy copying
-        return DirectionalAverage(std::move(μ_up), std::move(X_subset));
+        auto σ_ups_result = slice::covariances(X_subset, μ_up);
+        if (!σ_ups_result) return std::unexpected(σ_ups_result.error());
+        auto & σ_ups = σ_ups_result.value();
+        slice::MutableSlice2D σ_ups_sum(σ_ups[0].rows(), σ_ups[0].cols());
+
+        for(size_t i = 0; i < σ_ups.size(); i++) {
+            σ_ups_sum += σ_ups[i];
+        }
+        
+        return DirectionalAverage(std::move(μ_up), std::move(X_subset), std::move(σ_ups_sum));
     }
 
     std::expected<DirectionalAverage, TuxedoError> down_avg(
         const slice::Span2D & X, 
         const slice::Span2D & y                
-    ) { 
+    ) {
         // 1. Validation
         if(X.rows() != y.rows() || y.cols() != 1 || X.rows() == 0) { 
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
@@ -312,7 +320,17 @@ namespace timeseries::classifiers {
             μ_down[j, 0].value() /= static_cast<double>(count);
         }
 
-        return DirectionalAverage(std::move(μ_down), std::move(X_subset));
+        auto σ_downs_result = slice::covariances(X_subset, μ_down);
+        if (!σ_downs_result) return std::unexpected(σ_downs_result.error());
+        auto & σ_ups = σ_downs_result.value();
+        slice::MutableSlice2D σ_downs_sum(σ_ups[0].rows(), σ_ups[0].cols());
+
+        for(size_t i = 0; i < σ_ups.size(); i++) {
+            σ_downs_sum += σ_ups[i];
+        }
+        
+
+        return DirectionalAverage(std::move(μ_down), std::move(X_subset), std::move(σ_downs_sum));
     }
  
 }
