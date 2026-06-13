@@ -74,5 +74,61 @@ namespace timeseries::classifiers {
                
             }
     };
+
+    class LinearDiscriminant /*Analysis*/: public BinaryClassifier {
+        public:
+            std::expected<slice::MutableSlice2D, TuxedoError> predict(
+                const slice::Span2D & X // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+            ) override; // returns (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
+
+            std::expected<BinaryConfusionMatrix, TuxedoError> confusion_matrix(
+                const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+                const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
+            ) override;
+
+            static std::expected<std::unique_ptr<LogisticRegression>, TuxedoError> Create(
+                const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+                const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
+            );
+    
+        ~LinearDiscriminant() {}
+    
+    };
+
+    class DirectionalAverage {
+        private:
+            slice::MutableSlice2D avg_; // The resulting $μ^+$ or $ μ^-$ must have (Nx1) shape
+            slice::MutableSlice2D X_; // Rows from original $X$ with the same direction of resulting $μ^+$ or $ μ^-$ 
+        public:
+            DirectionalAverage(DirectionalAverage&&) = default;
+            DirectionalAverage& operator=(DirectionalAverage&&) = default;
+
+            DirectionalAverage(const DirectionalAverage&) = delete;
+            DirectionalAverage& operator=(const DirectionalAverage&) = delete;
+
+            inline DirectionalAverage(
+                slice::MutableSlice2D avg,
+                slice::MutableSlice2D X
+            ): avg_(avg), X_(X) {}
+
+            inline const slice::Span2D & avg() const { return avg_; }
+            inline const slice::Span2D & X() const { return X_; }
+
+            ~DirectionalAverage() {
+            }
+    };
+
+    std::expected<DirectionalAverage, TuxedoError> up_avg(
+        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+        const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
+    ); // Calculates average vector for positive days. The resulting μ^+ must have (Nx1) shape
+    
+    std::expected<DirectionalAverage, TuxedoError> down_avg(
+        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+        const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                        
+    ); // Calculates average vector for negative days. The resulting μ^- must have (Nx1) shape.
+
+    
+    
 }
 #endif

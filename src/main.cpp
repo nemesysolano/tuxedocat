@@ -75,6 +75,11 @@ int main(int argc, char* argv[]) {
     print_binary_confusion_matrix_test();
     logistic_regression_daily_timeframe_test(argv[0]);
     logistic_regression_different_time_frames_test(argv[0]);
+    up_avg_test();
+    down_avg_test();
+    matrix_multiplication_test() ;
+    transpose_test();
+    outer_product_test();
     return 0;
 }
 #endif

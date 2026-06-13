@@ -87,6 +87,10 @@ namespace slice {
             MutableSlice2DCell(double & data): data_(data){}
             inline operator double() const { return data_; }
             inline MutableSlice2DCell & operator=(double value) { data_ = value; return *this; }
+            inline MutableSlice2DCell & operator += (double value) { data_ += value; return *this; }
+            inline MutableSlice2DCell & operator -= (double value) { data_ -= value; return *this; }
+            inline MutableSlice2DCell & operator *= (double value) { data_ *= value; return *this; }
+            inline MutableSlice2DCell & operator /= (double value) { data_ /= value; return *this; }
     };
    
     class MutableSlice2D: public Span2D {
@@ -96,6 +100,8 @@ namespace slice {
             // 1. Constructor
             MutableSlice2D(const std::vector<double> & source, size_t rows, size_t cols): Span2D(rows, cols), data_(source) {}
             MutableSlice2D(size_t rows, size_t cols): Span2D(rows, cols), data_(rows * cols, 0.0) {}
+            MutableSlice2D(std::vector<double> && source, size_t rows, size_t cols): Span2D(rows, cols), data_(std::move(source)) {}
+            
             std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
             virtual std::expected<MutableSlice2DCell, TuxedoError> operator[](size_t row, size_t col);
             const double * data_handle() const override;
@@ -131,6 +137,22 @@ namespace slice {
     MutableSlice2D operator * (double scalar, const Span2D && other);
     MutableSlice2D operator * (const Span2D && other, double scalar);
 
+    std::expected<MutableSlice2D, TuxedoError> operator * (const Span2D & A, const Span2D & B);
+    std::expected<MutableSlice2D, TuxedoError> operator * (const Span2D && A, const Span2D & B);
+    std::expected<MutableSlice2D, TuxedoError> operator * (const Span2D & A, const Span2D && B);
+    std::expected<MutableSlice2D, TuxedoError> operator * (const Span2D && A, const Span2D && B);
 
+    std::expected<MutableSlice2D, TuxedoError> transpose(const Span2D & A);
+    std::expected<MutableSlice2D, TuxedoError> transpose(const Span2D && A);
+
+    std::expected<MutableSlice2D, TuxedoError> outer_product(const Span2D & A, const Span2D & B);
+    std::expected<MutableSlice2D, TuxedoError> outer_product(const Span2D && A, const Span2D & B);
+    std::expected<MutableSlice2D, TuxedoError> outer_product(const Span2D & A, const Span2D && B);
+    std::expected<MutableSlice2D, TuxedoError> outer_product(const Span2D && A, const Span2D && B);
+
+    std::expected<MutableSlice2D, TuxedoError> covariance(const Span2D & A, const Span2D & B);
+    std::expected<MutableSlice2D, TuxedoError> covariance(const Span2D && A, const Span2D & B);
+    std::expected<MutableSlice2D, TuxedoError> covariance(const Span2D & A, const Span2D && B);
+    std::expected<MutableSlice2D, TuxedoError> covariance(const Span2D && A, const Span2D && B);
 }
 #endif // __SLICE_H

@@ -2,6 +2,7 @@
 #include <expected>
 #include <Eigen/Dense>
 #include <iomanip>
+#include "tuxedo-error.h"
 using namespace std;
 
 std::ostream & operator << (std::ostream & out, const std::span<const double> & v) {
@@ -255,5 +256,96 @@ namespace slice {
         out.precision(old_precision);
         out.flags(old_flags);
         return out;
+    }
+
+
+    std::expected<MutableSlice2D, TuxedoError> operator * (const Span2D & A, const Span2D & B) {
+        // Validation: Inner dimensions must match (A.cols == B.rows)
+        if (A.cols() != B.rows()) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        MutableSlice2D result(A.rows(), B.cols());
+
+        // Naive O(N^3) multiplication using safe Span2D accessors
+        for (size_t i = 0; i < A.rows(); ++i) {
+            for (size_t j = 0; j < B.cols(); ++j) {
+                double sum = 0.0;
+                bool valid = true;
+
+                for (size_t k = 0; k < A.cols(); ++k) {
+                    auto a_val = A[i, k];
+                    auto b_val = B[k, j];
+                    
+                    if (a_val.has_value() && b_val.has_value()) {
+                        sum += a_val.value() * b_val.value();
+                    } else {
+                        valid = false;
+                        break; // Stop accumulating if a cell is unreadable
+                    }
+                }
+                
+                auto target = result[i, j];
+                if (target.has_value()) {
+                    target.value() = valid ? sum : std::nan("");
+                }
+            }
+        }
+        return result; // Implicitly converts to std::expected
+    }
+
+    // Siblings for Matrix x Matrix rvalue/lvalue combinations
+    std::expected<MutableSlice2D, TuxedoError> operator * (const Span2D && A, const Span2D & B) { return A * B; }
+    std::expected<MutableSlice2D, TuxedoError> operator * (const Span2D & A, const Span2D && B) { return A * B; }
+    std::expected<MutableSlice2D, TuxedoError> operator * (const Span2D && A, const Span2D && B) { return A * B; }
+
+    std::expected<MutableSlice2D, TuxedoError> transpose(const Span2D & A) {
+        MutableSlice2D result(A.cols(), A.rows());
+        if (A.empty()) return result;
+
+        const double* src = A.data_handle();
+        if (src) {
+            // Explicitly use Eigen::RowMajor for both Maps
+            Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> 
+                src_mat(src, A.rows(), A.cols());
+            
+            Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> 
+                dst_mat(result.mutable_data_handle(), result.rows(), result.cols());
+            
+            dst_mat = src_mat.transpose();
+        }
+        return result;
+    }
+
+    std::expected<MutableSlice2D, TuxedoError> transpose(const Span2D && A) {
+        return transpose(A);
+    }
+
+
+    std::expected<MutableSlice2D, TuxedoError> outer_product(const Span2D & A, const Span2D & B) {
+        bool is_col_row = (A.cols() == 1 && B.rows() == 1 && A.rows() == B.cols());
+        bool is_row_col = (A.rows() == 1 && B.cols() == 1 && A.cols() == B.rows());
+
+        if (!is_col_row && !is_row_col) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);        
+        }
+
+        // Since we already overloaded operator*, we just delegate to it!
+        // Guarantee the (M x 1) column vector is always on the left for the outer product
+        if (is_col_row) {
+            return A * B;
+        } else {
+            return B * A;
+        }
+    }
+
+    std::expected<MutableSlice2D, TuxedoError> outer_product(const Span2D && A, const Span2D & B) {
+        return outer_product(A, B);
+    }
+    std::expected<MutableSlice2D, TuxedoError> outer_product(const Span2D & A, const Span2D && B) {
+        return outer_product(A, B);
+    }
+    std::expected<MutableSlice2D, TuxedoError> outer_product(const Span2D && A, const Span2D && B) {
+        return outer_product(A, B);
     }
 }

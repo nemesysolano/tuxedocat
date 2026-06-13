@@ -1,4 +1,4 @@
-# Log Return instead vs Pct Change #
+# Logistic Regression (Log Return instead vs Pct Change) #
 
 Yes, absolutely. In fact, transitioning from simple percentage changes to log returns—also known as continuously compounded returns—is a standard best practice in quantitative finance, especially when expanding lookback windows to 20 or 30 days.
 
@@ -54,3 +54,82 @@ If you modify your predict function to return the actual probability p instead o
 - Stay in Cash: If $0.45 ≤ p ≤0.55$
 
 By filtering out the low-confidence predictions (where the model is essentially flipping a coin), you will likely see your precision and overall backtest Sharpe ratio climb significantly, trading slightly less frequently but with a much higher win rate.
+
+
+# Linear Discriminant Analysis (LDA) #
+
+Switching from Logistic Regression to **Linear Discriminant Analysis (LDA)** is a fantastic architectural pivot, especially in quantitative finance. While Logistic Regression is a *discriminative* model (it only cares about finding the boundary between classes), LDA is a *generative* model. It tries to understand the actual distribution of the data in each class before drawing a line between them.
+
+Here is a breakdown of how LDA works, the mathematical intuition, and its core formulae.
+
+## The Core Intuition of LDA
+
+Imagine you have a scatter plot of your 5-day momentum features. The positive return days are mixed in with the negative return days. LDA tries to find a new axis (a 1D line) to project this data onto so that two things happen simultaneously:
+
+1. **Maximize the Distance Between Means:** The center of the "Positive Days" cluster should be as far away as possible from the center of the "Negative Days" cluster.
+2. **Minimize the Scatter Within Classes:** The points within the "Positive Days" cluster should be grouped as tightly together as possible (low variance), and the same for the negative days.
+
+This is known as the **Fisher Criterion**. By doing both, you minimize the overlap between the two classes.
+
+---
+
+## The Mathematics and Formulae
+
+Assume you have a dataset with $N$ total samples, split into two classes: Class 1 ($C_1$, Positive Returns) and Class 2 ($C_2$, Negative Returns). Your feature matrix $X$ has $d$ dimensions (e.g., your momentum horizons).
+
+### Step 1: Calculate Class Means
+
+First, find the average vector for each class.
+
+
+$$\mu_1 = \frac{1}{N_1} \sum_{x \in C_1} x$$
+
+$$\mu_2 = \frac{1}{N_2} \sum_{x \in C_2} x$$
+
+### Step 2: Calculate Within-Class Scatter ($S_W$)
+
+How spread out is the data within its own class? We calculate the scatter matrix (which is proportional to the covariance matrix) for each class and sum them.
+
+
+$$S_1 = \sum_{x \in C_1} (x - \mu_1)(x - \mu_1)^T$$
+
+$$S_2 = \sum_{x \in C_2} (x - \mu_2)(x - \mu_2)^T$$
+
+$$S_W = S_1 + S_2$$
+
+### Step 3: Calculate Between-Class Scatter ($S_B$)
+
+How far apart are the two class means? This is represented by the outer product of the difference between the mean vectors.
+
+
+$$S_B = (\mu_1 - \mu_2)(\mu_1 - \mu_2)^T$$
+
+### Step 4: Maximize the Fisher Criterion
+
+We are looking for a projection vector $w$ (our coefficients) that maximizes the ratio of between-class scatter to within-class scatter. The objective function is:
+
+
+$$J(w) = \frac{w^T S_B w}{w^T S_W w}$$
+
+### Step 5: The Optimal Solution (The Weights)
+
+Using calculus and linear algebra (specifically solving the generalized eigenvalue problem), the optimal projection vector $w$ that maximizes $J(w)$ has a beautifully simple closed-form solution:
+
+
+$$w \propto S_W^{-1} (\mu_1 - \mu_2)$$
+
+This is your model! $S_W^{-1}$ is the inverse of the within-class scatter matrix, and $(\mu_1 - \mu_2)$ is the vector pointing from one mean to the other.
+
+Once you calculate $w$, predicting a new day's direction is just a dot product: $z = w^T x$. If $z$ is greater than a certain threshold, you classify it as positive.
+
+---
+
+## LDA vs. Logistic Regression for Trading
+
+* **No Iterations Required:** Unlike Logistic Regression which requires the IRLS algorithm to loop 10 times to find the weights, LDA is a closed-form analytical solution. It is just matrix multiplication and one matrix inversion ($S_W^{-1}$). It runs infinitely faster, which is great for high-frequency backtesting.
+* **The Normality Assumption:** LDA strictly assumes that your features are Normally Distributed (Gaussian) and that both classes share the exact same covariance matrix (Homoscedasticity). Because you are now using **log returns** (which are highly symmetric and normally distributed), LDA is practically tailor-made for your current dataset.
+
+To help solidify the geometric intuition behind the math, here is an interactive visualization of how the projection angle affects the Fisher Criterion.
+
+
+

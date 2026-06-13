@@ -217,4 +217,155 @@ void slice_operations_tests() {
 
     std::cout << "  Passed slice_operations_tests (Operators + 3-Param Named Functions exhaustive)." << std::endl;
 }
+
+void matrix_multiplication_test() {
+    // 1. Setup two test matrices: A (2x3) and B (3x2)
+    // A = [[1, 2, 3], [4, 5, 6]]
+    // B = [[7, 8], [9, 10], [11, 12]]
+    std::vector<double> dataA = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
+    std::vector<double> dataB = {7.0, 8.0, 9.0, 10.0, 11.0, 12.0};
+    
+    slice::Slice2D A(std::span<double>(dataA), 2, 3);
+    slice::Slice2D B(std::span<double>(dataB), 3, 2);
+
+    // Expected Result C = A * B
+    // C[0,0] = 1*7 + 2*9 + 3*11 = 7 + 18 + 33 = 58
+    // C[0,1] = 1*8 + 2*10 + 3*12 = 8 + 20 + 36 = 64
+    // C[1,0] = 4*7 + 5*9 + 6*11 = 28 + 45 + 66 = 139
+    // C[1,1] = 4*8 + 5*10 + 6*12 = 32 + 50 + 72 = 154
+
+    // 2. Test successful multiplication
+    auto res = A * B;
+    assert(res.has_value());
+    auto & C = res.value();
+    assert(C.rows() == 2 && C.cols() == 2);
+    assert(std::abs(C[0, 0].value() - 58.0) < 1e-6);
+    assert(std::abs(C[0, 1].value() - 64.0) < 1e-6);
+    assert(std::abs(C[1, 0].value() - 139.0) < 1e-6);
+    assert(std::abs(C[1, 1].value() - 154.0) < 1e-6);
+
+    // 3. Test dimension mismatch (2x3 * 2x3 should fail)
+    auto fail_res = A * A; 
+    assert(!fail_res.has_value());
+    assert(fail_res.error() == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+
+    // 4. Test NaN propagation
+    // Create matrix with a NaN
+    std::vector<double> data_nan = {1.0, std::nan(""), 3.0, 4.0, 5.0, 6.0};
+    slice::Slice2D A_nan(std::span<double>(data_nan), 2, 3);
+    auto nan_res = A_nan * B;
+    assert(nan_res.has_value());
+    assert(std::isnan(nan_res.value()[0, 0].value()));
+
+    std::cout << "matrix_multiplication_test passed." << std::endl;
+}
+
+void transpose_test() {
+    // 1. Setup a 2x3 matrix:
+    // [[1.0, 2.0, 3.0], 
+    //  [4.0, 5.0, 6.0]]
+    std::vector<double> data = {1.0, 2.0, 3.0, 4.0, 5.0, 6.0};
+    slice::Slice2D A(std::span<double>(data), 2, 3);
+
+    // 2. Transpose (Should be 3x2)
+    // [[1.0, 4.0], 
+    //  [2.0, 5.0], 
+    //  [3.0, 6.0]]
+    auto res = slice::transpose(A);
+    assert(res.has_value());
+    auto & T = res.value();
+
+    // 3. Verify Dimensions
+    assert(T.rows() == 3);
+    assert(T.cols() == 2);
+
+    // 4. Verify Data mapping
+    assert(std::abs(T[0, 0].value() - 1.0) < 1e-6);
+    assert(std::abs(T[0, 1].value() - 4.0) < 1e-6);
+    assert(std::abs(T[1, 0].value() - 2.0) < 1e-6);
+    assert(std::abs(T[1, 1].value() - 5.0) < 1e-6);
+    assert(std::abs(T[2, 0].value() - 3.0) < 1e-6);
+    assert(std::abs(T[2, 1].value() - 6.0) < 1e-6);
+
+    // 5. Test identity: Transpose of Transpose should be A
+    auto res2 = slice::transpose(T);
+    assert(res2.has_value());
+    auto & T2 = res2.value();
+    
+    for (size_t i = 0; i < A.rows(); ++i) {
+        for (size_t j = 0; j < A.cols(); ++j) {
+            assert(std::abs(T2[i, j].value() - A[i, j].value()) < 1e-6);
+        }
+    }
+
+    std::cout << "transpose_test passed." << std::endl;
+}
+
+void outer_product_test() {
+    // 1. Setup Data
+    // Column Vector A (3x1): [1.0, 2.0, 3.0]^T
+    std::vector<double> dataA = {1.0, 2.0, 3.0};
+    slice::Slice2D col_vec(std::span<double>(dataA), 3, 1);
+    
+    // Row Vector B (1x3): [4.0, 5.0, 6.0]
+    std::vector<double> dataB = {4.0, 5.0, 6.0};
+    slice::Slice2D row_vec(std::span<double>(dataB), 1, 3);
+
+    // Expected Result:
+    // [[ 1*4, 1*5, 1*6 ],   [[  4.0,  5.0,  6.0 ],
+    //  [ 2*4, 2*5, 2*6 ], =  [  8.0, 10.0, 12.0 ],
+    //  [ 3*4, 3*5, 3*6 ]]    [ 12.0, 15.0, 18.0 ]]
+
+    // 2. Test Standard Order: Col x Row
+    auto res1 = slice::outer_product(col_vec, row_vec);
+    assert(res1.has_value());
+    auto & M1 = res1.value();
+    
+    assert(M1.rows() == 3 && M1.cols() == 3);
+    assert(std::abs(M1[0, 0].value() - 4.0) < 1e-6);
+    assert(std::abs(M1[0, 1].value() - 5.0) < 1e-6);
+    assert(std::abs(M1[0, 2].value() - 6.0) < 1e-6);
+    assert(std::abs(M1[1, 0].value() - 8.0) < 1e-6);
+    assert(std::abs(M1[1, 1].value() - 10.0) < 1e-6);
+    assert(std::abs(M1[1, 2].value() - 12.0) < 1e-6);
+    assert(std::abs(M1[2, 0].value() - 12.0) < 1e-6);
+    assert(std::abs(M1[2, 1].value() - 15.0) < 1e-6);
+    assert(std::abs(M1[2, 2].value() - 18.0) < 1e-6);
+
+    // 3. Test Argument Reversal: Row x Col
+    // The mathematical outer product operation should gracefully flip this 
+    // to yield the exact same M x M result matrix, avoiding a 1x1 dot product.
+    auto res2 = slice::outer_product(row_vec, col_vec);
+    assert(res2.has_value());
+    auto & M2 = res2.value();
+    
+    assert(M2.rows() == 3 && M2.cols() == 3);
+    for (size_t i = 0; i < 3; ++i) {
+        for (size_t j = 0; j < 3; ++j) {
+            assert(std::abs(M1[i, j].value() - M2[i, j].value()) < 1e-6);
+        }
+    }
+
+    // 4. Test Invalid Shapes
+    // Two Column Vectors (3x1 and 3x1)
+    auto fail_col_col = slice::outer_product(col_vec, col_vec);
+    assert(!fail_col_col.has_value());
+    assert(fail_col_col.error() == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+
+    // Mismatched lengths (3x1 and 1x2)
+    std::vector<double> dataC = {1.0, 2.0};
+    slice::Slice2D short_row(std::span<double>(dataC), 1, 2);
+    auto fail_mismatch = slice::outer_product(col_vec, short_row);
+    assert(!fail_mismatch.has_value());
+    assert(fail_mismatch.error() == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+
+    // Full Matrices (2x2 and 2x2)
+    std::vector<double> mat_data = {1.0, 2.0, 3.0, 4.0};
+    slice::Slice2D mat(std::span<double>(mat_data), 2, 2);
+    auto fail_mat = slice::outer_product(mat, mat);
+    assert(!fail_mat.has_value());
+    assert(fail_mat.error() == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+
+    std::cout << "outer_product_test passed." << std::endl;
+}
 #endif

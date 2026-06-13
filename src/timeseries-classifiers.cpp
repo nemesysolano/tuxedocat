@@ -170,4 +170,149 @@ namespace timeseries::classifiers {
  -2.159910  1.669591 -2.496545  0.780280  0.085327 -1.083837       -1.0        
  */
 
+    std::expected<slice::MutableSlice2D, TuxedoError> LinearDiscriminant::predict(
+        const slice::Span2D & X // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+    ) { // returns (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
+        return std::unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+    }
+
+    std::expected<BinaryConfusionMatrix, TuxedoError> LinearDiscriminant::confusion_matrix(
+        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+        const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
+    ) {
+        return std::unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+    }
+
+    std::expected<std::unique_ptr<LogisticRegression>, TuxedoError> LinearDiscriminant::Create(
+        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+        const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
+    ) {
+        if(X.rows() != y.rows() || y.cols() != 1 || X.rows() == 0) { 
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }        
+
+        return std::unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+    }
+
+    std::expected<DirectionalAverage, TuxedoError> up_avg(
+        const slice::Span2D & X, 
+        const slice::Span2D & y  
+    ) { 
+        // 1. Validation
+        if(X.rows() != y.rows() || y.cols() != 1 || X.rows() == 0) { 
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        size_t N = X.cols();
+        size_t M = X.rows();
+
+        // 2. First Pass: Count the positive days to allocate subset matrix
+        size_t count = 0;
+        for (size_t i = 0; i < M; ++i) {
+            auto dir_val = y[i, 0];
+            if (!dir_val.has_value()) return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+            
+            if (dir_val.value() > 0.0) {
+                count++;
+            }
+        }
+
+        // Prevent division by zero / empty class
+        if (count == 0) {
+            return std::unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL);
+        }
+
+        // 3. Allocate the Mean vector and the X subset matrix
+        slice::MutableSlice2D μ_up(N, 1);
+        slice::MutableSlice2D X_subset(count, N);
+        
+        for (size_t j = 0; j < N; ++j) {
+            μ_up[j, 0].value() = 0.0;
+        }
+
+        // 4. Second Pass: Populate X_subset and sum features
+        size_t subset_row = 0;
+        for (size_t i = 0; i < M; ++i) {
+            if (y[i, 0].value() > 0.0) {
+                for (size_t j = 0; j < N; ++j) {
+                    auto x_val = X[i, j];
+                    if (!x_val.has_value()) return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+                    
+                    // Copy to subset matrix
+                    X_subset[subset_row, j].value() = x_val.value();
+                    // Add to mean accumulator
+                    μ_up[j, 0].value() += x_val.value();
+                }
+                subset_row++;
+            }
+        }
+
+        // 5. Divide sum by N^+ to get the mean
+        for (size_t j = 0; j < N; ++j) {
+            μ_up[j, 0].value() /= static_cast<double>(count);
+        }
+
+        // Package and return using std::move to prevent heavy copying
+        return DirectionalAverage(std::move(μ_up), std::move(X_subset));
+    }
+
+    std::expected<DirectionalAverage, TuxedoError> down_avg(
+        const slice::Span2D & X, 
+        const slice::Span2D & y                
+    ) { 
+        // 1. Validation
+        if(X.rows() != y.rows() || y.cols() != 1 || X.rows() == 0) { 
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        size_t N = X.cols();
+        size_t M = X.rows();
+
+        // 2. First Pass: Count the negative days
+        size_t count = 0;
+        for (size_t i = 0; i < M; ++i) {
+            auto dir_val = y[i, 0];
+            if (!dir_val.has_value()) return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+            
+            if (dir_val.value() < 0.0) {
+                count++;
+            }
+        }
+
+        // Prevent division by zero
+        if (count == 0) {
+            return std::unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL);
+        }
+
+        // 3. Allocate
+        slice::MutableSlice2D μ_down(N, 1);
+        slice::MutableSlice2D X_subset(count, N);
+        
+        for (size_t j = 0; j < N; ++j) {
+            μ_down[j, 0].value() = 0.0;
+        }
+
+        // 4. Second Pass: Populate X_subset and sum features
+        size_t subset_row = 0;
+        for (size_t i = 0; i < M; ++i) {
+            if (y[i, 0].value() < 0.0) {
+                for (size_t j = 0; j < N; ++j) {
+                    auto x_val = X[i, j];
+                    if (!x_val.has_value()) return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+                    
+                    X_subset[subset_row, j].value() = x_val.value();
+                    μ_down[j, 0].value() += x_val.value();
+                }
+                subset_row++;
+            }
+        }
+
+        // 5. Calculate Mean
+        for (size_t j = 0; j < N; ++j) {
+            μ_down[j, 0].value() /= static_cast<double>(count);
+        }
+
+        return DirectionalAverage(std::move(μ_down), std::move(X_subset));
+    }
+ 
 }
