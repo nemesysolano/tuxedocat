@@ -141,4 +141,5 @@ namespace forecast
     std::expected<DataFrame, TuxedoError> get_nth_momentum(DataFrame & source, const std::string && price_column_name, size_t momentum) {
         return get_nth_momentum(source, static_cast<const std::string &>(price_column_name), momentum);
     }
+
 }

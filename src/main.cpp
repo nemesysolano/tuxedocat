@@ -81,6 +81,7 @@ int main(int argc, char* argv[]) {
     transpose_test();
     outer_product_test();
     covariances_test();
+    scatter_matrices_test();
     return 0;
 }
 #endif

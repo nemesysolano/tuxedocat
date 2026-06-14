@@ -332,5 +332,31 @@ namespace timeseries::classifiers {
 
         return DirectionalAverage(std::move(μ_down), std::move(X_subset), std::move(σ_downs_sum));
     }
- 
+    
+
+    std::expected<ScatterMatrices, TuxedoError> scatter_matrices(
+        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+        const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`               
+    ) {
+        auto dir_up_result = up_avg(X, y);
+        if (!dir_up_result) return std::unexpected(dir_up_result.error());
+        auto & dir_up = dir_up_result.value();
+
+        auto dir_down_result = down_avg(X, y);
+        if (!dir_down_result) return std::unexpected(dir_down_result.error());
+        auto & dir_down = dir_down_result.value();        
+
+        auto sw = dir_up.σ() + dir_down.σ();
+        auto μ_diff = dir_up.μ() - dir_down.μ();
+        
+        auto u_diff_transpose_result = slice::transpose(μ_diff);
+        if (!u_diff_transpose_result) return std::unexpected(u_diff_transpose_result.error());
+        auto & u_diff_transpose = u_diff_transpose_result.value();
+        
+        auto sb_result = μ_diff * u_diff_transpose;
+        if (!sb_result) return std::unexpected(sb_result.error());
+        auto sb = sb_result.value();
+
+        return ScatterMatrices(std::move(sw), std::move(sb));
+    }    
 }

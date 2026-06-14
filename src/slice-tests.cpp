@@ -430,6 +430,10 @@ void covariances_test() {
     assert(!err_shape.has_value());
     assert(err_shape.error() == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
 
-    std::cout << "covariances_test passed." << std::endl;
+    auto & cov_variance_matrix_0 = cov_matrices[0];
+    auto & cov_variance_matrix_1 = cov_matrices[1];
+    cout << cov_variance_matrix_0 << endl;
+    cout << cov_variance_matrix_1 << endl;
+    std::cout << "covariances_test passed. covariances_size = " << cov_matrices.size() << std::endl;
 }
 #endif

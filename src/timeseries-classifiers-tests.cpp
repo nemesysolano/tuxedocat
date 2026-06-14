@@ -294,4 +294,46 @@ void down_avg_test() {
 
     std::cout << "down_avg_test passed." << std::endl;
 }
+
+void scatter_matrices_test() {
+    // 1. Arrange: Setup deterministic X (4 rows, 2 columns) and y (4 rows, 1 column)
+    MutableSlice2D X(4, 2);
+    X[0, 0].value() = 1.0; X[0, 1].value() = 2.0; // Positive
+    X[1, 0].value() = 3.0; X[1, 1].value() = 4.0; // Negative
+    X[2, 0].value() = 5.0; X[2, 1].value() = 6.0; // Positive
+    X[3, 0].value() = 7.0; X[3, 1].value() = 8.0; // Negative
+
+    MutableSlice2D y(4, 1);
+    y[0, 0].value() = 1.0; y[1, 0].value() = -1.0;
+    y[2, 0].value() = 1.0; y[3, 0].value() = -1.0;
+
+    // 2. Act: Execute scatter_matrices pipeline
+    auto result_exp = scatter_matrices(X, y);
+    assert(result_exp.has_value());
+
+    auto & matrices = result_exp.value();
+    auto & sw = matrices.sw(); // Use your exact accessor names (e.g., sw() or S_W())
+    auto & sb = matrices.sb(); 
+
+    // 3. Assert: Dimensions
+    assert(sw.rows() == 2 && sw.cols() == 2);
+    assert(sb.rows() == 2 && sb.cols() == 2);
+
+    // 4. Assert: Within-Class Scatter (Sw = Sigma+ + Sigma-)
+    // Sw must equal [[16.0, 16.0], [16.0, 16.0]]
+    assert(std::abs(sw[0, 0].value() - 16.0) < 1e-6);
+    assert(std::abs(sw[0, 1].value() - 16.0) < 1e-6);
+    assert(std::abs(sw[1, 0].value() - 16.0) < 1e-6);
+    assert(std::abs(sw[1, 1].value() - 16.0) < 1e-6);
+
+    // 5. Assert: Between-Class Scatter (Sb)
+    // Sb = (mu+ - mu-)(mu+ - mu-)^T 
+    // [-2, -2] outer product -> [[4.0, 4.0], [4.0, 4.0]]
+    assert(std::abs(sb[0, 0].value() - 4.0) < 1e-6);
+    assert(std::abs(sb[0, 1].value() - 4.0) < 1e-6);
+    assert(std::abs(sb[1, 0].value() - 4.0) < 1e-6);
+    assert(std::abs(sb[1, 1].value() - 4.0) < 1e-6);
+
+    std::cout << "scatter_matrices_test passed." << std::endl;
+}
 #endif

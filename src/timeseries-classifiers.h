@@ -99,7 +99,7 @@ namespace timeseries::classifiers {
         private:
             slice::MutableSlice2D μ_; // The resulting $μ^+$ or $ μ^-$ must have (Nx1) shape
             slice::MutableSlice2D X_; // Rows from original $X$ with the same direction of resulting $μ^+$ or $ μ^-$ 
-            slice::MutableSlice2D σ_; //Within-class scatter: How spread out is the data within its own class
+            slice::MutableSlice2D σ_; // Covariance matrixes sum.
         public:
             DirectionalAverage(DirectionalAverage&&) = default;
             DirectionalAverage& operator=(DirectionalAverage&&) = default;
@@ -132,6 +132,32 @@ namespace timeseries::classifiers {
         const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                        
     ); // Calculates average vector for negative days. The resulting μ^- must have (Nx1) shape.
 
+    
+    class ScatterMatrices {
+        private:
+            slice::MutableSlice2D sw_; // Within-Class Scatter
+            slice::MutableSlice2D sb_; // Between-Class Scatter 
+
+        public:
+            ScatterMatrices(ScatterMatrices&&) = default;
+            ScatterMatrices& operator=(ScatterMatrices&&) = default;
+
+            ScatterMatrices(const ScatterMatrices&) = delete;
+            ScatterMatrices& operator=(const ScatterMatrices&) = delete;
+
+            inline ScatterMatrices(
+                slice::MutableSlice2D sw,
+                slice::MutableSlice2D sb
+            ): sw_(sw), sb_(sb) {}
+
+            const slice::Span2D & sw() const { return sw_; }
+            const slice::Span2D & sb() const { return sb_; }           
+    };
+
+    std::expected<ScatterMatrices, TuxedoError> scatter_matrices(
+        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+        const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`               
+    );
     
     
 }
