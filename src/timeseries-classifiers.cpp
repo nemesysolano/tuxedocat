@@ -170,30 +170,6 @@ namespace timeseries::classifiers {
  -2.159910  1.669591 -2.496545  0.780280  0.085327 -1.083837       -1.0        
  */
 
-    std::expected<slice::MutableSlice2D, TuxedoError> LinearDiscriminant::predict(
-        const slice::Span2D & X // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
-    ) { // returns (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
-        return std::unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
-    }
-
-    std::expected<BinaryConfusionMatrix, TuxedoError> LinearDiscriminant::confusion_matrix(
-        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
-        const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
-    ) {
-        return std::unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
-    }
-
-    std::expected<std::unique_ptr<LogisticRegression>, TuxedoError> LinearDiscriminant::Create(
-        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
-        const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
-    ) {
-        if(X.rows() != y.rows() || y.cols() != 1 || X.rows() == 0) { 
-            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
-        }        
-
-        return std::unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
-    }
-
     std::expected<DirectionalAverage, TuxedoError> up_avg(
         const slice::Span2D & X, 
         const slice::Span2D & y  
@@ -357,6 +333,159 @@ namespace timeseries::classifiers {
         if (!sb_result) return std::unexpected(sb_result.error());
         auto sb = sb_result.value();
 
-        return ScatterMatrices(std::move(sw), std::move(sb));
+        return ScatterMatrices(std::move(sw), std::move(sb), std::move(μ_diff));
     }    
+
+    std::expected<slice::MutableSlice2D, TuxedoError> linear_discriminant_weights(
+        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+        const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                       
+    ) { // $w \propto S_W^{-1} (μ_1 - μ_2)$ where $S_W$ is the inverse of the within-class scatter matrix $S_W$.
+        
+        // 1. Fetch pre-calculated S_W, S_B, and μ_diff
+        // This inherently validates X and y dimensions.
+        auto scatter_matrices_result = scatter_matrices(X, y);
+        if (!scatter_matrices_result) return std::unexpected(scatter_matrices_result.error());
+        auto & scatter_matrices_obj = scatter_matrices_result.value();
+
+        auto & sw = scatter_matrices_obj.sw(); 
+        auto & mu_diff = scatter_matrices_obj.μ_diff();
+
+        size_t N = X.cols();
+
+        // 2. Safely map to Eigen layout for numerically stable solving
+        Eigen::MatrixXd Sw_eigen(N, N);
+        Eigen::VectorXd mu_diff_eigen(N);
+
+        for (size_t i = 0; i < N; ++i) {
+            auto mu_val = mu_diff[i, 0];
+            if (!mu_val.has_value()) return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+            mu_diff_eigen(i) = mu_val.value();
+
+            for (size_t j = 0; j < N; ++j) {
+                auto sw_val = sw[i, j];
+                if (!sw_val.has_value()) return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+                Sw_eigen(i, j) = sw_val.value();
+            }
+        }
+
+        // 3. Solve S_W * w = (μ_1 - μ_2) via Cholesky (LDLT) decomposition
+        // We use LDLT instead of a direct inverse (.inverse()) because S_W is a symmetric 
+        // positive semi-definite covariance matrix. This prevents floating-point drift.
+        Eigen::VectorXd w_eigen = Sw_eigen.ldlt().solve(mu_diff_eigen);
+
+        // 4. Map the solved Fisher weights back into a (N x 1) MutableSlice2D
+        slice::MutableSlice2D w(N, 1);
+        for(size_t i = 0; i < N; ++i) {
+            w[i, 0].value() = w_eigen(i);
+        }
+        
+        return w;
+    }
+
+
+    std::expected<slice::MutableSlice2D, TuxedoError> LinearDiscriminant::predict(
+        const slice::Span2D & X // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+    ) { // returns (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
+        
+        // 1. Matrix dimension validation
+        if (X.cols() != weights_.rows() || X.rows() == 0) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+        
+        // 2. Project the data onto the Fisher linear boundary: Z = X * w
+        auto Z_result = X * weights_;
+        if (!Z_result) return std::unexpected(Z_result.error());
+        auto & Z = Z_result.value();
+
+        // 3. Thresholding: Assign classes based on the projection threshold
+        slice::MutableSlice2D y_pred(Z.rows(), 1);
+        for (size_t i = 0; i < Z.rows(); ++i) {
+            auto z_val = Z[i, 0];
+            if (!z_val.has_value()) return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+            
+            if (z_val.value() > threshold_) {
+                y_pred[i, 0].value() = 1.0;
+            } else {
+                y_pred[i, 0].value() = -1.0;
+            }
+        }
+        
+        return y_pred;
+    }
+
+    std::expected<BinaryConfusionMatrix, TuxedoError> LinearDiscriminant::confusion_matrix(
+        const slice::Span2D & X, // (M×N) lags span
+        const slice::Span2D & y // (M×1) directions span                
+    ) {
+        if(X.rows() != y.rows() || y.cols() != 1 || X.rows() == 0) { 
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        // 1. Generate predictions using the loaded Fisher weights
+        auto y_pred_result = predict(X);
+        if (!y_pred_result) return std::unexpected(y_pred_result.error());
+        auto & y_pred = y_pred_result.value();
+
+        int tp = 0, tn = 0, fp = 0, fn = 0;
+        
+        // 2. Tabulate the confusion matrix components
+        for (size_t i = 0; i < y.rows(); ++i) {
+            auto actual_val = y[i, 0];
+            auto pred_val = y_pred[i, 0];
+
+            if (!actual_val.has_value() || !pred_val.has_value()) {
+                return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+            }
+
+            bool actual_pos = actual_val.value() > 0.0;
+            bool pred_pos = pred_val.value() > 0.0;
+
+            if (actual_pos && pred_pos) tp++;
+            else if (!actual_pos && !pred_pos) tn++;
+            else if (!actual_pos && pred_pos) fp++;
+            else if (actual_pos && !pred_pos) fn++;
+        }
+
+        return BinaryConfusionMatrix(tp, tn, fp, fn);
+    }
+
+    std::expected<std::unique_ptr<LinearDiscriminant>, TuxedoError> LinearDiscriminant::Create(
+        const slice::Span2D & X, // (M×N) lags span 
+        const slice::Span2D & y  // (M×1) directions span                
+    ) {
+        if(X.rows() != y.rows() || y.cols() != 1 || X.rows() == 0) { 
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }        
+
+        // 1. Calculate the Fisher Discriminant Weights: w = S_w^-1 * (μ_1 - μ_2)
+        auto w_result = linear_discriminant_weights(X, y);
+        if (!w_result) return std::unexpected(w_result.error());
+        auto w = std::move(w_result.value());
+
+        // 2. Extract class means to calculate the midpoint decision boundary threshold
+        auto dir_up_result = up_avg(X, y);
+        if (!dir_up_result) return std::unexpected(dir_up_result.error());
+        auto & mu_up = dir_up_result.value().μ();
+
+        auto dir_down_result = down_avg(X, y);
+        if (!dir_down_result) return std::unexpected(dir_down_result.error());
+        auto & mu_down = dir_down_result.value().μ();
+
+        // 3. Threshold Calculation: c = w^T * (μ_1 + μ_2) / 2
+        auto mu_sum = mu_up + mu_down;
+        
+        auto w_T_result = slice::transpose(w);
+        if (!w_T_result) return std::unexpected(w_T_result.error());
+        auto & w_T = w_T_result.value();
+
+        auto threshold_mat_result = w_T * mu_sum;
+        if (!threshold_mat_result) return std::unexpected(threshold_mat_result.error());
+        
+        // Since w_T is (1xN) and mu_sum is (Nx1), the result is exactly a 1x1 scalar matrix
+        double threshold = threshold_mat_result.value()[0, 0].value() / 2.0;
+
+        // 4. Instantiate and return the trained classifier
+        return std::make_unique<LinearDiscriminant>(std::move(w), threshold);
+    } 
+      
 }

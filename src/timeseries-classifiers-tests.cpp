@@ -66,17 +66,7 @@ DataFrame create_momentum_data_frame(DataFrame & df) {
     return std::move(momentum_dataset_result.value());    
 }
 
-void logistic_regression_different_time_frames_test(const char * current_program_path) {
-    /* Creates momentum (X) and direction dataframes (Y) */
-    std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
-    std::string file_path = (exe_path / "bdx.csv").string();    
-    auto input_stream = ifstream(file_path);    
-    assert(input_stream.is_open());
-
-    auto dataframe_result = DataFrame::Create(input_stream);
-    assert(dataframe_result.has_value());
-    auto & df = dataframe_result.value();
-    
+void logistic_regression_different_time_frames_test(DataFrame & df) {
     DataFrame momentum_df = create_momentum_data_frame(df);
 
     vector<string> momentum_names = {"Momentum_21", "Momentum_10", "Momentum_5", "Momentum_1"};
@@ -122,12 +112,12 @@ void logistic_regression_different_time_frames_test(const char * current_program
     auto confusion_matrix_result = logistic_regression->confusion_matrix(X_test, Y_test);
     assert(confusion_matrix_result.has_value());
     auto & confusion_matrix = confusion_matrix_result.value();
-    cout << "logistic_regression_different_time_frames_test" << endl;
-    cout << confusion_matrix << endl;    
+    cout << confusion_matrix << endl;
+    cout << "PASSED logistic_regression_different_time_frames_test" << endl;
 }
 
-void logistic_regression_daily_timeframe_test(const char * current_program_path) {
-    const size_t lags = 5;
+void regression_test(const char * current_program_path) {
+    /* Creates momentum (X) and direction dataframes (Y) */
     std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
     std::string file_path = (exe_path / "bdx.csv").string();    
     auto input_stream = ifstream(file_path);    
@@ -137,63 +127,7 @@ void logistic_regression_daily_timeframe_test(const char * current_program_path)
     assert(dataframe_result.has_value());
     auto & df = dataframe_result.value();
 
-    auto lagged_result = created_lagged_timeseries(df, "Volume", "Close", lags);
-    assert(lagged_result.has_value());
-
-    auto & lagged = lagged_result.value();
-    auto lagged_without_nans_result = lagged.dropna();
-    assert(lagged_without_nans_result.has_value());
-    auto & momentum_df = lagged_without_nans_result.value();    
-
-    size_t train_end_row = momentum_df.rows() * 0.8;
-    
-    vector<string> lag_names;
-    for (size_t i = 0; i < lags; ++i) {
-        lag_names.push_back("Lag" + to_string(i + 1));
-    }
-
-    auto X_result = momentum_df.copy(lag_names, lag_names);
-    assert(X_result.has_value());
-    auto & X = X_result.value();
-
-    auto X_train_result = X.slice_to(train_end_row);
-    assert(X_train_result.has_value());
-    auto & X_train = X_train_result.value();
-
-    auto X_test_result = X.slice_from(train_end_row);
-    assert(X_test_result.has_value());
-    auto & X_test = X_test_result.value();
-
-    auto Y_result = momentum_df.copy({"Direction"}, {"Direction"});
-    assert(Y_result.has_value());
-    auto & Y = Y_result.value();;
-
-    auto Y_train_result = Y.slice_to(train_end_row);
-    assert(Y_train_result.has_value());
-    auto & Y_train = Y_train_result.value();
-
-    auto Y_test_result = Y.slice_from(train_end_row);
-    assert(Y_test_result.has_value());
-    auto & Y_test = Y_test_result.value();
-
-    assert(Y_test.rows() == X_test.rows());
-    assert(Y_train.rows() == X_train.rows());    
-    assert(Y_test.rows() + Y_train.rows() ==  momentum_df.rows());
-    assert(X_test.rows() + X_train.rows() ==  momentum_df.rows());
-
-    auto logistic_regression_result = LogisticRegression::Create(X_train, Y_train);
-    assert(logistic_regression_result.has_value());
-    auto & logistic_regression = logistic_regression_result.value();
-
-    auto predictions_result = logistic_regression->predict(X_test);    
-    assert(predictions_result.has_value());
-    
-    auto confusion_matrix_result = logistic_regression->confusion_matrix(X_test, Y_test);
-    assert(confusion_matrix_result.has_value());
-    auto & confusion_matrix = confusion_matrix_result.value();
-    cout << "logistic_regression_daily_timeframe_test" << endl;
-    cout << confusion_matrix << endl;
-
+    logistic_regression_different_time_frames_test(df);
 }
 
 void print_binary_confusion_matrix_test() {
@@ -335,5 +269,52 @@ void scatter_matrices_test() {
     assert(std::abs(sb[1, 1].value() - 4.0) < 1e-6);
 
     std::cout << "scatter_matrices_test passed." << std::endl;
+}
+
+void linear_discriminant_weights_test() {
+    // 1. Arrange: Setup non-singular matrix components
+    // We design the classes to have orthogonal covariance spans so S_W is full-rank (invertible).
+    // Positive Class (+1): [1.0, 5.0] and [5.0, 1.0] -> mean = [3.0, 3.0]
+    // Negative Class (-1): [4.0, 4.0] and [6.0, 6.0] -> mean = [5.0, 5.0]
+    MutableSlice2D X(4, 2);
+    X[0, 0].value() = 1.0; X[0, 1].value() = 5.0; // Positive
+    X[1, 0].value() = 4.0; X[1, 1].value() = 4.0; // Negative
+    X[2, 0].value() = 5.0; X[2, 1].value() = 1.0; // Positive
+    X[3, 0].value() = 6.0; X[3, 1].value() = 6.0; // Negative
+
+    MutableSlice2D y(4, 1);
+    y[0, 0].value() = 1.0;
+    y[1, 0].value() = -1.0;
+    y[2, 0].value() = 1.0;
+    y[3, 0].value() = -1.0;
+
+    // --- The Mathematical Proof ---
+    // μ_diff = μ_up - μ_down = [3, 3]^T - [5, 5]^T = [-2, -2]^T
+    // S_W = [[10, -6], [-6, 10]]  (Determinant is 100 - 36 = 64. Safely invertible!)
+    // S_W * w = μ_diff  ==>  [[10, -6], [-6, 10]] * [w1, w2]^T = [-2, -2]^T
+    // 10w1 - 6w2 = -2
+    // -6w1 + 10w2 = -2
+    // By symmetry: 4w1 = -2  ==>  w1 = -0.5, w2 = -0.5
+
+    // 2. Act: Execute solver pipeline
+    auto result_exp = linear_discriminant_weights(X, y);
+    assert(result_exp.has_value());
+    auto & w = result_exp.value();
+
+    // 3. Assert Dimensions: Should return an (N x 1) vector
+    assert(w.rows() == 2 && w.cols() == 1);
+
+    // 4. Assert Data: Verify exact convergence of the Fisher Weights
+    assert(std::abs(w[0, 0].value() - (-0.5)) < 1e-6);
+    assert(std::abs(w[1, 0].value() - (-0.5)) < 1e-6);
+
+    // 5. Assert Guard Rails
+    MutableSlice2D y_bad_size(3, 1);
+    auto fail_shape = linear_discriminant_weights(X, y_bad_size);
+    assert(!fail_shape.has_value());
+    assert(fail_shape.error() == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+
+    cout << w << endl;
+    std::cout << "linear_discriminant_weights_test passed." << std::endl;
 }
 #endif

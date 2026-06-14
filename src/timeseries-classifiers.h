@@ -76,7 +76,12 @@ namespace timeseries::classifiers {
     };
 
     class LinearDiscriminant /*Analysis*/: public BinaryClassifier {
+        private:
+            slice::MutableSlice2D weights_;
+            double threshold_;
         public:
+            LinearDiscriminant(slice::MutableSlice2D weights, double threshold): weights_(weights), threshold_(threshold){}
+
             std::expected<slice::MutableSlice2D, TuxedoError> predict(
                 const slice::Span2D & X // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
             ) override; // returns (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
@@ -86,12 +91,13 @@ namespace timeseries::classifiers {
                 const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
             ) override;
 
-            static std::expected<std::unique_ptr<LogisticRegression>, TuxedoError> Create(
+
+            static std::expected<std::unique_ptr<LinearDiscriminant>, TuxedoError> Create(
                 const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
                 const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
-            );
+            );            
     
-        ~LinearDiscriminant() {}
+            ~LinearDiscriminant() {}
     
     };
 
@@ -137,7 +143,7 @@ namespace timeseries::classifiers {
         private:
             slice::MutableSlice2D sw_; // Within-Class Scatter
             slice::MutableSlice2D sb_; // Between-Class Scatter 
-
+            slice::MutableSlice2D μ_diff_; // μ_up - μ_down
         public:
             ScatterMatrices(ScatterMatrices&&) = default;
             ScatterMatrices& operator=(ScatterMatrices&&) = default;
@@ -147,18 +153,25 @@ namespace timeseries::classifiers {
 
             inline ScatterMatrices(
                 slice::MutableSlice2D sw,
-                slice::MutableSlice2D sb
-            ): sw_(sw), sb_(sb) {}
+                slice::MutableSlice2D sb,
+                slice::MutableSlice2D μ_diff
+            ): sw_(sw), sb_(sb), μ_diff_(μ_diff) {}
 
             const slice::Span2D & sw() const { return sw_; }
             const slice::Span2D & sb() const { return sb_; }           
+            const slice::Span2D & μ_diff() const { return μ_diff_; }
     };
 
     std::expected<ScatterMatrices, TuxedoError> scatter_matrices(
         const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
         const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`               
     );
-    
+
+
+    std::expected<slice::MutableSlice2D, TuxedoError> linear_discriminant_weights(
+        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+        const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                       
+    );
     
 }
 #endif
