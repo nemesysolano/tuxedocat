@@ -66,7 +66,36 @@ DataFrame create_momentum_data_frame(DataFrame & df) {
     return std::move(momentum_dataset_result.value());    
 }
 
-void logistic_regression_different_time_frames_test(DataFrame & df) {
+void regression_test_impl(
+    slice::Slice2D & X_train, slice::Slice2D & X_test, slice::Slice2D & Y_train, slice::Slice2D & Y_test,
+    BinaryClassifier & binary_classifier, 
+    std::string && classifier_name
+) {
+    auto logistic_regression_result = LogisticRegression::Create(X_train, Y_train);
+    assert(logistic_regression_result.has_value());
+    auto & logistic_regression = logistic_regression_result.value();
+
+    auto predictions_result = logistic_regression->predict(X_test);    
+    assert(predictions_result.has_value());
+    
+    auto confusion_matrix_result = binary_classifier.confusion_matrix(X_test, Y_test);
+    assert(confusion_matrix_result.has_value());
+    auto & confusion_matrix = confusion_matrix_result.value();
+    cout << confusion_matrix << endl;
+    cout << "PASSED " << classifier_name << "test passed" << endl;
+}
+
+void regression_test(const char * current_program_path) {
+    /* Creates momentum (X) and direction dataframes (Y) */
+    std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
+    std::string file_path = (exe_path / "bdx.csv").string();    
+    auto input_stream = ifstream(file_path);    
+    assert(input_stream.is_open());
+
+    auto dataframe_result = DataFrame::Create(input_stream);
+    assert(dataframe_result.has_value());
+    auto & df = dataframe_result.value();
+
     DataFrame momentum_df = create_momentum_data_frame(df);
 
     vector<string> momentum_names = {"Momentum_21", "Momentum_10", "Momentum_5", "Momentum_1"};
@@ -100,34 +129,20 @@ void logistic_regression_different_time_frames_test(DataFrame & df) {
     assert(Y_test.rows() == X_test.rows());
     assert(Y_train.rows() == X_train.rows());    
     assert(Y_test.rows() + Y_train.rows() ==  momentum_df.rows());
-    assert(X_test.rows() + X_train.rows() ==  momentum_df.rows());
-
+    assert(X_test.rows() + X_train.rows() ==  momentum_df.rows());    
+    
+    /* Logictic Regression */
     auto logistic_regression_result = LogisticRegression::Create(X_train, Y_train);
     assert(logistic_regression_result.has_value());
-    auto & logistic_regression = logistic_regression_result.value();
+    auto & logistic_regression = *logistic_regression_result.value();
 
-    auto predictions_result = logistic_regression->predict(X_test);    
-    assert(predictions_result.has_value());
+    /* Linear Discriminant Analysis */
+    auto linear_discriminant_result = LinearDiscriminant::Create(X_train, Y_train);
+    assert(linear_discriminant_result.has_value());
+    auto & linear_discriminant = *linear_discriminant_result.value();
     
-    auto confusion_matrix_result = logistic_regression->confusion_matrix(X_test, Y_test);
-    assert(confusion_matrix_result.has_value());
-    auto & confusion_matrix = confusion_matrix_result.value();
-    cout << confusion_matrix << endl;
-    cout << "PASSED logistic_regression_different_time_frames_test" << endl;
-}
-
-void regression_test(const char * current_program_path) {
-    /* Creates momentum (X) and direction dataframes (Y) */
-    std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
-    std::string file_path = (exe_path / "bdx.csv").string();    
-    auto input_stream = ifstream(file_path);    
-    assert(input_stream.is_open());
-
-    auto dataframe_result = DataFrame::Create(input_stream);
-    assert(dataframe_result.has_value());
-    auto & df = dataframe_result.value();
-
-    logistic_regression_different_time_frames_test(df);
+    regression_test_impl(X_train, X_test, Y_train, Y_test, logistic_regression, "LogisticRegression");
+    regression_test_impl(X_train, X_test, Y_train, Y_test, linear_discriminant, "LinearDiscriminant");
 }
 
 void print_binary_confusion_matrix_test() {
