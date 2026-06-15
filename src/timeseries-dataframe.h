@@ -63,13 +63,13 @@ namespace timeseries::dataframe {
 
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input, char field_delimiter);
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input);
-            std::expected<DataFrame, TuxedoError> copy(std::vector<std::string> & source_columns, std::vector<std::string> & target_columns);
-            std::expected<DataFrame, TuxedoError> copy(std::vector<std::string> & source_columns, std::vector<std::string> && target_columns);
-            std::expected<DataFrame, TuxedoError> copy(std::vector<std::string> && source_columns, std::vector<std::string> & target_columns);
-            std::expected<DataFrame, TuxedoError> copy(std::vector<std::string> && source_columns, std::vector<std::string> && target_columns);
-            std::expected<DataFrame, TuxedoError> copy(std::set<std::chrono::sys_seconds> & timestamps, size_t column_index);            
-            std::expected<DataFrame, TuxedoError> copy(std::set<std::chrono::sys_seconds> & timestamps, std::string & column_name);            
-            inline std::expected<DataFrame, TuxedoError> copy(std::set<std::chrono::sys_seconds> & timestamps, std::string && column_name) {return copy(timestamps, column_name);}            
+            std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns) const;
+            std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> && target_columns) const;
+            std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> && source_columns, const std::vector<std::string> & target_columns) const;
+            std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> && source_columns, const std::vector<std::string> && target_columns) const;
+            std::expected<DataFrame, TuxedoError> copy(const std::set<std::chrono::sys_seconds> & timestamps, size_t column_index) const;            
+            std::expected<DataFrame, TuxedoError> copy(const std::set<std::chrono::sys_seconds> & timestamps, const std::string & column_name) const;            
+            inline std::expected<DataFrame, TuxedoError> copy(const std::set<std::chrono::sys_seconds> & timestamps, const std::string && column_name) const {return copy(timestamps, column_name);}            
 
             TuxedoError append_column(DataFrame & source, const std::string & source_column_name, const std::string & target_column_name);
             TuxedoError append_column(DataFrame & source, const std::string & source_column_name, const std::string && target_column_name);
@@ -85,14 +85,14 @@ namespace timeseries::dataframe {
             std::expected<DataFrame, TuxedoError> log_change(size_t count);            
             inline std::expected<DataFrame, TuxedoError> log_change() { return log_change(1);}
 
-            std::expected<DataFrame, TuxedoError> direction(const std::string & source_column_name, const std::string & target_column_name);            
-            inline std::expected<DataFrame, TuxedoError> direction(const std::string && source_column_name, const std::string && target_column_name) {
+            std::expected<DataFrame, TuxedoError> direction(const std::string & source_column_name, const std::string & target_column_name) const;            
+            inline std::expected<DataFrame, TuxedoError> direction(const std::string && source_column_name, const std::string && target_column_name) const {
                 return direction(source_column_name, target_column_name);
             }
-            inline std::expected<DataFrame, TuxedoError> direction(const std::string & source_column_name, const std::string && target_column_name) {
+            inline std::expected<DataFrame, TuxedoError> direction(const std::string & source_column_name, const std::string && target_column_name) const {
                 return direction(source_column_name, target_column_name);
             }
-            inline std::expected<DataFrame, TuxedoError> direction(const std::string && source_column_name, const std::string & target_column_name) {
+            inline std::expected<DataFrame, TuxedoError> direction(const std::string && source_column_name, const std::string & target_column_name) const {
                 return direction(source_column_name, target_column_name);
             }
 

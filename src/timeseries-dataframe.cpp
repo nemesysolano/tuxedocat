@@ -108,7 +108,7 @@ namespace timeseries::dataframe {
         return DataFrame(rows, expected_cols - 1, std::move(data), std::move(column_name_to_column_index_), std::move(timestamp_to_row_index_), std::move(timestamps_));
     }
 
-    std::expected<DataFrame, TuxedoError> DataFrame::copy(std::vector<std::string> & source_columns, std::vector<std::string> & target_columns) {
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns) const {
         // 2. source_columns and target_columns must have the same size
         if (source_columns.size() != target_columns.size()) {
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
@@ -167,22 +167,22 @@ namespace timeseries::dataframe {
         );
     }
 
-    std::expected<DataFrame, TuxedoError> DataFrame::copy(std::vector<std::string> & source_columns, std::vector<std::string> && target_columns) {
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> && target_columns) const {
         // target_columns is an rvalue reference, but as a named variable, it acts as an lvalue.
         return this->copy(source_columns, target_columns);
     }
 
-    std::expected<DataFrame, TuxedoError> DataFrame::copy(std::vector<std::string> && source_columns, std::vector<std::string> & target_columns) {
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> && source_columns, const std::vector<std::string> & target_columns) const {
         // source_columns acts as an lvalue here.
         return this->copy(source_columns, target_columns);
     }
 
-    std::expected<DataFrame, TuxedoError> DataFrame::copy(std::vector<std::string> && source_columns, std::vector<std::string> && target_columns) {
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> && source_columns, const std::vector<std::string> && target_columns) const {
         // Both act as lvalues.
         return this->copy(source_columns, target_columns);
     }
 
-std::expected<DataFrame, TuxedoError> DataFrame::shift(int count, double filler) {
+    std::expected<DataFrame, TuxedoError> DataFrame::shift(int count, double filler) {
         size_t num_rows = this->rows();
         size_t num_cols = this->cols();
 
@@ -344,7 +344,7 @@ std::expected<DataFrame, TuxedoError> DataFrame::shift(int count, double filler)
         );
     }
 
-    std::expected<DataFrame, TuxedoError> DataFrame::direction(const std::string & source_column_name, const std::string & target_column_name) {
+    std::expected<DataFrame, TuxedoError> DataFrame::direction(const std::string & source_column_name, const std::string & target_column_name) const{
         // 1. Validate that the source column exists
         auto src_it = this->column_name_to_column_index_.find(source_column_name);
         if (src_it == this->column_name_to_column_index_.end()) {
@@ -536,7 +536,7 @@ std::expected<DataFrame, TuxedoError> DataFrame::shift(int count, double filler)
         return data_.data();
     }
 
-    std::expected<DataFrame, TuxedoError> DataFrame::copy(std::set<std::chrono::sys_seconds> & timestamps, size_t column_index) {
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::set<std::chrono::sys_seconds> & timestamps, size_t column_index) const{
         // 1. Validate the column index
         if (column_index >= cols_) {
             return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
@@ -596,7 +596,10 @@ std::expected<DataFrame, TuxedoError> DataFrame::shift(int count, double filler)
     }
 
     // String overload implementation
-    std::expected<DataFrame, TuxedoError> DataFrame::copy(std::set<std::chrono::sys_seconds> & timestamps, std::string & column_name) {
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(
+        const std::set<std::chrono::sys_seconds> & timestamps, 
+        const std::string & column_name
+    ) const {
         auto it = column_name_to_column_index_.find(column_name);
         if (it == column_name_to_column_index_.end()) {
             return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);

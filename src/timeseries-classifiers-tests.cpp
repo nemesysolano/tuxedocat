@@ -6,31 +6,56 @@
 #include <fstream>
 #include <cassert>
 #include "forecast.h"
-using namespace std;
 
+using namespace std;
 using namespace timeseries::classifiers;
 using namespace slice;
 using namespace timeseries::dataframe;
 using namespace forecast;
 
-DataFrame create_momentum_data_frame(DataFrame & df) {
+const static std::string DIRECTION_COLUMN_NAME = "Direction";
+class Momenta {
+    private:
+        DataFrame data_frame_;
+        std::vector<std::string> momentum_column_names_;
+
+        Momenta(const DataFrame & data_frame, const std::vector<std::string> & momentum_column_names)
+            : data_frame_(data_frame), momentum_column_names_(momentum_column_names) {}        
+    public:
+
+        Momenta(const Momenta&) = delete;
+        Momenta& operator=(const Momenta&) = delete;
+        const std::string & direction_column_name() const { return DIRECTION_COLUMN_NAME; }
+        const DataFrame & data_frame() const { return data_frame_; }
+        const std::vector<std::string> & momentum_column_names() const { return momentum_column_names_; }
+
+        static Momenta Create(const DataFrame & df);
+};
+
+Momenta Momenta::Create(const DataFrame & df) {
+    TuxedoError error;
+    string momentum_column_name;
     string price_column_name("Close");
+    std::vector<size_t> prime_horizons = {2, 3, 5, 11, 19, 31, 47};
+    
+    // 1. Initialize the master dataframe safely
+    auto momentum_result = get_nth_momentum(df, price_column_name, 1); 
+    assert(momentum_result.has_value()); 
+    auto & momentum = momentum_result.value();
+    
+    // 2. Iterate and append remaining prime horizons
+    vector<string> momentum_column_names({"Momentum_1"});
+    for (size_t h : prime_horizons) {
+        auto momentum_h_result = get_nth_momentum(df, price_column_name, h);
+        assert(momentum_h_result.has_value()); // Moved above .value()
+        
+        auto & momentum_h = momentum_h_result.value();
+        momentum_column_name = "Momentum_" + std::to_string(h);
 
-    auto one_day_momentum_result = get_nth_momentum(df, price_column_name, 1); 
-    assert(one_day_momentum_result.has_value());
-    auto & one_day_momentum = one_day_momentum_result.value();
-
-    auto one_week_momentum_result = get_nth_momentum(df, price_column_name, 5); 
-    assert(one_week_momentum_result.has_value());
-    auto & one_week_momentum = one_week_momentum_result.value();
-
-    auto two_weeks_momentum_result = get_nth_momentum(df, price_column_name, 10); 
-    assert(two_weeks_momentum_result.has_value());
-    auto & two_weeks_momentum = two_weeks_momentum_result.value();
-
-    auto one_month_momentum_result = get_nth_momentum(df, price_column_name, 21); 
-    assert(one_month_momentum_result.has_value());
-    auto & one_month_momentum = one_month_momentum_result.value();
+        error = momentum.append_column(momentum_h, momentum_column_name, momentum_column_name);
+        assert(error == TuxedoError::NO_ERROR);
+        momentum_column_names.push_back(momentum_column_name);
+    }
 
     auto direction_result = df.direction(price_column_name, "Direction");
     assert(direction_result.has_value());
@@ -39,31 +64,15 @@ DataFrame create_momentum_data_frame(DataFrame & df) {
     auto shifted_direction_result = direction.shift(-1);
     assert(shifted_direction_result.has_value());
     auto & shifted_direction = shifted_direction_result.value();
-
-
-    assert(one_day_momentum.rows() == one_week_momentum.rows());
-    assert(one_day_momentum.rows() == two_weeks_momentum.rows());
-    assert(one_day_momentum.rows() == one_month_momentum.rows());
-    assert(one_day_momentum.rows() == df.rows());
-    assert(shifted_direction.rows() == df.rows());
-
-    TuxedoError error;
-
-    error = one_month_momentum.append_column(two_weeks_momentum, "Momentum_10", "Momentum_10");
+    
+    error = momentum.append_column(shifted_direction, "Direction", "Direction");
     assert(error == TuxedoError::NO_ERROR);
 
-    error = one_month_momentum.append_column(one_week_momentum, "Momentum_5", "Momentum_5");
-    assert(error == TuxedoError::NO_ERROR);
+    auto momentum_without_nans_result = momentum.dropna();
+    assert(momentum_without_nans_result.has_value());
+    auto momentum_without_nans = momentum_without_nans_result.value();
 
-    error = one_month_momentum.append_column(one_day_momentum, "Momentum_1", "Momentum_1");
-    assert(error == TuxedoError::NO_ERROR);    
-
-    error = one_month_momentum.append_column(shifted_direction, "Direction", "Direction");
-    assert(error == TuxedoError::NO_ERROR);
-
-    auto momentum_dataset_result = one_month_momentum.dropna();
-    assert(momentum_dataset_result.has_value());
-    return std::move(momentum_dataset_result.value());    
+    return Momenta(std::move(momentum_without_nans), std::move(momentum_column_names));
 }
 
 void regression_test_impl(
@@ -88,7 +97,7 @@ void regression_test_impl(
 void regression_test(const char * current_program_path) {
     /* Creates momentum (X) and direction dataframes (Y) */
     std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
-    std::string file_path = (exe_path / "bdx.csv").string();    
+    std::string file_path = (exe_path / "nvo.csv").string();    
     auto input_stream = ifstream(file_path);    
     assert(input_stream.is_open());
 
@@ -96,12 +105,12 @@ void regression_test(const char * current_program_path) {
     assert(dataframe_result.has_value());
     auto & df = dataframe_result.value();
 
-    DataFrame momentum_df = create_momentum_data_frame(df);
-
-    vector<string> momentum_names = {"Momentum_21", "Momentum_10", "Momentum_5", "Momentum_1"};
+    auto momenta = Momenta::Create(df);
+    const DataFrame & momentum_df = momenta.data_frame();
+    const std::vector<std::string> & momentum_column_names = momenta.momentum_column_names();
     size_t train_end_row = momentum_df.rows() * 0.8;
 
-    auto X_result = momentum_df.copy(momentum_names, momentum_names);
+    auto X_result = momentum_df.copy(momentum_column_names, momentum_column_names);
     assert(X_result.has_value());
     auto & X = X_result.value();
 
@@ -143,6 +152,7 @@ void regression_test(const char * current_program_path) {
     
     regression_test_impl(X_train, X_test, Y_train, Y_test, logistic_regression, "LogisticRegression");
     regression_test_impl(X_train, X_test, Y_train, Y_test, linear_discriminant, "LinearDiscriminant");
+    
 }
 
 void print_binary_confusion_matrix_test() {

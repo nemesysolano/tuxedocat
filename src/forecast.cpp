@@ -112,7 +112,7 @@ namespace forecast
         return created_lagged_timeseries(source, static_cast<const std::string &>(volume_column_name), static_cast<const std::string &>(price_column_name), lags);
     }
 
-    std::expected<DataFrame, TuxedoError> get_nth_momentum(DataFrame & source, const std::string  & price_column_name, size_t momentum) {
+    std::expected<DataFrame, TuxedoError> get_nth_momentum(const DataFrame & source, const std::string  & price_column_name, size_t momentum) {
         // 1. Strict Boundary Validations
         if (!source.column_index(price_column_name).has_value()) {
             return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);        
@@ -138,7 +138,7 @@ namespace forecast
         return price_slice_result.value().log_change(momentum);
     }
 
-    std::expected<DataFrame, TuxedoError> get_nth_momentum(DataFrame & source, const std::string && price_column_name, size_t momentum) {
+    std::expected<DataFrame, TuxedoError> get_nth_momentum(const DataFrame && source, const std::string && price_column_name, size_t momentum) {
         return get_nth_momentum(source, static_cast<const std::string &>(price_column_name), momentum);
     }
 
