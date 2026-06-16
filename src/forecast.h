@@ -39,5 +39,8 @@ namespace forecast {
 
     std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_momentum(const timeseries::dataframe::DataFrame & source, const std::string  & price_column_name, size_t momentum);
     std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_momentum(const timeseries::dataframe::DataFrame && source, const std::string && price_column_name, size_t momentum);
+
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_z_score(const timeseries::dataframe::DataFrame & source, const std::string  & price_column_name, size_t t);
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_z_score(const timeseries::dataframe::DataFrame && source, const std::string && price_column_name, size_t t);
 };
 #endif

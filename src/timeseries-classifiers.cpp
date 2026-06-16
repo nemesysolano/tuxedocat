@@ -170,7 +170,7 @@ namespace timeseries::classifiers {
  -2.159910  1.669591 -2.496545  0.780280  0.085327 -1.083837       -1.0        
  */
 
-    std::expected<DirectionalAverage, TuxedoError> up_avg(
+    std::expected<DirectionalCategory, TuxedoError> up_category(
         const slice::Span2D & X, 
         const slice::Span2D & y  
     ) { 
@@ -237,10 +237,10 @@ namespace timeseries::classifiers {
             σ_ups_sum += σ_ups[i];
         }
         
-        return DirectionalAverage(std::move(μ_up), std::move(X_subset), std::move(σ_ups_sum));
+        return DirectionalCategory(std::move(μ_up), std::move(X_subset), std::move(σ_ups_sum));
     }
 
-    std::expected<DirectionalAverage, TuxedoError> down_avg(
+    std::expected<DirectionalCategory, TuxedoError> down_category(
         const slice::Span2D & X, 
         const slice::Span2D & y                
     ) {
@@ -306,7 +306,7 @@ namespace timeseries::classifiers {
         }
         
 
-        return DirectionalAverage(std::move(μ_down), std::move(X_subset), std::move(σ_downs_sum));
+        return DirectionalCategory(std::move(μ_down), std::move(X_subset), std::move(σ_downs_sum));
     }
     
 
@@ -314,11 +314,11 @@ namespace timeseries::classifiers {
         const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
         const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`               
     ) {
-        auto dir_up_result = up_avg(X, y);
+        auto dir_up_result = up_category(X, y);
         if (!dir_up_result) return std::unexpected(dir_up_result.error());
         auto & dir_up = dir_up_result.value();
 
-        auto dir_down_result = down_avg(X, y);
+        auto dir_down_result = down_category(X, y);
         if (!dir_down_result) return std::unexpected(dir_down_result.error());
         auto & dir_down = dir_down_result.value();        
 
@@ -463,11 +463,11 @@ namespace timeseries::classifiers {
         auto w = std::move(w_result.value());
 
         // 2. Extract class means to calculate the midpoint decision boundary threshold
-        auto dir_up_result = up_avg(X, y);
+        auto dir_up_result = up_category(X, y);
         if (!dir_up_result) return std::unexpected(dir_up_result.error());
         auto & mu_up = dir_up_result.value().μ();
 
-        auto dir_down_result = down_avg(X, y);
+        auto dir_down_result = down_category(X, y);
         if (!dir_down_result) return std::unexpected(dir_down_result.error());
         auto & mu_down = dir_down_result.value().μ();
 

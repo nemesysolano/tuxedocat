@@ -30,7 +30,7 @@ namespace reports {
         auto & df = dataframe_result.value();
         input_stream.close();
 
-        auto momenta = Momenta::Create(df);
+        auto momenta = Features::CreateMomenta(df);
         const DataFrame & momentum_df = momenta.data_frame();
         const std::vector<std::string> & momentum_column_names = momenta.momentum_column_names();
         size_t train_end_row = momentum_df.rows() * 0.8;

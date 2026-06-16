@@ -142,4 +142,30 @@ namespace forecast
         return get_nth_momentum(source, static_cast<const std::string &>(price_column_name), momentum);
     }
 
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_z_score(const timeseries::dataframe::DataFrame & source, const std::string  & price_column_name, size_t t){
+        // 1. Strict Boundary Validations
+        if (!source.column_index(price_column_name).has_value()) {
+            return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);        
+        } 
+        
+        // A momentum window of 0 is mathematically meaningless (ln(P/P) = 0).
+        // The total rows must be strictly greater than the momentum lookback.
+        if (t == 0 || source.rows() <= t) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);        
+        }
+
+        // 2. Isolate the price column and rename it to reflect the feature
+        std::string feature_name = "ZScore_" + std::to_string(t);
+        auto price_slice_result = source.copy({price_column_name}, {feature_name});
+        
+        if (!price_slice_result) {
+            return std::unexpected(price_slice_result.error());
+        }
+
+        return price_slice_result.value().z_score(t);        
+    }
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_z_score(const timeseries::dataframe::DataFrame && source, const std::string && price_column_name, size_t t) {
+        return get_nth_z_score(source, static_cast<const std::string &>(price_column_name), t);
+    }
+
 }

@@ -101,19 +101,37 @@ namespace timeseries::classifiers {
     
     };
 
-    class DirectionalAverage {
+    class QuadraticDiscriminant /*Analysis*/: public BinaryClassifier {
+        public: 
+            std::expected<slice::MutableSlice2D, TuxedoError> predict(
+                const slice::Span2D & X // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+            ) override; // returns (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
+
+            std::expected<BinaryConfusionMatrix, TuxedoError> confusion_matrix(
+                const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+                const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
+            ) override;
+
+
+            static std::expected<std::unique_ptr<QuadraticDiscriminant>, TuxedoError> Create(
+                const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+                const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
+            );                    
+    };
+
+    class DirectionalCategory {
         private:
             slice::MutableSlice2D μ_; // The resulting $μ^+$ or $ μ^-$ must have (Nx1) shape
             slice::MutableSlice2D X_; // Rows from original $X$ with the same direction of resulting $μ^+$ or $ μ^-$ 
-            slice::MutableSlice2D σ_; // Covariance matrixes sum.
+            slice::MutableSlice2D σ_; // Covariance matrixes sum.            
         public:
-            DirectionalAverage(DirectionalAverage&&) = default;
-            DirectionalAverage& operator=(DirectionalAverage&&) = default;
+            DirectionalCategory(DirectionalCategory&&) = default;
+            DirectionalCategory& operator=(DirectionalCategory&&) = default;
 
-            DirectionalAverage(const DirectionalAverage&) = delete;
-            DirectionalAverage& operator=(const DirectionalAverage&) = delete;
+            DirectionalCategory(const DirectionalCategory&) = delete;
+            DirectionalCategory& operator=(const DirectionalCategory&) = delete;
 
-            inline DirectionalAverage(
+            inline DirectionalCategory(
                 slice::MutableSlice2D μ,
                 slice::MutableSlice2D X,
                 slice::MutableSlice2D σ
@@ -124,21 +142,22 @@ namespace timeseries::classifiers {
             inline const slice::Span2D & σ() const { return σ_; }
 
 
-            ~DirectionalAverage() {
+            ~DirectionalCategory() {
             }
     };
 
-    std::expected<DirectionalAverage, TuxedoError> up_avg(
+    std::expected<DirectionalCategory, TuxedoError> up_category(
         const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
         const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
     ); // Calculates average vector for positive days. The resulting μ^+ must have (Nx1) shape
     
-    std::expected<DirectionalAverage, TuxedoError> down_avg(
+    std::expected<DirectionalCategory, TuxedoError> down_category(
         const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
         const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                        
     ); // Calculates average vector for negative days. The resulting μ^- must have (Nx1) shape.
 
-    
+    std::expected<slice::MutableSlice2D, TuxedoError> covariance(const DirectionalCategory & category);
+
     class ScatterMatrices {
         private:
             slice::MutableSlice2D sw_; // Within-Class Scatter

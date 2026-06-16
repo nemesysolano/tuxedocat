@@ -39,7 +39,7 @@ void regression_test(const char * current_program_path) {
     assert(dataframe_result.has_value());
     auto & df = dataframe_result.value();
 
-    auto momenta = Momenta::Create(df);
+    auto momenta = Features::CreateMomenta(df);
     const DataFrame & momentum_df = momenta.data_frame();
     const std::vector<std::string> & momentum_column_names = momenta.momentum_column_names();
     size_t train_end_row = momentum_df.rows() * 0.8;
@@ -106,7 +106,7 @@ Accuracy |Precision|   Recall| F1_Score|
 
 */    
 }
-void up_avg_test() {
+void up_category_test() {
     // 1. Setup deterministic X (4 rows, 2 columns) and y (4 rows, 1 column)
     MutableSlice2D X(4, 2);
     // Row 0: Positive
@@ -123,7 +123,7 @@ void up_avg_test() {
     y[2, 0].value() = 1.0; y[3, 0].value() = -1.0;
 
     // 2. Test Execution
-    auto result_exp = up_avg(X, y);
+    auto result_exp = up_category(X, y);
     assert(result_exp.has_value());
     
     auto & dir_avg = result_exp.value();
@@ -147,10 +147,10 @@ void up_avg_test() {
     assert(std::abs(sigma[0, 0].value() - 8.0) < 1e-6);
     assert(std::abs(sigma[1, 1].value() - 8.0) < 1e-6);
 
-    std::cout << "up_avg_test passed." << std::endl;
+    std::cout << "up_category_test passed." << std::endl;
 }
 
-void down_avg_test() {
+void down_category_test() {
     // 1. Setup X (same as above)
     MutableSlice2D X(4, 2);
     X[0, 0].value() = 1.0; X[0, 1].value() = 2.0;
@@ -163,7 +163,7 @@ void down_avg_test() {
     y[2, 0].value() = 1.0; y[3, 0].value() = -1.0;
 
     // 2. Test Execution
-    auto result_exp = down_avg(X, y);
+    auto result_exp = down_category(X, y);
     assert(result_exp.has_value());
     
     auto & dir_avg = result_exp.value();
@@ -185,7 +185,7 @@ void down_avg_test() {
     assert(std::abs(sigma[0, 0].value() - 8.0) < 1e-6);
     assert(std::abs(sigma[1, 1].value() - 8.0) < 1e-6);
 
-    std::cout << "down_avg_test passed." << std::endl;
+    std::cout << "down_category_test passed." << std::endl;
 }
 
 void scatter_matrices_test() {

@@ -344,6 +344,66 @@ namespace timeseries::dataframe {
         );
     }
 
+    std::expected<DataFrame, TuxedoError> DataFrame::z_score(size_t periods) const {
+        // 1. Validation: Z-Score requires at least 2 periods to calculate a standard deviation.
+        if (periods < 2 || this->rows() < periods) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        // 2. Prepare the new underlying data array
+        std::vector<double> z_data(this->rows() * this->cols(), std::numeric_limits<double>::quiet_NaN());
+
+        // 3. Iterate over every column independently
+        for (size_t c = 0; c < this->cols(); ++c) {
+            
+            // 4. Start at the first valid window: index (periods - 1)
+            for (size_t i = periods - 1; i < this->rows(); ++i) {
+                
+                // Step A: Calculate Rolling Mean (mu)
+                double sum = 0.0;
+                for (size_t w = 0; w < periods; ++w) {
+                    sum += this->data_[(i - w) * this->cols() + c];
+                }
+                double mu = sum / static_cast<double>(periods);
+
+                // Step B: Calculate Rolling Sample Variance
+                double sum_sq_diff = 0.0;
+                for (size_t w = 0; w < periods; ++w) {
+                    double val = this->data_[(i - w) * this->cols() + c];
+                    double diff = val - mu;
+                    sum_sq_diff += diff * diff;
+                }
+                
+                // Bessel's Correction: Divide by (periods - 1)
+                double variance = sum_sq_diff / static_cast<double>(periods - 1);
+                double std_dev = std::sqrt(variance);
+
+                // Step C: Calculate Z-Score safely
+                double current_val = this->data_[i * this->cols() + c];
+                double z;
+                
+                // Safeguard against perfectly flat price action (division by zero)
+                if (std_dev < 1e-8) {
+                    z = 0.0; 
+                } else {
+                    z = (current_val - mu) / std_dev;
+                }
+
+                z_data[i * this->cols() + c] = z;
+            }
+        }
+
+        // 5. Return a fresh DataFrame containing the Z-Scores
+        // (Assuming your constructor supports this instantiation)
+        return DataFrame(
+            this->rows(), this->cols(), 
+            std::move(z_data), 
+            this->column_name_to_column_index_, 
+            this->timestamp_to_row_index_, 
+            this->timestamps_
+        );
+    }
+
     std::expected<DataFrame, TuxedoError> DataFrame::direction(const std::string & source_column_name, const std::string & target_column_name) const{
         // 1. Validate that the source column exists
         auto src_it = this->column_name_to_column_index_.find(source_column_name);

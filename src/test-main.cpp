@@ -71,8 +71,8 @@ int test_main(int argc, char* argv[]) {
     append_column_test();    
     created_lagged_timeseries_tests(argv[0]);
     print_binary_confusion_matrix_test();
-    up_avg_test();
-    down_avg_test();
+    up_category_test();
+    down_category_test();
     matrix_multiplication_test() ;
     transpose_test();
     outer_product_test();

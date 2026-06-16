@@ -85,6 +85,9 @@ namespace timeseries::dataframe {
             std::expected<DataFrame, TuxedoError> log_change(size_t count);            
             inline std::expected<DataFrame, TuxedoError> log_change() { return log_change(1);}
 
+            std::expected<DataFrame, TuxedoError> z_score(size_t periods) const;            
+            inline std::expected<DataFrame, TuxedoError> z_score() const { return z_score(1);}
+
             std::expected<DataFrame, TuxedoError> direction(const std::string & source_column_name, const std::string & target_column_name) const;            
             inline std::expected<DataFrame, TuxedoError> direction(const std::string && source_column_name, const std::string && target_column_name) const {
                 return direction(source_column_name, target_column_name);

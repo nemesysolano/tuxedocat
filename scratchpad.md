@@ -131,5 +131,23 @@ Once you calculate $w$, predicting a new day's direction is just a dot product: 
 
 To help solidify the geometric intuition behind the math, here is an interactive visualization of how the projection angle affects the Fisher Criterion.
 
+# Quadratic Discriminant Analysis (QDA) #
+
+In LDA, the math explicitly assumes that the "Up" days and the "Down" days share the exact same structural shape (Covariance Matrix, $Σ$). LDA assumes that the spread, volatility, and correlation of your features are identical regardless of whether the market goes up or down tomorrow.
+
+QDA drops the equal variance assumption. It allows each class to have its own distinct covariance matrix ($Σ_{\text up}$ and $Σ_{\text down}$). Because the model now understands that the "Up" class has a different geometric shape than the "Down" class, it no longer draws a straight line. Instead, it wraps the classes in curves (parabolas, ellipses, or hyperbolas).
+
+## The Discriminant Function $δ_k(x)$ ##
+
+Let $k$ a class (either "up" or "down"), then we define $δ_k(x)$
+
+$δ_k(x) = -\frac{1}{2} \log |Σ_k| - \frac{1}{2} (x - μ_k)^T Σ_k^{-1} (x - μ_k) + \log π_k$, where
+
+1. $Σ_k$: Covariance matrix for class $k$.
+2. $|Σ_k|$: Determinant of $Σ_k$.
+3. $Σ_k^{-1}$: Inverse $Σ_k$
+4. $μ_k$: Mean vector for class $k$
+5. $π_k$: Ratio of samples in class $k$ to total.
 
 
+To make a prediction  $δ_{up}(x)$ and $δ_{down}(x)$. Whichever value is larger dictates the prediction.
