@@ -7,9 +7,10 @@ SRCS := $(shell find $(SRC_DIR) -type f -name "*.cpp")
 OBJS := $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 LDFLAGS := -framework Accelerate
 
-ifdef __TEST_MAIN__
+ifneq ($(filter 1,$(if $(__TEST_MAIN__),1)$(if $(__CLI_MAIN__),1)),)
     TARGET := $(BIN_DIR)/tuxedocat    
-    CFLAGS += -D__TEST_MAIN__
+    $(if $(__TEST_MAIN__),$(eval CFLAGS += -D__TEST_MAIN__))
+    $(if $(__CLI_MAIN__),$(eval CFLAGS += -D__CLI_MAIN__))
 else
     TARGET := $(BIN_DIR)/libtuxedocat.dylib
     CFLAGS += -fPIC

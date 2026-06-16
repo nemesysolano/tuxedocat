@@ -6,87 +6,21 @@
 #include <fstream>
 #include <cassert>
 #include "forecast.h"
+#include "timeseries-momenta.h"
 
 using namespace std;
 using namespace timeseries::classifiers;
 using namespace slice;
 using namespace timeseries::dataframe;
 using namespace forecast;
-
-const static std::string DIRECTION_COLUMN_NAME = "Direction";
-class Momenta {
-    private:
-        DataFrame data_frame_;
-        std::vector<std::string> momentum_column_names_;
-
-        Momenta(const DataFrame & data_frame, const std::vector<std::string> & momentum_column_names)
-            : data_frame_(data_frame), momentum_column_names_(momentum_column_names) {}        
-    public:
-
-        Momenta(const Momenta&) = delete;
-        Momenta& operator=(const Momenta&) = delete;
-        const std::string & direction_column_name() const { return DIRECTION_COLUMN_NAME; }
-        const DataFrame & data_frame() const { return data_frame_; }
-        const std::vector<std::string> & momentum_column_names() const { return momentum_column_names_; }
-
-        static Momenta Create(const DataFrame & df);
-};
-
-Momenta Momenta::Create(const DataFrame & df) {
-    TuxedoError error;
-    string momentum_column_name;
-    string price_column_name("Close");
-    std::vector<size_t> prime_horizons = {2, 3, 5, 11, 19, 31, 47};
-    
-    // 1. Initialize the master dataframe safely
-    auto momentum_result = get_nth_momentum(df, price_column_name, 1); 
-    assert(momentum_result.has_value()); 
-    auto & momentum = momentum_result.value();
-    
-    // 2. Iterate and append remaining prime horizons
-    vector<string> momentum_column_names({"Momentum_1"});
-    for (size_t h : prime_horizons) {
-        auto momentum_h_result = get_nth_momentum(df, price_column_name, h);
-        assert(momentum_h_result.has_value()); // Moved above .value()
-        
-        auto & momentum_h = momentum_h_result.value();
-        momentum_column_name = "Momentum_" + std::to_string(h);
-
-        error = momentum.append_column(momentum_h, momentum_column_name, momentum_column_name);
-        assert(error == TuxedoError::NO_ERROR);
-        momentum_column_names.push_back(momentum_column_name);
-    }
-
-    auto direction_result = df.direction(price_column_name, "Direction");
-    assert(direction_result.has_value());
-    auto & direction = direction_result.value();
-
-    auto shifted_direction_result = direction.shift(-1);
-    assert(shifted_direction_result.has_value());
-    auto & shifted_direction = shifted_direction_result.value();
-    
-    error = momentum.append_column(shifted_direction, "Direction", "Direction");
-    assert(error == TuxedoError::NO_ERROR);
-
-    auto momentum_without_nans_result = momentum.dropna();
-    assert(momentum_without_nans_result.has_value());
-    auto momentum_without_nans = momentum_without_nans_result.value();
-
-    return Momenta(std::move(momentum_without_nans), std::move(momentum_column_names));
-}
+using namespace timeseries::momenta;
 
 void regression_test_impl(
     slice::Slice2D & X_train, slice::Slice2D & X_test, slice::Slice2D & Y_train, slice::Slice2D & Y_test,
     BinaryClassifier & binary_classifier, 
     std::string && classifier_name
 ) {
-    auto logistic_regression_result = LogisticRegression::Create(X_train, Y_train);
-    assert(logistic_regression_result.has_value());
-    auto & logistic_regression = logistic_regression_result.value();
-
-    auto predictions_result = logistic_regression->predict(X_test);    
-    assert(predictions_result.has_value());
-    
+ 
     auto confusion_matrix_result = binary_classifier.confusion_matrix(X_test, Y_test);
     assert(confusion_matrix_result.has_value());
     auto & confusion_matrix = confusion_matrix_result.value();
@@ -97,7 +31,7 @@ void regression_test_impl(
 void regression_test(const char * current_program_path) {
     /* Creates momentum (X) and direction dataframes (Y) */
     std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
-    std::string file_path = (exe_path / "nvo.csv").string();    
+    std::string file_path = (exe_path / "SPMO.csv").string();    
     auto input_stream = ifstream(file_path);    
     assert(input_stream.is_open());
 
