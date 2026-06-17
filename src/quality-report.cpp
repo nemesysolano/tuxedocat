@@ -30,7 +30,7 @@ namespace reports {
         auto & df = dataframe_result.value();
         input_stream.close();
 
-        auto momenta = Features::CreateMomenta(df);
+        auto momenta = Features::CreateZScores(df);
         const DataFrame & momentum_df = momenta.data_frame();
         const std::vector<std::string> & momentum_column_names = momenta.momentum_column_names();
         size_t train_end_row = momentum_df.rows() * 0.8;
@@ -57,13 +57,15 @@ namespace reports {
         // 1. Create the classifiers
         auto logistic_result = LogisticRegression::Create(X_train, Y_train);
         auto lda_result = LinearDiscriminant::Create(X_train, Y_train);
+        auto qda_result = QuadraticDiscriminant::Create(X_train, Y_train);
 
         // 2. Compute confusion matrices immediately
         auto logistic_matrix = logistic_result.value()->confusion_matrix(X_test, Y_test).value();
         auto lda_matrix = lda_result.value()->confusion_matrix(X_test, Y_test).value();
+        auto qda_matrix = qda_result.value()->confusion_matrix(X_test, Y_test).value();
 
         // 3. Create the report using the confusion matrices (not the unique_ptr<Classifier>)
-        return make_unique<QualityReport>(full_file_path, logistic_matrix, lda_matrix);
+        return make_unique<QualityReport>(full_file_path, logistic_matrix, lda_matrix, qda_matrix);
     
     }
 
@@ -86,13 +88,13 @@ void quality(const char * current_program_path, const vector<string> & files) {
         
         // 1. Print Exact ASCII Headers
         cout << "                                                                                    CLASSIFIERS REPORT" << endl;
-        cout << "|------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
-        cout << "|Ticker|                                 Logistic                                            |                                 Linear Discriminant Analysis                        |" << endl;
-        cout << "+------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
-        cout << "|      |              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|" << endl;
-        cout << "|      |----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+" << endl;
-        cout << "|      |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |" << endl;
-        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
+        cout << "|------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
+        cout << "|Ticker|                                 Logistic                                            |                                 Linear Discriminant Analysis                        |                                Quadratic Discriminant Analysis                      |" << endl;
+        cout << "+------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
+        cout << "|      |              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|" << endl;
+        cout << "|      |----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+" << endl;
+        cout << "|      |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |" << endl;
+        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
 
         // 2. Lambda to format and print a single classifier's metrics
         auto print_metrics = [](const BinaryConfusionMatrix& m) {
@@ -122,12 +124,14 @@ void quality(const char * current_program_path, const vector<string> & files) {
                 // Print LDA Block
                 print_metrics(report->linear_discriminant());
                 
+                // Print LDA Block
+                print_metrics(report->quadratic_discriminant());                
                 cout << "|" << endl;
             }
         }
         
         // 4. Print Footer
-        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
+        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
     }
 
 }

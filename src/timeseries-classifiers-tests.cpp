@@ -83,9 +83,15 @@ void regression_test(const char * current_program_path) {
     auto linear_discriminant_result = LinearDiscriminant::Create(X_train, Y_train);
     assert(linear_discriminant_result.has_value());
     auto & linear_discriminant = *linear_discriminant_result.value();
+
+    /* Quadratic Discriminant Analysis */
+    auto quadratic_discriminant_result = QuadraticDiscriminant::Create(X_train, Y_train);
+    assert(quadratic_discriminant_result.has_value());
+    auto & quadratic_discriminant = *quadratic_discriminant_result.value();
     
     regression_test_impl(X_train, X_test, Y_train, Y_test, logistic_regression, "LogisticRegression");
     regression_test_impl(X_train, X_test, Y_train, Y_test, linear_discriminant, "LinearDiscriminant");
+    regression_test_impl(X_train, X_test, Y_train, Y_test, quadratic_discriminant, "QuadraticDiscriminant");
     
 }
 
@@ -275,5 +281,181 @@ void linear_discriminant_weights_test() {
 
     cout << w << endl;
     std::cout << "linear_discriminant_weights_test passed." << std::endl;
+}
+
+void category_covariance_test() {
+    // 1. Create a 4x2 Feature Matrix (X)
+    // We design the first 3 rows to be perfectly linear to test the covariance math
+    std::vector<double> x_data = {
+        2.0,  4.0,  // Row 0 (UP)
+        4.0,  6.0,  // Row 1 (UP)
+        6.0,  8.0,  // Row 2 (UP)
+       10.0, 10.0   // Row 3 (DOWN) - Should be ignored by up_category
+    };
+    slice::MutableSlice2D X(x_data, 4, 2);
+
+    // 2. Create a 4x1 Target Matrix (y)
+    std::vector<double> y_data = {
+        1.0,   // UP
+        1.0,   // UP
+        1.0,   // UP
+       -1.0    // DOWN
+    };
+    slice::MutableSlice2D y(y_data, 4, 1);
+
+    // 3. Extract the UP category using existing infrastructure
+    auto up_cat_result = up_category(X, y);
+    assert(up_cat_result.has_value());
+    auto & up_cat = up_cat_result.value();
+
+    // 4. Calculate the Covariance Matrix
+    auto cov_result = category_covariance(up_cat);
+    assert(cov_result.has_value());
+    auto & cov = cov_result.value();
+
+    // 5. Validate Structural Dimensions
+    assert(cov.rows() == 2);
+    assert(cov.cols() == 2);
+
+    // 6. Validate Mathematical Correctness
+    // Feature 1 (UP rows): {2.0, 4.0, 6.0} -> Mean = 4.0
+    // Feature 2 (UP rows): {4.0, 6.0, 8.0} -> Mean = 6.0
+    // Deviations from Mean:
+    // Row 0: [-2.0, -2.0]
+    // Row 1: [ 0.0,  0.0]
+    // Row 2: [ 2.0,  2.0]
+    //
+    // Sum of Squares for Feature 1 (cov[0,0]): (-2)^2 + 0^2 + 2^2 = 8.0
+    // Bessel's Correction: M - 1 = 3 - 1 = 2
+    // Expected Variance: 8.0 / 2 = 4.0
+    
+    assert(std::abs(cov[0, 0].value() - 4.0) < 1e-6); // Variance of Feature 1
+    assert(std::abs(cov[1, 1].value() - 4.0) < 1e-6); // Variance of Feature 2
+    
+    // Expected Covariance between Feature 1 and 2:
+    // ((-2*-2) + (0*0) + (2*2)) / 2 = 8.0 / 2 = 4.0
+    assert(std::abs(cov[0, 1].value() - 4.0) < 1e-6); // Cross-Covariance
+    assert(std::abs(cov[1, 0].value() - 4.0) < 1e-6); // Symmetric Cross-Covariance
+
+    std::cout << "PASSED category_covariance_test" << std::endl;
+}
+
+void determinant_test() {
+    // --- Test 1: 2x2 Matrix ---
+    // | 4  3 |
+    // | 6  3 |
+    // Det = (4 * 3) - (3 * 6) = 12 - 18 = -6.0
+    std::vector<double> data_2x2 = {
+        4.0, 3.0,
+        6.0, 3.0
+    };
+    MutableSlice2D mat_2x2(data_2x2, 2, 2);
+    auto det_2x2 = determinant(mat_2x2);
+    assert(det_2x2.has_value());
+    assert(std::abs(det_2x2.value() - (-6.0)) < 1e-6);
+
+    // --- Test 2: 3x3 Matrix ---
+    // | 6  1  1 |
+    // | 4 -2  5 |
+    // | 2  8  7 |
+    // Det = 6(-14 - 40) - 1(28 - 10) + 1(32 - (-4)) 
+    //     = 6(-54) - 18 + 36 = -324 - 18 + 36 = -306.0
+    std::vector<double> data_3x3 = {
+        6.0,  1.0, 1.0,
+        4.0, -2.0, 5.0,
+        2.0,  8.0, 7.0
+    };
+    MutableSlice2D mat_3x3(data_3x3, 3, 3);
+    auto det_3x3 = determinant(mat_3x3);
+    assert(det_3x3.has_value());
+    assert(std::abs(det_3x3.value() - (-306.0)) < 1e-6);
+
+    // --- Test 3: Identity Matrix ---
+    // Det = 1.0
+    std::vector<double> data_id = {
+        1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0
+    };
+    MutableSlice2D mat_id(data_id, 3, 3);
+    auto det_id = determinant(mat_id);
+    assert(det_id.has_value());
+    assert(std::abs(det_id.value() - 1.0) < 1e-6);
+
+    // --- Test 4: Non-Square Matrix Validation ---
+    // Determinants are strictly for N x N matrices.
+    std::vector<double> data_rect = {
+        1.0, 2.0, 3.0,
+        4.0, 5.0, 6.0
+    };
+    MutableSlice2D mat_rect(data_rect, 2, 3);
+    auto det_rect = determinant(mat_rect);
+    assert(!det_rect.has_value()); // Must fail gracefully
+    assert(det_rect.error() == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+
+    std::cout << "PASSED determinant_test" << std::endl;
+}
+
+void inverse_test() {
+    // --- Test 1: 2x2 Invertible Matrix ---
+    // A = | 4  7 |   Det = (4*6) - (7*2) = 10
+    //     | 2  6 |
+    //
+    // A^-1 = (1/10) * |  6 -7 |  =  |  0.6 -0.7 |
+    //                 | -2  4 |     | -0.2  0.4 |
+    std::vector<double> data_2x2 = {
+        4.0, 7.0,
+        2.0, 6.0
+    };
+    MutableSlice2D mat_2x2(data_2x2, 2, 2);
+    auto inv_2x2_exp = inverse(mat_2x2);
+    assert(inv_2x2_exp.has_value());
+    auto & inv_2x2 = inv_2x2_exp.value();
+    
+    assert(std::abs(inv_2x2[0, 0].value() -  0.6) < 1e-6);
+    assert(std::abs(inv_2x2[0, 1].value() - -0.7) < 1e-6);
+    assert(std::abs(inv_2x2[1, 0].value() - -0.2) < 1e-6);
+    assert(std::abs(inv_2x2[1, 1].value() -  0.4) < 1e-6);
+
+    // --- Test 2: Identity Matrix ---
+    // The inverse of an identity matrix is itself.
+    std::vector<double> data_id = {
+        1.0, 0.0, 0.0,
+        0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0
+    };
+    MutableSlice2D mat_id(data_id, 3, 3);
+    auto inv_id_exp = inverse(mat_id);
+    assert(inv_id_exp.has_value());
+    auto & inv_id = inv_id_exp.value();
+    
+    assert(std::abs(inv_id[0, 0].value() - 1.0) < 1e-6);
+    assert(std::abs(inv_id[1, 1].value() - 1.0) < 1e-6);
+    assert(std::abs(inv_id[2, 2].value() - 1.0) < 1e-6);
+    assert(std::abs(inv_id[0, 1].value() - 0.0) < 1e-6);
+
+    // --- Test 3: Non-Square Matrix Validation ---
+    // Inversions are mathematically undefined for rectangular matrices.
+    std::vector<double> data_rect = {
+        1.0, 2.0, 3.0,
+        4.0, 5.0, 6.0
+    };
+    MutableSlice2D mat_rect(data_rect, 2, 3);
+    auto inv_rect_exp = inverse(mat_rect);
+    assert(!inv_rect_exp.has_value());
+    assert(inv_rect_exp.error() == TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+
+    // --- Test 4: Singular (Non-Invertible) Matrix Validation ---
+    // The determinant of this matrix is 0 because Row 2 is exactly 2x Row 1.
+    std::vector<double> data_singular = {
+        1.0, 2.0,
+        2.0, 4.0
+    };
+    MutableSlice2D mat_singular(data_singular, 2, 2);
+    auto inv_singular_exp = inverse(mat_singular);
+    assert(!inv_singular_exp.has_value()); // Must fail gracefully
+    assert(inv_singular_exp.error() == TuxedoError::ERR_NOT_INVERTIBLE_MATRIX);
+
+    std::cout << "[PASSED] inverse_test" << std::endl;
 }
 #endif

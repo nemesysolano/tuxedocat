@@ -122,7 +122,35 @@ namespace slice {
             MutableSlice2D(const std::vector<double> & source, size_t rows, size_t cols): Span2D(rows, cols), data_(source) {}
             MutableSlice2D(size_t rows, size_t cols): Span2D(rows, cols), data_(rows * cols, 0.0) {}
             MutableSlice2D(std::vector<double> && source, size_t rows, size_t cols): Span2D(rows, cols), data_(std::move(source)) {}
+            MutableSlice2D(const MutableSlice2D & other): Span2D(other.rows_, other.cols_), data_(other.data_) {}
+            MutableSlice2D(MutableSlice2D && other) noexcept : Span2D(other.rows_, other.cols_), data_(std::move(other.data_)) {}
+            MutableSlice2D(const Span2D & source): Span2D(source.rows(), source.cols()), data_(source.rows() * source.cols(), 0.0) {
+                for (size_t i = 0; i < source.rows(); ++i) {
+                    for (size_t j = 0; j < source.cols(); ++j) {
+                        auto val = source[i, j];
+                        if (!val) continue;
+                        data_[i * source.cols() + j] = val.value();
+                    }
+                }
+            }
             
+            MutableSlice2D& operator=(const MutableSlice2D& other) {
+                if (this != &other) {
+                    rows_ = other.rows_;
+                    cols_ = other.cols_;
+                    data_ = other.data_;
+                }
+                return *this;
+            }
+            MutableSlice2D& operator=(MutableSlice2D&& other) noexcept {
+                if (this != &other) {
+                    rows_ = other.rows_;
+                    cols_ = other.cols_;
+                    data_ = std::move(other.data_);
+                }
+                return *this;
+            }
+
             std::expected<double, TuxedoError> operator[](size_t row, size_t col) const override;
             virtual std::expected<MutableSlice2DCell, TuxedoError> operator[](size_t row, size_t col);
 

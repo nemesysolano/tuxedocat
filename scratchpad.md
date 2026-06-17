@@ -151,3 +151,4 @@ $δ_k(x) = -\frac{1}{2} \log |Σ_k| - \frac{1}{2} (x - μ_k)^T Σ_k^{-1} (x - μ
 
 
 To make a prediction  $δ_{up}(x)$ and $δ_{down}(x)$. Whichever value is larger dictates the prediction.
+

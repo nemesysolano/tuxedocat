@@ -10,8 +10,8 @@ void down_category_test();
 void scatter_matrices_test();
 void linear_discriminant_weights_test();
 void regression_test(const char * current_program_path);
-
-
-
+void category_covariance_test();
+void determinant_test();
+void inverse_test();
 #endif
 #endif

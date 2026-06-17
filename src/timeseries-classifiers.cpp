@@ -85,32 +85,6 @@ namespace timeseries::classifiers {
         return result;
     }
 
-    // 2. Confusion Matrix: Evaluate predictions against actual directions
-    std::expected<BinaryConfusionMatrix, TuxedoError> LogisticRegression::confusion_matrix(
-        const slice::Span2D & lags, 
-        const slice::Span2D & directions
-    ) {
-        if (lags.rows() != directions.rows()) {
-            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
-        }
-
-        auto pred_res = predict(lags);
-        if (!pred_res) return std::unexpected(pred_res.error());
-        auto& preds = pred_res.value();
-
-        int tp = 0, tn = 0, fp = 0, fn = 0;
-
-        for (size_t i = 0; i < lags.rows(); ++i) {
-            double p = preds[i, 0].value();
-            double a = directions[i, 0].value();
-
-            if (a > 0 && p > 0) tp++;
-            else if (a < 0 && p < 0) tn++;
-            else if (a < 0 && p > 0) fp++;
-            else if (a > 0 && p < 0) fn++;
-        }
-        return BinaryConfusionMatrix(tp, tn, fp, fn);
-    }
 
     // 3. Create: Train the model using IRLS
     std::expected<std::unique_ptr<LogisticRegression>, TuxedoError> LogisticRegression::Create(
@@ -161,14 +135,6 @@ namespace timeseries::classifiers {
         return std::make_unique<LogisticRegression>(coeffs, beta(0));
     }
 
-
-/* 
-     Today      Lag1.     Lag2      Lag3      Lag4.     Lag5  Direction
-  0.780280  0.085327 -1.083837 -2.370044 -1.311540  0.201223        1.0
- -2.496545  0.780280  0.085327 -1.083837 -2.370044 -1.311540       -1.0
-  1.669591 -2.496545  0.780280  0.085327 -1.083837 -2.370044        1.0
- -2.159910  1.669591 -2.496545  0.780280  0.085327 -1.083837       -1.0        
- */
 
     std::expected<DirectionalCategory, TuxedoError> up_category(
         const slice::Span2D & X, 
@@ -309,6 +275,129 @@ namespace timeseries::classifiers {
         return DirectionalCategory(std::move(μ_down), std::move(X_subset), std::move(σ_downs_sum));
     }
     
+    std::expected<slice::MutableSlice2D, TuxedoError> category_covariance(const DirectionalCategory & category) { // Σ_k
+        // Retrieve the feature rows (X) and the pre-calculated mean vector (μ)
+        const auto & X = category.X(); 
+        const auto & μ = category.μ();
+        
+        size_t M = X.rows();
+        size_t N = X.cols();
+
+        // Validation: Need at least 2 observations for sample covariance
+        if (M < 2 || N == 0) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        // 1. Initialize the N x N covariance matrix
+        slice::MutableSlice2D cov(N, N);
+        for (size_t j = 0; j < N; ++j) {
+            for (size_t k = 0; k < N; ++k) {
+                cov[j, k].value() = 0.0;
+            }
+        }
+
+        // 2. Compute the sum of squared deviations
+        // Exploiting matrix symmetry: cov[j, k] == cov[k, j]
+        for (size_t i = 0; i < M; ++i) {
+            for (size_t j = 0; j < N; ++j) {            
+                auto μ_result = μ[j, 0];
+                assert(μ_result.has_value());
+                double diff_j = X[i, j].value() - μ_result.value();
+                
+                // Only compute the upper triangle (k starts at j)
+                for (size_t k = j; k < N; ++k) {
+                    μ_result = μ[k,0];
+                    assert(μ_result.has_value());
+                    double diff_k = X[i, k].value() - μ_result.value();
+                    cov[j, k].value() += diff_j * diff_k;                
+                }
+            }
+        }
+
+        // 3. Apply Bessel's Correction (M - 1) and fill the lower triangle
+        double dof = static_cast<double>(M - 1);
+        for (size_t j = 0; j < N; ++j) {
+            for (size_t k = j; k < N; ++k) {
+                double val = cov[j, k].value() / dof;
+                
+                cov[j, k].value() = val; // Set upper triangle/diagonal
+                if (j != k) {
+                    cov[k, j].value() = val; // Mirror to lower triangle
+                }
+            }
+        }
+
+        return cov;
+    }   
+
+    std::expected<double, TuxedoError> category_ratio(const DirectionalCategory & a, const DirectionalCategory & b){ // returns $\frac {Σ^{N-1}_{k=0} a.X[k]}{Σ^{N-1}_{k=0} a.X[k] + Σ^{N-1}_{k=0} b.X[k]}$
+        size_t b_count = b.X().rows();
+        if(b_count == 0) return std::unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL);       
+        
+        size_t a_count = a.X().rows();
+        size_t total_count = a_count + b_count;
+
+        return static_cast<double>(a_count) / total_count;
+    }
+
+    std::expected<double, TuxedoError> determinant(const slice::Span2D & X) {
+        // 1. Validation: Determinants are strictly defined for non-empty square matrices
+        if (X.rows() != X.cols() || X.rows() == 0) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        // 2. Zero-Copy Memory Mapping (Strictly Row-Major)
+        Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> 
+            eigen_X(X.data_handle(), X.rows(), X.cols());
+
+        // 3. Robust Singularity Check using Full Pivoting LU Decomposition
+        Eigen::FullPivLU<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> lu(eigen_X);
+        
+        // If the matrix is singular (rank < dimension), the determinant is effectively 0.0
+        if (!lu.isInvertible()) {
+            return std::unexpected(TuxedoError::ERR_NOT_INVERTIBLE_MATRIX);
+        }
+
+        // 4. Return the safely calculated determinant
+        return lu.determinant();
+    }
+
+   /**
+     * Calculates the inverse of a square matrix.
+     * Validates invertibility using Full Pivoting LU Decomposition to prevent 
+     * silent NaN/Infinity propagation on mathematically singular matrices.
+     */
+    std::expected<slice::MutableSlice2D, TuxedoError> inverse(const slice::Span2D & X) {
+        // 1. Validation: Only non-empty square matrices are invertible
+        if (X.rows() != X.cols() || X.rows() == 0) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        // 2. Zero-Copy Memory Mapping (Strictly Row-Major)
+        Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> 
+            eigen_X(X.data_handle(), X.rows(), X.cols());
+
+        // 3. Robust Singularity Check using Full Pivoting LU Decomposition
+        Eigen::FullPivLU<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> lu(eigen_X);
+        
+        // If the algebraic rank does not equal the dimension, the determinant is 0.
+        if (!lu.isInvertible()) {
+            return std::unexpected(TuxedoError::ERR_NOT_INVERTIBLE_MATRIX);
+        }
+
+        // 4. Compute the Inverse (safe now that we know it is mathematically valid)
+        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> eigen_inv = lu.inverse();
+
+        // 5. Map the result back into the Tuxedo slice ecosystem
+        slice::MutableSlice2D result(X.rows(), X.cols());
+        for (size_t i = 0; i < X.rows(); ++i) {
+            for (size_t j = 0; j < X.cols(); ++j) {
+                result[i, j].value() = eigen_inv(i, j);
+            }
+        }
+
+        return result;
+    }
 
     std::expected<ScatterMatrices, TuxedoError> scatter_matrices(
         const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
@@ -413,42 +502,6 @@ namespace timeseries::classifiers {
         return y_pred;
     }
 
-    std::expected<BinaryConfusionMatrix, TuxedoError> LinearDiscriminant::confusion_matrix(
-        const slice::Span2D & X, // (M×N) lags span
-        const slice::Span2D & y // (M×1) directions span                
-    ) {
-        if(X.rows() != y.rows() || y.cols() != 1 || X.rows() == 0) { 
-            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
-        }
-
-        // 1. Generate predictions using the loaded Fisher weights
-        auto y_pred_result = predict(X);
-        if (!y_pred_result) return std::unexpected(y_pred_result.error());
-        auto & y_pred = y_pred_result.value();
-
-        int tp = 0, tn = 0, fp = 0, fn = 0;
-        
-        // 2. Tabulate the confusion matrix components
-        for (size_t i = 0; i < y.rows(); ++i) {
-            auto actual_val = y[i, 0];
-            auto pred_val = y_pred[i, 0];
-
-            if (!actual_val.has_value() || !pred_val.has_value()) {
-                return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
-            }
-
-            bool actual_pos = actual_val.value() > 0.0;
-            bool pred_pos = pred_val.value() > 0.0;
-
-            if (actual_pos && pred_pos) tp++;
-            else if (!actual_pos && !pred_pos) tn++;
-            else if (!actual_pos && pred_pos) fp++;
-            else if (actual_pos && !pred_pos) fn++;
-        }
-
-        return BinaryConfusionMatrix(tp, tn, fp, fn);
-    }
-
     std::expected<std::unique_ptr<LinearDiscriminant>, TuxedoError> LinearDiscriminant::Create(
         const slice::Span2D & X, // (M×N) lags span 
         const slice::Span2D & y  // (M×1) directions span                
@@ -487,5 +540,166 @@ namespace timeseries::classifiers {
         // 4. Instantiate and return the trained classifier
         return std::make_unique<LinearDiscriminant>(std::move(w), threshold);
     } 
-      
+
+    std::expected<slice::MutableSlice2D, TuxedoError> QuadraticDiscriminant::predict(
+        const slice::Span2D & X // (M×N) lags span
+    ) {
+        size_t M = X.rows();
+        size_t N = X.cols();
+
+        // 1. Structural Match Verification against trained model dimensions
+        if (μ_up_.cols() != 1 ) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        slice::MutableSlice2D predictions(M, 1);
+        
+        // Local contiguous buffer to prevent excessive virtual slice lookups
+        std::vector<double> x_row(N); 
+
+        for (size_t i = 0; i < M; ++i) {
+            // High-Performance Array Extraction: 
+            for (size_t j = 0; j < N; ++j) {
+                auto val = X[i, j];
+                if (!val.has_value()) {
+                    return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+                }
+                x_row[j] = val.value();
+            }
+
+            double quad_up = 0.0;
+            double quad_down = 0.0;
+
+            // 2. Evaluate the Quadratic Form: (x - μ)^T * Σ^-1 * (x - μ)
+            for (size_t r = 0; r < N; ++r) {
+                double diff_r_up = x_row[r] - μ_up_[r, 0].value();
+                double diff_r_down = x_row[r] - μ_down_[r, 0].value();
+                
+                double row_sum_up = 0.0;
+                double row_sum_down = 0.0;
+
+                for (size_t c = 0; c < N; ++c) {
+                    double diff_c_up = x_row[c] - μ_up_[c, 0].value();
+                    double diff_c_down = x_row[c] - μ_down_[c, 0].value();
+
+                    // Using your explicit inverse matrix variable names
+                    row_sum_up += inverse_Σ_up_[r, c].value() * diff_c_up;
+                    row_sum_down += inverse_Σ_down_[r, c].value() * diff_c_down;
+                }
+                
+                quad_up += diff_r_up * row_sum_up;
+                quad_down += diff_r_down * row_sum_down;
+            }
+
+            // 3. Assemble the full Discriminant Function δ_k(x)
+            // Fully aligned to your custom class header variable names!
+            double score_up = -half_log_determinant_Σ_up_ - 0.5 * quad_up + log_π_k_up_;
+            double score_down = -half_log_determinant_Σ_down_ - 0.5 * quad_down + log_π_k_down_;
+
+            // 4. Parabolic Decision Boundary Check
+            predictions[i, 0].value() = (score_up > score_down) ? 1.0 : -1.0;
+        }
+
+        return predictions;
+    }
+
+    std::expected<std::unique_ptr<QuadraticDiscriminant>, TuxedoError> QuadraticDiscriminant::Create(
+        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+        const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
+    ) {
+        if(X.rows() != y.rows() || y.cols() != 1 || X.rows() == 0) { 
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }    
+        
+        /* 
+        double half_log_determinant_Σ_up_; // $\frac{1}{2} \log |Σ_k|$
+        slice::MutableSlice2D inverse_Σ_up_; // Σ_k^{-1} 
+        double log_π_k_up_; // $\log π_k$
+
+        double half_log_determinant_Σ_down_; // $\frac{1}{2} \log |Σ_k|$
+        slice::MutableSlice2D inverse_Σ_down_; // Σ_k^{-1} 
+        double log_π_k_down_; // $\log π_k$     
+        */
+
+        // Calculates direction_up and direction_down
+        auto dir_up_result = up_category(X, y);
+        if (!dir_up_result) return std::unexpected(dir_up_result.error());
+        auto & dir_up = dir_up_result.value();
+
+        auto dir_down_result = down_category(X, y);
+        if (!dir_down_result) return std::unexpected(dir_down_result.error());
+        auto & dir_down = dir_down_result.value();
+
+        // Calculates Σ_up and Σ_down
+        auto Σ_up_result = category_covariance(dir_up);
+        if (!Σ_up_result) return std::unexpected(Σ_up_result.error());
+        auto & Σ_up = Σ_up_result.value();
+
+        auto Σ_down_result = category_covariance(dir_down);
+        if (!Σ_down_result) return std::unexpected(Σ_down_result.error());
+        auto & Σ_down = Σ_down_result.value();
+
+        // Calculates inverse_Σ_up and inverse_Σ_down
+        auto inverse_Σ_up_result = inverse(Σ_up);
+        if (!inverse_Σ_up_result) return std::unexpected(inverse_Σ_up_result.error());
+        auto inverse_Σ_up = inverse_Σ_up_result.value();
+
+        auto inverse_Σ_down_result = inverse(Σ_down);
+        if (!inverse_Σ_down_result) return std::unexpected(inverse_Σ_down_result.error());
+        auto inverse_Σ_down = inverse_Σ_down_result.value();
+
+        // Calculates half_log_determinant_Σ_up and half_log_determinant_Σ_down
+        auto half_Σ_up_determinant_result = determinant(Σ_up);
+        if (!half_Σ_up_determinant_result) return std::unexpected(half_Σ_up_determinant_result.error());
+        if(half_Σ_up_determinant_result.value() <= 0.0) return std::unexpected(TuxedoError::ERR_NEGATIVE_LOG_ARG);
+        auto half_Σ_up_determinant = 0.5*std::log(half_Σ_up_determinant_result.value());
+
+        auto half_Σ_down_determinant_result = determinant(Σ_down);
+        if (!half_Σ_down_determinant_result) return std::unexpected(half_Σ_down_determinant_result.error());
+        if(half_Σ_down_determinant_result.value() <= 0.0) return std::unexpected(TuxedoError::ERR_NEGATIVE_LOG_ARG);
+        auto half_Σ_down_determinant = 0.5*std::log(half_Σ_down_determinant_result.value());
+
+        // calculates log_π_k_up and log_π_k_down
+        auto π_k_up_result = category_ratio(dir_up, dir_down);
+        if (!π_k_up_result) return std::unexpected(π_k_up_result.error());
+        auto log_π_k_up = std::log(π_k_up_result.value());
+
+        auto π_k_down_result = category_ratio(dir_down, dir_up);
+        if (!π_k_down_result) return std::unexpected(π_k_down_result.error());
+        auto log_π_k_down = std::log(π_k_down_result.value());
+
+        
+        return std::make_unique<QuadraticDiscriminant>(
+            slice::MutableSlice2D(dir_up.μ()),     half_Σ_up_determinant, std::move(inverse_Σ_up), log_π_k_up,
+            slice::MutableSlice2D(dir_down.μ()), half_Σ_down_determinant, std::move(inverse_Σ_down), log_π_k_down
+        );  
+    }
+
+    std::expected<BinaryConfusionMatrix, TuxedoError> BinaryClassifier::confusion_matrix(
+        const slice::Span2D & lags, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+        const slice::Span2D & directions// (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
+    ) {
+        if (lags.rows() != directions.rows()) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+
+        auto pred_res = predict(lags);
+        if (!pred_res) { 
+            return std::unexpected(pred_res.error());
+        }
+        auto& preds = pred_res.value();
+
+        int tp = 0, tn = 0, fp = 0, fn = 0;
+
+        for (size_t i = 0; i < lags.rows(); ++i) {
+            double p = preds[i, 0].value();
+            double a = directions[i, 0].value();
+
+            if (a > 0 && p > 0) tp++;
+            else if (a < 0 && p < 0) tn++;
+            else if (a < 0 && p > 0) fp++;
+            else if (a > 0 && p < 0) fn++;
+        }
+        return BinaryConfusionMatrix(tp, tn, fp, fn);
+    }
 }

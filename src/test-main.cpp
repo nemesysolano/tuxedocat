@@ -80,7 +80,9 @@ int test_main(int argc, char* argv[]) {
     scatter_matrices_test();
     linear_discriminant_weights_test();
     regression_test(argv[0]);
-    
+    category_covariance_test();
+    determinant_test();
+    inverse_test();
     return 0;
 }
 
