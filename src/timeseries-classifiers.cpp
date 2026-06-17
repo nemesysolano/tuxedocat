@@ -675,6 +675,20 @@ namespace timeseries::classifiers {
         );  
     }
 
+
+    std::expected<slice::MutableSlice2D, TuxedoError> RadialSupportVectorMachine::predict(
+        const slice::Span2D & X // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+    ) { // returns (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
+        return std::unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+    }
+
+    std::expected<std::unique_ptr<QuadraticDiscriminant>, TuxedoError> RadialSupportVectorMachine::Create(
+        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+        const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
+    ){
+        return std::unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+    }
+
     std::expected<BinaryConfusionMatrix, TuxedoError> BinaryClassifier::confusion_matrix(
         const slice::Span2D & lags, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
         const slice::Span2D & directions// (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
