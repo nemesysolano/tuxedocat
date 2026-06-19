@@ -964,6 +964,27 @@ namespace timeseries::classifiers {
         return classifier;
     }
 
+    double RandomForest::predict_tree(const RandomForestNode* node, const slice::Span2D& X_test, size_t row_i) {
+        return NAN;
+    }
+
+    double RandomForest::predict_forest(const std::vector<std::unique_ptr<RandomForestNode>>& forest, const slice::Span2D& X_test, size_t row_i) {
+        return NAN;
+    }
+
+    std::expected<slice::MutableSlice2D, TuxedoError> RandomForest::predict(
+      const slice::Span2D &X // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+    ) { // returns (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
+        return std::unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+    }
+
+    std::expected<std::unique_ptr<RadialSupportVectorMachine>, TuxedoError> RandomForest::Create(
+      const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+      const slice::Span2D& y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
+    ) {
+        return std::unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+    }          
+
     std::expected<BinaryConfusionMatrix, TuxedoError> BinaryClassifier::confusion_matrix(
         const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
         const slice::Span2D & y// (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
