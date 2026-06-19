@@ -39,7 +39,9 @@ void regression_test(const char * current_program_path) {
     assert(dataframe_result.has_value());
     auto & df = dataframe_result.value();
 
-    auto momenta = Features::CreateMomenta(df);
+    auto momenta_result = Features::CreateMomenta(df);
+    assert(momenta_result.has_value());
+
     const DataFrame & momentum_df = momenta.data_frame();
     const std::vector<std::string> & momentum_column_names = momenta.momentum_column_names();
     size_t train_end_row = momentum_df.rows() * 0.8;

@@ -15,17 +15,18 @@ namespace reports {
             BinaryConfusionMatrix logistic_;
             BinaryConfusionMatrix linear_discriminant_;
             BinaryConfusionMatrix quadratic_discriminant_;
-
+            BinaryConfusionMatrix rsvm_;
         public:
-            QualityReport(const string & file_path, BinaryConfusionMatrix logistic, BinaryConfusionMatrix linear_discriminant, BinaryConfusionMatrix quadratic_discriminant): 
-            file_path_(file_path), logistic_(logistic), linear_discriminant_(linear_discriminant), quadratic_discriminant_(quadratic_discriminant) {}
+            QualityReport(const string & file_path, BinaryConfusionMatrix logistic, BinaryConfusionMatrix linear_discriminant, BinaryConfusionMatrix quadratic_discriminant, BinaryConfusionMatrix rsvm): 
+            file_path_(file_path), logistic_(logistic), linear_discriminant_(linear_discriminant), quadratic_discriminant_(quadratic_discriminant), rsvm_(rsvm) {}
             const string & file_path() const { return file_path_; }
             const BinaryConfusionMatrix & logistic() const { return logistic_; }
             const BinaryConfusionMatrix & linear_discriminant() const { return linear_discriminant_; }
             const BinaryConfusionMatrix & quadratic_discriminant() const { return quadratic_discriminant_; }
+            const BinaryConfusionMatrix & rsvm() const { return rsvm_; }
     };
 
     unique_ptr<QualityReport> quality(const string & full_file_path);
-    void quality(const char * current_program_path, const vector<string> & files);
+    void quality(const vector<string> & files);
 }
 #endif

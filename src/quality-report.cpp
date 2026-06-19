@@ -11,6 +11,7 @@
 #include <string_view>
 #include <ranges>
 #include <execution>
+#include <future>
 
 using namespace std;
 using namespace std::filesystem;
@@ -20,81 +21,96 @@ using namespace timeseries::momenta;
 
 namespace reports {
     unique_ptr<QualityReport> quality(const string & full_file_path) {
-        auto input_stream = ifstream(full_file_path);    
-        auto dataframe_result = DataFrame::Create(input_stream);
+        try {
+            auto input_stream = ifstream(full_file_path);    
+            auto dataframe_result = DataFrame::Create(input_stream);
 
-        if(!dataframe_result) {
-            cout << "Can't load " << full_file_path << endl;            
-            return nullptr;            
+            if(!dataframe_result) {
+                cout << "Can't load " << full_file_path << endl;            
+                return nullptr;            
+            }
+            auto & df = dataframe_result.value();
+            input_stream.close();
+
+            auto momenta_result = Features::CreateZScores(df);
+            if(!momenta_result.has_value()) {
+                return nullptr;
+            }
+            auto & momenta = momenta_result.value();
+            const DataFrame & momentum_df = momenta.data_frame();
+            const std::vector<std::string> & momentum_column_names = momenta.momentum_column_names();
+            size_t train_end_row = momentum_df.rows() * 0.8;
+
+            auto X_result = momentum_df.copy(momentum_column_names, momentum_column_names);
+            auto & X = X_result.value();
+
+            auto X_train_result = X.slice_to(train_end_row);
+            auto & X_train = X_train_result.value();
+
+            auto X_test_result = X.slice_from(train_end_row);
+            auto & X_test = X_test_result.value();    
+
+            auto Y_result = momentum_df.copy({"Direction"}, {"Direction"});
+            auto & Y = Y_result.value();;
+
+            auto Y_train_result = Y.slice_to(train_end_row);
+            auto & Y_train = Y_train_result.value();
+
+            auto Y_test_result = Y.slice_from(train_end_row);
+            auto & Y_test = Y_test_result.value();
+            
+            // 1. Create the classifiers
+            auto logistic_result = LogisticRegression::Create(X_train, Y_train);
+            auto lda_result = LinearDiscriminant::Create(X_train, Y_train);
+            auto qda_result = QuadraticDiscriminant::Create(X_train, Y_train);
+            auto rsvm_result = RadialSupportVectorMachine::Create(X_train, Y_train, X_test , Y_test);
+
+            // 2. Compute confusion matrices immediately
+            auto logistic_matrix = logistic_result.value()->confusion_matrix(X_test, Y_test).value();
+            auto lda_matrix = lda_result.value()->confusion_matrix(X_test, Y_test).value();
+            auto qda_matrix = qda_result.value()->confusion_matrix(X_test, Y_test).value();
+            auto rsvm_matrix = rsvm_result.value()->confusion_matrix(X_test, Y_test).value();
+
+            // 3. Create the report using the confusion matrices (not the unique_ptr<Classifier>)
+            return make_unique<QualityReport>(full_file_path, logistic_matrix, lda_matrix, qda_matrix, rsvm_matrix);
+        } catch (const exception & e) {
+            cout << "failed to process " << full_file_path << endl;
+            return nullptr;
         }
-        auto & df = dataframe_result.value();
-        input_stream.close();
-
-        auto momenta = Features::CreateZScores(df);
-        const DataFrame & momentum_df = momenta.data_frame();
-        const std::vector<std::string> & momentum_column_names = momenta.momentum_column_names();
-        size_t train_end_row = momentum_df.rows() * 0.8;
-
-        auto X_result = momentum_df.copy(momentum_column_names, momentum_column_names);
-        auto & X = X_result.value();
-
-
-        auto X_train_result = X.slice_to(train_end_row);
-        auto & X_train = X_train_result.value();
-
-        auto X_test_result = X.slice_from(train_end_row);
-        auto & X_test = X_test_result.value();    
-
-        auto Y_result = momentum_df.copy({"Direction"}, {"Direction"});
-        auto & Y = Y_result.value();;
-
-        auto Y_train_result = Y.slice_to(train_end_row);
-        auto & Y_train = Y_train_result.value();
-
-        auto Y_test_result = Y.slice_from(train_end_row);
-        auto & Y_test = Y_test_result.value();
-        
-        // 1. Create the classifiers
-        auto logistic_result = LogisticRegression::Create(X_train, Y_train);
-        auto lda_result = LinearDiscriminant::Create(X_train, Y_train);
-        auto qda_result = QuadraticDiscriminant::Create(X_train, Y_train);
-
-        // 2. Compute confusion matrices immediately
-        auto logistic_matrix = logistic_result.value()->confusion_matrix(X_test, Y_test).value();
-        auto lda_matrix = lda_result.value()->confusion_matrix(X_test, Y_test).value();
-        auto qda_matrix = qda_result.value()->confusion_matrix(X_test, Y_test).value();
-
-        // 3. Create the report using the confusion matrices (not the unique_ptr<Classifier>)
-        return make_unique<QualityReport>(full_file_path, logistic_matrix, lda_matrix, qda_matrix);
     
     }
 
-void quality(const char * current_program_path, const vector<string> & files) {
-        auto exe_path = canonical(current_program_path).parent_path();
-        
-        cout << "Running quality reports with files in " << exe_path.string() << endl;
+void quality(const vector<string> & files) {        
+    std::vector<std::future<std::unique_ptr<QualityReport>>> futures;
+    futures.reserve(files.size());
 
-        vector<unique_ptr<QualityReport>> reports(files.size());
-
-        transform(
-            files.begin(), files.end(),
-            reports.begin(),
-            [&](const string & file) {
-                return quality(exe_path.string() + "/" + file);
-            }
-        );
+   //  1. Dispatch all tasks asynchronously 
+    for (const auto& file : files) {
+        futures.push_back(std::async(std::launch::async, [&file]() {
+            return quality(file);
+        }));
+    }
+    
+    // 2. Gather results, blocking until each thread finishes, and filter
+    std::vector<std::unique_ptr<QualityReport>> reports;
+    for (auto& fut : futures) {
+        auto report = fut.get();
+        if (report != nullptr) {
+            reports.push_back(std::move(report));
+        }
+    }
 
         // --- NEW: Tabulated Output Engine ---
         
         // 1. Print Exact ASCII Headers
-        cout << "                                                                                    CLASSIFIERS REPORT" << endl;
-        cout << "|------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
-        cout << "|Ticker|                                 Logistic                                            |                                 Linear Discriminant Analysis                        |                                Quadratic Discriminant Analysis                      |" << endl;
-        cout << "+------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
-        cout << "|      |              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|" << endl;
-        cout << "|      |----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+" << endl;
-        cout << "|      |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |" << endl;
-        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
+        cout << "                                                                                                             CLASSIFIERS REPORT" << endl;
+        cout << "|------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
+        cout << "|Ticker|                                 Logistic                                            |                                 Linear Discriminant Analysis                        |                                Quadratic Discriminant Analysis                      |                                Rarial Support Vector Machine.                       |" << endl;
+        cout << "+------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
+        cout << "|      |              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|" << endl;
+        cout << "|      |----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+" << endl;
+        cout << "|      |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |" << endl;
+        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
 
         // 2. Lambda to format and print a single classifier's metrics
         auto print_metrics = [](const BinaryConfusionMatrix& m) {
@@ -126,12 +142,15 @@ void quality(const char * current_program_path, const vector<string> & files) {
                 
                 // Print LDA Block
                 print_metrics(report->quadratic_discriminant());                
-                cout << "|" << endl;
+                
+                // Print RSVM Block
+                print_metrics(report->rsvm());                
+                cout << "|" << endl;                
             }
         }
         
         // 4. Print Footer
-        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
+        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
     }
 
 }

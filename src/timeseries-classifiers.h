@@ -122,23 +122,39 @@ namespace timeseries::classifiers {
             );                    
     };
     
+
     class RadialSupportVectorMachine: public BinaryClassifier {
         private:
+            slice::MutableSlice2D x_; // Support vectors
             slice::MutableSlice2D α_; // Support vector weights.
-            double λ; //gravity well depth
-            double b; // bias in $f(x)$
+            double λ_; //gravity well depth
+            double b_; // bias in $f(x)$
 
         public:
-            inline RadialSupportVectorMachine(slice::MutableSlice2D α, double λ, double b): α_(α), λ(λ), b(b) {}
+            inline RadialSupportVectorMachine(
+                slice::MutableSlice2D x, // <-- Added Support Vectors
+                slice::MutableSlice2D α, 
+                double λ, 
+                double b
+            ): x_(std::move(x)), α_(std::move(α)), λ_(λ), b_(b) {}
 
             std::expected<slice::MutableSlice2D, TuxedoError> predict(
                 const slice::Span2D & X // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
             ) override; // returns (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
 
-            static std::expected<std::unique_ptr<QuadraticDiscriminant>, TuxedoError> Create(
+            static std::expected<std::unique_ptr<RadialSupportVectorMachine>, TuxedoError> Create(
                 const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
-                const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
-            );        
+                const slice::Span2D & y, // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`,
+                double λ,
+                double C
+            );            
+
+            static std::expected<std::unique_ptr<RadialSupportVectorMachine>, TuxedoError> Create(
+                const slice::Span2D & X_train, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+                const slice::Span2D & y_train, // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
+                const slice::Span2D & X_validate, // (m×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+                const slice::Span2D & y_validate // (m×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
+            );            
     };
 
     class DirectionalCategory {

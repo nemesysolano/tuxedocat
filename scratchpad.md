@@ -152,3 +152,31 @@ $δ_k(x) = -\frac{1}{2} \log |Σ_k| - \frac{1}{2} (x - μ_k)^T Σ_k^{-1} (x - μ
 
 To make a prediction  $δ_{up}(x)$ and $δ_{down}(x)$. Whichever value is larger dictates the prediction.
 
+# Radial Support Vector Machine (RSVM) #
+
+To understand the Radial Support Vector Machine (RBF SVM), overcomes the fundamental limitation of linear models. Linear Discriminant Analysis (LDA), Logistic Regression, and Linear Support Vector Classifiers all try to separate data by drawing straight lines or flat planes.
+
+## The Math: The Radial Basis Function (RBF) ##
+The engine that performs this dimensional warping is the Radial Basis Function (RBF) Kernel.
+Rather than comparing the features of two data points via a standard dot product, the RBF kernel measures the **Euclidean distance** between them to calculate a similarity score.
+
+The kernel formula between any two data points $x_i$ and $x_j$ is:
+
+$K(x_i, x_j) = \exp(-γ ||x_i - x_j||^2)$
+
+## The Prediction Function (Decision Boundary) ##
+
+Once the model is trained, it does not use a global weight vector to make predictions. Instead, it memorizes a critical subset of your training data known as the Support Vectors.To predict the class of a new, unseen data point $x$, the SVM calculates its RBF similarity to all the memorized Support Vectors and takes a weighted vote:
+
+$f(x) = \text{sign}\left( \sum_{i=1}^{M} \alpha_i y_i \exp(-\γ ||x_i - x||^2) + b \right)$
+
+- $M$: The total number of historical points.
+- $y_i$: The actual label of the historical point (e.g., +1 or -1).
+- $α_i$: The specific voting weight assigned to that historical point.
+- $b$: The bias term.
+
+## The Training Phase and the Penalty ($C$) ##
+
+During training, the algorithmic solver tries to maximize the margin between classes while assigning the $\alpha_i$ weights. However, it is strictly bound by a ceiling:
+
+$0 \leq \alpha_i \leq C$
