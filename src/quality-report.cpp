@@ -63,7 +63,7 @@ namespace reports {
             auto logistic_result = LogisticRegression::Create(X_train, Y_train);
             auto lda_result = LinearDiscriminant::Create(X_train, Y_train);
             auto qda_result = QuadraticDiscriminant::Create(X_train, Y_train);
-            auto rsvm_result = RadialSupportVectorMachine::Create(X_train, Y_train, X_test , Y_test);
+            auto rsvm_result = RadialSupportVectorMachine::Create(X_train, Y_train, 1 / static_cast<double>(X_train.cols()) , 1);
 
             // 2. Compute confusion matrices immediately
             auto logistic_matrix = logistic_result.value()->confusion_matrix(X_test, Y_test).value();

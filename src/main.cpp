@@ -19,7 +19,7 @@ using namespace reports;
 vector<string> read_lines_from_file(const char* current_program_path) {
     auto exe_path = canonical(current_program_path).parent_path();
     auto test_data_dir = exe_path.string() + "/../toolchain/test-data";
-    auto symbols_file = exe_path.string() + "/../documents/top-etf-jun-26.csv";
+    auto symbols_file = exe_path.string() + "/../documents/top-10-etf-jun-26.csv";
     vector<string> lines;
 
     if(!(

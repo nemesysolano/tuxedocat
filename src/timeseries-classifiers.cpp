@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <Eigen/Dense>
+#include <random> // Required for lock-free multi-threading
 
 using namespace std;
 
@@ -677,202 +678,107 @@ namespace timeseries::classifiers {
     }
 
 
-    std::expected<slice::MutableSlice2D, TuxedoError> RadialSupportVectorMachine::predict(
-        const slice::Span2D & X
-    ) {
-        size_t M = X.rows();
-        size_t N = X.cols();
-        size_t num_sv = x_.rows();
-
-        if (N != x_.cols()) {
-            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
-        }
-
-        slice::MutableSlice2D predictions(M, 1);
-
-        // 1. Zero-Copy Memory Map: Treat our Spans as Eigen Row-Major Matrices
-        using MatrixRowMajor = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-        
-        Eigen::Map<const MatrixRowMajor> X_map(X.data_handle(), M, N);
-        Eigen::Map<const MatrixRowMajor> SV_map(x_.data_handle(), num_sv, N);
-        
-        // α_ is an (num_sv x 1) matrix, which acts identically to an Eigen::VectorXd
-        Eigen::Map<const Eigen::VectorXd> alpha_map(α_.data_handle(), num_sv);
-
-        // 2. High-Speed Vectorized Prediction
-        for (size_t i = 0; i < M; ++i) {
-            
-            // Calculate the squared distance between X_i and EVERY Support Vector simultaneously
-            Eigen::VectorXd dist_sq = (SV_map.rowwise() - X_map.row(i)).rowwise().squaredNorm();
-            
-            // Apply the RBF Kernel: exp(-λ * dist^2)
-            Eigen::VectorXd kernel_vals = (-λ_ * dist_sq.array()).exp();
-            
-            // Calculate decision value using a lightning-fast SIMD Dot Product
-            double decision_value = b_ + alpha_map.dot(kernel_vals);
-
-            predictions[i, 0].value() = (decision_value >= 0.0) ? 1.0 : -1.0;
-        }
-
-        return predictions;
-    }
-
-    std::expected<std::unique_ptr<RadialSupportVectorMachine>, TuxedoError>
-    RadialSupportVectorMachine::Create(
+  
+   // ========================================================================
+    // HIGH-SPEED INTERNAL SMO SOLVER (DEPENDENCY INJECTION CACHE)
+    // ========================================================================
+    std::expected<std::unique_ptr<timeseries::classifiers::RadialSupportVectorMachine>, TuxedoError> 
+    create_from_cache(
         const slice::Span2D & X,
         const slice::Span2D & y,
+        const Eigen::MatrixXd & Q,
         double λ,
         double C
     ) {
         size_t M = X.rows();
         size_t N = X.cols();
 
-        if (M != y.rows() || M <= N || N == 0) {
-            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
-        }
-
-        // Zero-copy Eigen maps (row-major)
-        using MatrixRowMajor = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-        Eigen::Map<const MatrixRowMajor> X_map(X.data_handle(), M, N);
         Eigen::Map<const Eigen::VectorXd> y_map(y.data_handle(), M);
 
-        // 1. Precompute the full kernel matrix K (M x M)
-        Eigen::MatrixXd K(M, M);
-        for (size_t i = 0; i < M; ++i) {
-            for (size_t j = i; j < M; ++j) {
-                double dist_sq = (X_map.row(i) - X_map.row(j)).squaredNorm();
-                double val = std::exp(-λ * dist_sq);
-                K(i, j) = val;
-                K(j, i) = val;
-            }
-        }
-
-        // 2. Initialise dual variables, bias, and error cache
         Eigen::VectorXd alpha = Eigen::VectorXd::Zero(M);
-        double b = 0.0;
-        // Compute f = K * (alpha .* y) + b
-        Eigen::VectorXd f = K * (alpha.cwiseProduct(y_map));   // K * (α⊙y)
-        f.array() += b;                                        // add bias to every element
-        Eigen::VectorXd E = f - y_map;                         // E_i = f_i - y_i
-
-        // 3. SMO parameters
-        const double tol = 1e-5;
-        const int max_passes = 100;
+        
+        int max_passes = 10;
         int passes = 0;
-        int total_changed = 0;
-        bool examine_all = true;
+        double b_smo = 0.0;
+        double tol_smo = 1e-4;
+
+        // 1. Thread-Local Lock-Free RNG for lightning-fast SMO convergence
+        thread_local std::mt19937 gen([]() {
+            std::random_device rd;
+            return rd();
+        }());
+        std::uniform_int_distribution<size_t> dist_rand(0, M - 1);
 
         while (passes < max_passes) {
-            int num_changed = 0;
-
+            int num_changed_alphas = 0;
             for (size_t i = 0; i < M; ++i) {
-                // Skip if we are not examining all and alpha_i is on the bound
-                if (!examine_all && (alpha(i) == 0.0 || alpha(i) == C))
-                    continue;
+                double y_i = y_map(i);
+                
+                double f_i = b_smo + y_i * alpha.dot(Q.col(i));
+                double E_i = f_i - y_i;
 
-                // Check KKT conditions
-                if ((y_map(i) * E(i) < -tol && alpha(i) < C) ||
-                    (y_map(i) * E(i) >  tol && alpha(i) > 0)) {
+                if ((y_i * E_i < -tol_smo && alpha(i) < C) || (y_i * E_i > tol_smo && alpha(i) > 0)) {
+                    
+                    // Secure, thread-safe, global-lock-free random selection
+                    size_t j;
+                    
+                    do {
+                        j = dist_rand(gen);
+                    } while (j == i);
 
-                    // ---- Select j using the second‑order heuristic ----
-                    size_t j = i;
-                    double max_diff = -1.0;
-                    for (size_t k = 0; k < M; ++k) {
-                        if (k == i) continue;
-                        double diff = std::abs(E(i) - E(k));
-                        if (diff > max_diff) {
-                            max_diff = diff;
-                            j = k;
-                        }
-                    }
-                    if (j == i) {   // fallback (should not happen)
-                        j = (i + 1) % M;
-                    }
-
-                    // ---- Update alpha_i and alpha_j ----
-                    double y_i = y_map(i);
                     double y_j = y_map(j);
+
+                    double f_j = b_smo + y_j * alpha.dot(Q.col(j));
+                    double E_j = f_j - y_j;
 
                     double alpha_i_old = alpha(i);
                     double alpha_j_old = alpha(j);
 
-                    // Compute L and H (bounds)
                     double L, H;
                     if (y_i != y_j) {
-                        L = std::max(0.0, alpha_j_old - alpha_i_old);
-                        H = std::min(C, C + alpha_j_old - alpha_i_old);
+                        L = std::max(0.0, alpha(j) - alpha(i));
+                        H = std::min(C, C + alpha(j) - alpha(i));
                     } else {
-                        L = std::max(0.0, alpha_i_old + alpha_j_old - C);
-                        H = std::min(C, alpha_i_old + alpha_j_old);
+                        L = std::max(0.0, alpha(i) + alpha(j) - C);
+                        H = std::min(C, alpha(i) + alpha(j));
                     }
+
                     if (L == H) continue;
 
-                    double K_ii = K(i, i);
-                    double K_jj = K(j, j);
-                    double K_ij = K(i, j);
+                    double K_ii = Q(i, i); 
+                    double K_jj = Q(j, j); 
+                    double K_ij = Q(i, j) * y_i * y_j;
+
                     double eta = 2.0 * K_ij - K_ii - K_jj;
-                    if (eta >= 0.0) continue;   // safe guard
+                    if (eta >= 0.0) continue;
 
-                    // Update alpha_j
-                    double alpha_j_new = alpha_j_old - (y_j * (E(i) - E(j))) / eta;
-                    if (alpha_j_new > H) alpha_j_new = H;
-                    else if (alpha_j_new < L) alpha_j_new = L;
+                    alpha(j) -= (y_j * (E_i - E_j)) / eta;
+                    
+                    if (alpha(j) > H) alpha(j) = H;
+                    else if (alpha(j) < L) alpha(j) = L;
 
-                    if (std::abs(alpha_j_new - alpha_j_old) < 1e-5) continue;
+                    if (std::abs(alpha(j) - alpha_j_old) < 1e-5) continue;
 
-                    // Update alpha_i
-                    double alpha_i_new = alpha_i_old + y_i * y_j * (alpha_j_old - alpha_j_new);
+                    alpha(i) += y_i * y_j * (alpha_j_old - alpha(j));
 
-                    // ---- Update bias b ----
-                    double b1 = b - E(i)
-                                - y_i * (alpha_i_new - alpha_i_old) * K_ii
-                                - y_j * (alpha_j_new - alpha_j_old) * K_ij;
-                    double b2 = b - E(j)
-                                - y_i * (alpha_i_new - alpha_i_old) * K_ij
-                                - y_j * (alpha_j_new - alpha_j_old) * K_jj;
+                    double b1 = b_smo - E_i - y_i * (alpha(i) - alpha_i_old) * K_ii - y_j * (alpha(j) - alpha_j_old) * K_ij;
+                    double b2 = b_smo - E_j - y_i * (alpha(i) - alpha_i_old) * K_ij - y_j * (alpha(j) - alpha_j_old) * K_jj;
 
-                    if (alpha_i_new > 0.0 && alpha_i_new < C) b = b1;
-                    else if (alpha_j_new > 0.0 && alpha_j_new < C) b = b2;
-                    else b = (b1 + b2) / 2.0;
+                    if (0.0 < alpha(i) && alpha(i) < C) b_smo = b1;
+                    else if (0.0 < alpha(j) && alpha(j) < C) b_smo = b2;
+                    else b_smo = (b1 + b2) / 2.0;
 
-                    // Apply updates
-                    alpha(i) = alpha_i_new;
-                    alpha(j) = alpha_j_new;
-
-                    // ---- Update error cache for all samples ----
-                    double delta_i = y_i * (alpha_i_new - alpha_i_old);
-                    double delta_j = y_j * (alpha_j_new - alpha_j_old);
-                    for (size_t k = 0; k < M; ++k) {
-                        E(k) += delta_i * K(i, k) + delta_j * K(j, k);
-                    }
-                    // Recompute E(i) and E(j) for numerical stability
-                    E(i) = (b + K.row(i).dot(alpha.cwiseProduct(y_map))) - y_i;
-                    E(j) = (b + K.row(j).dot(alpha.cwiseProduct(y_map))) - y_j;
-
-                    num_changed++;
-                    total_changed++;
+                    num_changed_alphas++;
                 }
             }
-
-            if (num_changed == 0) {
-                if (examine_all) {
-                    examine_all = false;
-                } else {
-                    passes++;
-                }
-            } else {
-                examine_all = true;
-                passes = 0;
-            }
-
-            if (total_changed > 0 && passes > 10) break;
+            if (num_changed_alphas == 0) passes++;
+            else passes = 0;
         }
 
-        // 4. Extract support vectors (α_i > tolerance)
-        const double alpha_tol = 1e-5;
+        double tol = 1e-5;
         std::vector<size_t> sv_indices;
         for (size_t i = 0; i < M; ++i) {
-            if (alpha(i) > alpha_tol) {
+            if (alpha(i) > tol) {
                 sv_indices.push_back(i);
             }
         }
@@ -881,91 +787,181 @@ namespace timeseries::classifiers {
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
         }
 
-        // 5. Package the model
+        // 2. O(1) Vectorized KKT Bias fallback (Completely eliminates dist_cache and std::exp)
+        double b = 0.0;
+        int free_sv_count = 0;
+
+        for (size_t i = 0; i < M; ++i) {
+            if (alpha(i) > tol && alpha(i) < (C - tol)) {
+                double sum_k = y_map(i) * alpha.dot(Q.col(i));
+                b += y_map(i) - sum_k;
+                free_sv_count++;
+            }
+        }
+
+        if (free_sv_count > 0) {
+            b /= static_cast<double>(free_sv_count);
+        } else {
+            double max_sum_neg = -1e15;
+            double min_sum_pos = 1e15;
+            for (size_t i = 0; i < M; ++i) {
+                if (alpha(i) > tol) {
+                    double sum_k = y_map(i) * alpha.dot(Q.col(i));
+                    if (y_map(i) == 1.0) min_sum_pos = std::min(min_sum_pos, sum_k);
+                    else max_sum_neg = std::max(max_sum_neg, sum_k);
+                }
+            }
+            if (min_sum_pos != 1e15 && max_sum_neg != -1e15) b = -(max_sum_neg + min_sum_pos) / 2.0;
+            else b = b_smo;
+        }
+
         size_t num_sv = sv_indices.size();
         slice::MutableSlice2D x_sv(num_sv, N);
         slice::MutableSlice2D alpha_y(num_sv, 1);
+        
+        using MatrixRowMajor = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+        Eigen::Map<const MatrixRowMajor> X_map(X.data_handle(), M, N);
 
         for (size_t idx = 0; idx < num_sv; ++idx) {
-            size_t orig = sv_indices[idx];
-            alpha_y[idx, 0].value() = alpha(orig) * y_map(orig);
+            size_t original_i = sv_indices[idx];
+            alpha_y[idx, 0].value() = alpha(original_i) * y_map(original_i);
             for (size_t j = 0; j < N; ++j) {
-                x_sv[idx, j].value() = X_map(orig, j);
+                x_sv[idx, j].value() = X_map(original_i, j);
             }
         }
 
-        return std::make_unique<RadialSupportVectorMachine>(
-            std::move(x_sv),
-            std::move(alpha_y),
-            λ,
-            b
+        return std::make_unique<timeseries::classifiers::RadialSupportVectorMachine>(
+            std::move(x_sv), std::move(alpha_y), λ, b
         );
+    }    
+    
+   std::expected<slice::MutableSlice2D, TuxedoError> RadialSupportVectorMachine::predict(
+        const slice::Span2D & X
+    ) {
+        size_t M = X.rows();
+        size_t N = X.cols();
+        size_t num_sv = x_.rows();
+
+        if (N != x_.cols()) return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+
+        slice::MutableSlice2D predictions(M, 1);
+        using MatrixRowMajor = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+        Eigen::Map<const MatrixRowMajor> X_map(X.data_handle(), M, N);
+        Eigen::Map<const MatrixRowMajor> SV_map(x_.data_handle(), num_sv, N);
+        Eigen::Map<const Eigen::VectorXd> alpha_map(α_.data_handle(), num_sv);
+
+        // 3. ZERO-ALLOCATION Prediction loop to stop Malloc Contention across threads
+        for (size_t i = 0; i < M; ++i) {
+            double decision_value = b_;
+            for (size_t j = 0; j < num_sv; ++j) {
+                double dist_sq = (SV_map.row(j) - X_map.row(i)).squaredNorm();
+                decision_value += alpha_map(j) * std::exp(-λ_ * dist_sq);
+            }
+            predictions[i, 0].value() = (decision_value >= 0.0) ? 1.0 : -1.0;
+        }
+        return predictions;
     }
 
-
-    static vector<double> C_grid = {0.1, 0.5, 1, 10, 50, 100};
-
+   // BASE CREATE: Computes fresh, safe for standalone use.
     std::expected<std::unique_ptr<RadialSupportVectorMachine>, TuxedoError> RadialSupportVectorMachine::Create(
-        const slice::Span2D & X_train, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
-        const slice::Span2D & y_train, // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
-        const slice::Span2D & X_validate, // (m×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
-        const slice::Span2D & y_validate // (m×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
-    ){ // m < M 
-        
-        if(!(
-            X_train.cols() == X_validate.cols() && 
-            y_train.cols() == y_validate.cols() &&
-            y_validate.cols() == 1 &&
-            //--
-            X_train.rows() == y_train.rows() &&
-            X_validate.rows() == y_validate.rows() &&
-            //--
-            X_train.rows() > X_validate.rows()
-        )) {
-            return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
-        }
-        size_t N = X_train.cols();
-        size_t M = X_train.rows();
-        double base_λ = N / static_cast<double>(M);
+        const slice::Span2D & X, const slice::Span2D & y, double λ, double C
+    ) {
+        size_t M = X.rows();
+        size_t N = X.cols();
 
-        std::vector<double> λ_grid = {
-            base_λ * 0.01,  // The "Global" view: Extremely smooth, almost linear. Fights overfitting.
-            base_λ * 0.1,   // The "Broad" view.
-            base_λ * 1.0,   // The Baseline Heuristic.
-            base_λ * 10.0,  // The "Local" view: Tighter boundaries.
-            base_λ * 100.0  // The "Micro" view: Highly complex, wraps tightly around noise. 
-        };
+        if (M != y.rows() || M <= N || N == 0) return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+
+        using MatrixRowMajor = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+        Eigen::Map<const MatrixRowMajor> X_map(X.data_handle(), M, N);
+        Eigen::Map<const Eigen::VectorXd> y_map(y.data_handle(), M);
+
+        Eigen::MatrixXd Q(M, M);
+        
+        for (size_t i = 0; i < M; ++i) {
+            for (size_t j = i; j < M; ++j) { 
+                double dist_sq = (X_map.row(i) - X_map.row(j)).squaredNorm();
+                double q_val = y_map(i) * y_map(j) * std::exp(-λ * dist_sq);
+                Q(i, j) = q_val;
+                Q(j, i) = q_val; 
+            }
+        }
+
+        return create_from_cache(X, y, Q, λ, C);
+    }
+
+    // HIGHER-ORDER CREATE: The 2-Tier Hardware Accelerator
+    std::expected<std::unique_ptr<RadialSupportVectorMachine>, TuxedoError> RadialSupportVectorMachine::Create(
+        const slice::Span2D & X_train, const slice::Span2D & y_train,
+        const slice::Span2D & X_validate, const slice::Span2D & y_validate
+    ) {
+        size_t M = X_train.rows();
+        size_t N = X_train.cols();
+
+        if (M != y_train.rows() || M <= N || N == 0) return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+
+        using MatrixRowMajor = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+        Eigen::Map<const MatrixRowMajor> X_map(X_train.data_handle(), M, N);
+        Eigen::Map<const Eigen::VectorXd> y_map(y_train.data_handle(), M);
+
+        // ==========================================
+        // TIER 1 CACHE: Calculate Distances ONCE
+        // ==========================================
+        Eigen::MatrixXd dist_cache(M, M);
+        for (size_t i = 0; i < M; ++i) {
+            for (size_t j = i; j < M; ++j) {
+                double dist = (X_map.row(i) - X_map.row(j)).squaredNorm();
+                dist_cache(i, j) = dist;
+                dist_cache(j, i) = dist;
+            }
+        }
+
+        double base_lambda = 1/ static_cast<double>(N);
+        std::vector<double> lambda_grid = {base_lambda * 0.1, base_lambda};
+        std::vector<double> C_grid = {0.05, 0.25, 0.5, 1};
 
         std::unique_ptr<RadialSupportVectorMachine> classifier = nullptr;
-        double f1_score = -1.0;
+        double best_accuracy = -1.0;
 
-        for(auto λ: λ_grid) {
-            for (auto C : C_grid) {
-                auto current_classifier_result = Create(X_train, y_train, λ, C);
-                if(!current_classifier_result.has_value()) {
-                    return std::unexpected(current_classifier_result.error());
+        for (double lambda : lambda_grid) {
+            // ==========================================
+            // TIER 2 CACHE: Calculate Q Matrix per Lambda
+            // ==========================================
+            Eigen::MatrixXd Q(M, M);
+            for (size_t i = 0; i < M; ++i) {
+                for (size_t j = i; j < M; ++j) {
+                    double q_val = y_map(i) * y_map(j) * std::exp(-lambda * dist_cache(i, j));
+                    Q(i, j) = q_val;
+                    Q(j, i) = q_val;
                 }
-                auto current_classifier = std::move(current_classifier_result.value());
+            }
+
+            for (double C : C_grid) {
+                // Pass the precomputed Q matrix downward
+                auto classifier_res = create_from_cache(X_train, y_train, Q, lambda, C);
                 
-                auto predict_result = current_classifier->predict(X_validate);
-                if(!predict_result.has_value()) {
-                    return std::unexpected(predict_result.error());
-                }
+                if (!classifier_res) continue;
+
+                auto current_classifier = std::move(classifier_res.value());
                 
+                // Validate strictly Out-Of-Sample
                 auto confusion_matrix_result = current_classifier->confusion_matrix(X_validate, y_validate);
-                if(!confusion_matrix_result.has_value()) {
-                    return std::unexpected(confusion_matrix_result.error());
-                }
+                if (!confusion_matrix_result) continue;
+                
                 auto & confusion_matrix = confusion_matrix_result.value();
-
-                if(confusion_matrix.f1_score() > f1_score) {
+                double acc = confusion_matrix.accuracy();
+                int tn = confusion_matrix.true_negatives();
+                
+                // Force the model to capture downside risk (TN > 0) AND maximize Accuracy
+                if (tn > 0 && acc > best_accuracy) {
                     classifier = std::move(current_classifier);
-                    f1_score = confusion_matrix.f1_score();
+                    best_accuracy = acc;
                 }
             }
         }
 
-        return classifier;        
+        if (!classifier) return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        
+        return classifier;
     }
 
     std::expected<BinaryConfusionMatrix, TuxedoError> BinaryClassifier::confusion_matrix(
