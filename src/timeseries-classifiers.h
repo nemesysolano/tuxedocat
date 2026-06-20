@@ -154,12 +154,6 @@ namespace timeseries::classifiers {
       double C
     );
 
-    static std::expected<std::unique_ptr<RadialSupportVectorMachine>, TuxedoError> Create(const slice::Span2D
-      &X_train, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
-      const slice::Span2D &y_train, // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
-      const slice::Span2D &X_validate, // (m×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
-      const slice::Span2D &y_validate // (m×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
-    );
   };
 
   class RandomForestNode {

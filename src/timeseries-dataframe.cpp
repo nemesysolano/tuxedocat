@@ -261,7 +261,7 @@ namespace timeseries::dataframe {
                     double prev_val = this->data_[prev_index];
 
                     // Calculate: (Current - Previous) / Previous
-                    double pct = (current_val - prev_val) / (prev_val + 1e-10); // Avoid division by zero
+                    double pct = (current_val - prev_val) / (prev_val + 1e-8); // Avoid division by zero
                     new_data.push_back(pct);
                 }
             }
@@ -318,7 +318,7 @@ namespace timeseries::dataframe {
                 if (std::isnan(curr_val) || std::isnan(prev_val) || prev_val <= 0.0 || curr_val <= 0.0) {
                     new_data.push_back(std::nan(""));
                 } else {
-                    new_data.push_back(std::log(curr_val / (prev_val + 1e-10)));
+                    new_data.push_back(std::log(curr_val / (prev_val + 1e-8)));
                 }
             }
         }
@@ -675,7 +675,6 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
         // 1. Validate that the source column actually exists
         auto src_it = source.column_name_to_column_index_.find(source_column_name);
         if (src_it == source.column_name_to_column_index_.end()) {
-            trace();
             return TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS; 
         }
         size_t src_col_idx = src_it->second;

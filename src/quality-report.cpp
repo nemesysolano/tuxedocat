@@ -12,14 +12,20 @@
 #include <ranges>
 #include <execution>
 #include <future>
+#include "forecast.h"
+#include "timeseries-regression-data.h"
+#include <cassert>
 
 using namespace std;
 using namespace std::filesystem;
 using namespace timeseries::classifiers;
 using namespace timeseries::dataframe;
 using namespace timeseries::features;
+using namespace timeseries::regression::data;
+using namespace forecast;
 
 namespace reports {
+
     unique_ptr<QualityReport> quality(const string & full_file_path) {
         try {
             auto input_stream = ifstream(full_file_path);    
@@ -32,49 +38,33 @@ namespace reports {
             auto & df = dataframe_result.value();
             input_stream.close();
 
-            auto momenta_result = Features::CreateWithZScore(df);
-            if(!momenta_result.has_value()) {
-                return nullptr;
-            }
-            auto & momenta = momenta_result.value();
-            const DataFrame & momentum_df = momenta.data_frame();
-            const std::vector<std::string> & momentum_column_names = momenta.momentum_column_names();
-            size_t train_end_row = momentum_df.rows() * 0.8;
+            auto regression_data_result = RegressionData::CreateWithZScore(df);
+            assert(regression_data_result.has_value());
 
-            auto X_result = momentum_df.copy(momentum_column_names, momentum_column_names);
-            auto & X = X_result.value();
-
-            auto X_train_result = X.slice_to(train_end_row);
-            auto & X_train = X_train_result.value();
-
-            auto X_test_result = X.slice_from(train_end_row);
-            auto & X_test = X_test_result.value();    
-
-            auto Y_result = momentum_df.copy({"Direction"}, {"Direction"});
-            auto & Y = Y_result.value();;
-
-            auto Y_train_result = Y.slice_to(train_end_row);
-            auto & Y_train = Y_train_result.value();
-
-            auto Y_test_result = Y.slice_from(train_end_row);
-            auto & Y_test = Y_test_result.value();
+            auto & regression_data = regression_data_result.value();
+            auto & X_train = regression_data.X_train();
+            auto & X_test = regression_data.X_test();
+            auto & Y_train = regression_data.Y_train();
+            auto & Y_test = regression_data.Y_test();
+                        
+            // 0. Lambda Factories
             
             // 1. Create the classifiers
-            auto logistic_result = LogisticRegression::Create(X_train, Y_train);
-            auto lda_result = LinearDiscriminant::Create(X_train, Y_train);
-            auto qda_result = QuadraticDiscriminant::Create(X_train, Y_train);
-            auto rsvm_result = RadialSupportVectorMachine::Create(X_train, Y_train, 1 / static_cast<double>(X_train.cols()) , 1);
-            auto random_forex_result = RandomForest::Create(X_train, Y_train);
+            auto logistic_regression = LogisticRegression::Create(X_train, Y_train);
+            auto lda = LinearDiscriminant::Create(X_train, Y_train);
+            auto qda = QuadraticDiscriminant::Create(X_train, Y_train);
+            auto rsvm = RadialSupportVectorMachine::Create(X_train, Y_train, 1 / static_cast<double>(X_train.cols()) , 1);
+            auto random_forex = RandomForest::Create(X_train, Y_train);
 
             // 2. Compute confusion matrices immediately
-            auto logistic_matrix = logistic_result.value()->confusion_matrix(X_test, Y_test).value();
-            auto lda_matrix = lda_result.value()->confusion_matrix(X_test, Y_test).value();
-            auto qda_matrix = qda_result.value()->confusion_matrix(X_test, Y_test).value();
-            auto rsvm_matrix = rsvm_result.value()->confusion_matrix(X_test, Y_test).value();
-            auto random_forex = random_forex_result.value()->confusion_matrix(X_test, Y_test).value();
+            auto logistic_matrix = logistic_regression.value()->confusion_matrix(X_test, Y_test).value();
+            auto lda_matrix = lda.value()->confusion_matrix(X_test, Y_test).value();
+            auto qda_matrix = qda.value()->confusion_matrix(X_test, Y_test).value();
+            auto rsvm_matrix = rsvm.value()->confusion_matrix(X_test, Y_test).value();
+            auto random_matrix = random_forex.value()->confusion_matrix(X_test, Y_test).value();
 
             // 3. Create the report using the confusion matrices (not the unique_ptr<Classifier>)
-            return make_unique<QualityReport>(full_file_path, logistic_matrix, lda_matrix, qda_matrix, rsvm_matrix, random_forex);
+            return make_unique<QualityReport>(full_file_path, logistic_matrix, lda_matrix, qda_matrix, rsvm_matrix, random_matrix);
         } catch (const exception & e) {
             cout << "failed to process " << full_file_path << endl;
             return nullptr;

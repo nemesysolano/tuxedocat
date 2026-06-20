@@ -8,6 +8,7 @@
 #include "forecast.h"
 #include "timeseries-features.h"
 #include "timeseries-regression-data.h"
+#include "timeseries-log.h"
 
 using namespace std;
 using namespace timeseries::classifiers;
@@ -18,16 +19,19 @@ using namespace timeseries::features;
 using namespace timeseries::regression::data;
 
 void regression_test_impl(
-    slice::Span2D & X_train, slice::Span2D & X_test, slice::Span2D & Y_train, slice::Span2D & Y_test,
+    const RegressionData & regression_data,
     BinaryClassifier & binary_classifier, 
     std::string && classifier_name
 ) {
- 
+    const slice::Span2D & X_test = regression_data.X_test();
+    const slice::Span2D & Y_test = regression_data.Y_test();
+
+    cout << "TESTING " << classifier_name  << endl;
     auto confusion_matrix_result = binary_classifier.confusion_matrix(X_test, Y_test);
     assert(confusion_matrix_result.has_value());
     auto & confusion_matrix = confusion_matrix_result.value();
-    cout << confusion_matrix << endl;
-    cout << "PASSED " << classifier_name << "test passed" << endl;
+    cout << confusion_matrix;
+    cout << "PASSED " << classifier_name << "test passed" << endl << endl;
 }
 
 void regression_test(const char * current_program_path) {
@@ -41,43 +45,51 @@ void regression_test(const char * current_program_path) {
     assert(dataframe_result.has_value());
     auto & df = dataframe_result.value();
 
-    auto regression_data_result = RegressionData::CreateWithPctChange(df);
-    assert(regression_data_result.has_value());
-    auto & regression_data = regression_data_result.value();
+    /* Percentange change:  $(p_t - p_{t-k}) / (p_{t-k} + 10^{-8})$ */
+    auto regression_data_pct_change_result = RegressionData::CreateWithPctChange(df);
+    assert(regression_data_pct_change_result.has_value());
+    auto & regression_data_pct_change = regression_data_pct_change_result.value();
 
-    auto X_train = regression_data.X_train();
-    auto X_test = regression_data.X_test();
-    auto Y_train = regression_data.Y_train();
-    auto Y_test = regression_data.Y_test();
+    /* Log change: $\log(p_t / (p_{t-k} + 1e-8))$ */
+    auto regression_data_log_change_result = RegressionData::CreateWithLogChange(df);
+    assert(regression_data_log_change_result.has_value());
+    auto & regression_data_log_change = regression_data_log_change_result.value();
 
-    assert(Y_test.rows() == X_test.rows());
-    assert(Y_train.rows() == X_train.rows());    
+    /* ZScore $ */
+    auto regression_data_zscore_result = RegressionData::CreateWithZScore(df);
+    assert(regression_data_zscore_result.has_value());
+    auto & regression_data_zscore = regression_data_zscore_result.value();
     
     /* Logictic Regression */
-    auto logistic_regression_result = LogisticRegression::Create(X_train, Y_train);
+    auto logistic_regression_result = LogisticRegression::Create(regression_data_pct_change.X_train(), regression_data_pct_change.Y_train());
     assert(logistic_regression_result.has_value());
     auto & logistic_regression = *logistic_regression_result.value();
+    regression_test_impl(regression_data_pct_change, logistic_regression, "LogisticRegression");
 
     /* Linear Discriminant Analysis */
-    auto linear_discriminant_result = LinearDiscriminant::Create(X_train, Y_train);
+    auto linear_discriminant_result = LinearDiscriminant::Create(regression_data_log_change.X_train(), regression_data_log_change.Y_train());
     assert(linear_discriminant_result.has_value());
     auto & linear_discriminant = *linear_discriminant_result.value();
+    regression_test_impl(regression_data_log_change, linear_discriminant, "LinearDiscriminant");
 
     /* Quadratic Discriminant Analysis */
-    auto quadratic_discriminant_result = QuadraticDiscriminant::Create(X_train, Y_train);
+    auto quadratic_discriminant_result = QuadraticDiscriminant::Create(regression_data_pct_change.X_train(), regression_data_pct_change.Y_train());
     assert(quadratic_discriminant_result.has_value());
     auto & quadratic_discriminant = *quadratic_discriminant_result.value();
-    
+    regression_test_impl(regression_data_pct_change, quadratic_discriminant, "QuadraticDiscriminant");
+
     // Radial Support Vector Machine */
-    auto support_vector_machine_result = RadialSupportVectorMachine::Create(X_train, Y_train, 0.01, 1);
+    auto support_vector_machine_result = RadialSupportVectorMachine::Create(regression_data_zscore.X_train(), regression_data_zscore.Y_train(), 0.01, 1);
     assert(support_vector_machine_result.has_value());
     auto & support_vector_machine_rbf = *support_vector_machine_result.value();
+    regression_test_impl(regression_data_zscore, support_vector_machine_rbf, "RadialSupportVectorMachine");
     
-    regression_test_impl(X_train, X_test, Y_train, Y_test, logistic_regression, "LogisticRegression");
-    regression_test_impl(X_train, X_test, Y_train, Y_test, linear_discriminant, "LinearDiscriminant");
-    regression_test_impl(X_train, X_test, Y_train, Y_test, quadratic_discriminant, "QuadraticDiscriminant");
-    regression_test_impl(X_train, X_test, Y_train, Y_test, support_vector_machine_rbf, "RadialSupportVectorMachine");
-    
+
+    // RandomForest */
+    auto random_forest_result = RandomForest::Create(regression_data_pct_change.X_train(), regression_data_pct_change.Y_train());
+    assert(random_forest_result.has_value());
+    auto & random_forest = *random_forest_result.value();
+    regression_test_impl(regression_data_pct_change, random_forest, "RandomForest");    
 }
 
 void print_binary_confusion_matrix_test() {

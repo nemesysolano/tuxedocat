@@ -19,7 +19,12 @@ namespace reports {
             BinaryConfusionMatrix random_forex_;
         public:
             QualityReport(
-                const string & file_path, BinaryConfusionMatrix logistic, BinaryConfusionMatrix linear_discriminant, BinaryConfusionMatrix quadratic_discriminant, BinaryConfusionMatrix rsvm, BinaryConfusionMatrix random_forex
+                const string & file_path,
+                BinaryConfusionMatrix logistic,
+                BinaryConfusionMatrix linear_discriminant,
+                BinaryConfusionMatrix quadratic_discriminant,
+                BinaryConfusionMatrix rsvm,
+                BinaryConfusionMatrix random_forex
             ): 
             file_path_(file_path), logistic_(logistic), linear_discriminant_(linear_discriminant), quadratic_discriminant_(quadratic_discriminant), rsvm_(rsvm), random_forex_(random_forex) {}
             const string & file_path() const { return file_path_; }
