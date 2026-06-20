@@ -964,12 +964,66 @@ namespace timeseries::classifiers {
         return classifier;
     }
 
+    // Copy constructor (deep copy via RandomForestNode's copy ctor)
+    RandomForest::RandomForest(const RandomForest &other) {
+      forest_.reserve(other.forest_.size());
+      for (const auto &tree : other.forest_) {
+        if (tree) {
+          forest_.push_back(std::make_unique<RandomForestNode>(*tree));
+        } else {
+          forest_.push_back(nullptr);
+        }
+      }
+    }
+
+    // Copy assignment operator (copy-and-swap)
+    RandomForest & RandomForest::operator = (const RandomForest &other) {
+      if (this != &other) {
+        RandomForest tmp(other);
+        std::swap(forest_, tmp.forest_);
+      }
+      return *this;
+    }
+
+    // Move constructor
+    RandomForest::RandomForest(RandomForest &&other): forest_(std::move(other.forest_)) {}
+
+    // Move assignment operator
+    RandomForest & RandomForest::operator = (RandomForest &&other) {
+      if (this != &other) {
+        forest_ = std::move(other.forest_);
+      }
+      return *this;
+    }
+
+
     double RandomForest::predict_tree(const RandomForestNode* node, const slice::Span2D& X_test, size_t row_i) {
-        return NAN;
+        // Base Case: We hit a terminal region (Leaf Node)
+        if (node->is_leaf()) {
+            return node->prediction();
+        }
+        
+        // Recursive Case: Route the data based on the threshold
+        double feature_value = X_test[row_i, node->feature_index()].value();
+        
+        if (feature_value <= node->threshold()) {
+            return predict_tree(node->left().get(), X_test, row_i);
+        } else {
+            return predict_tree(node->right().get(), X_test, row_i);
+        }
     }
 
     double RandomForest::predict_forest(const std::vector<std::unique_ptr<RandomForestNode>>& forest, const slice::Span2D& X_test, size_t row_i) {
-        return NAN;
+        double vote_sum = 0.0;
+        
+        // Query every T_b(x) in the ensemble
+        for (const auto& root_node : forest) {
+            auto root_node_ptr = root_node.get();
+            vote_sum += predict_tree(root_node_ptr, X_test, row_i);
+        }
+        
+        // Return +1.0 if sum >= 0, else -1.0
+        return (vote_sum >= 0.0) ? 1.0 : -1.0; 
     }
 
     std::expected<slice::MutableSlice2D, TuxedoError> RandomForest::predict(

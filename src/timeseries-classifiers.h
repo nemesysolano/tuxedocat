@@ -222,10 +222,10 @@ namespace timeseries::classifiers {
         return *this;
       }
 
-      bool is_leaf() const { return is_leaf_; } const // 1. State Flags    
-      double prediction() const { return prediction_; } const // 2. Leaf Node Mathematics (Only used if is_leaf == true);  e.g., +1.0 (Up) or -1.0 (Down).
-      size_t feature_index() const { return feature_index_; } const // The j index
-      double threshold() const { return threshold_; } const     // The tau threshold
+      bool is_leaf() const { return is_leaf_; } // 1. State Flags    
+      double prediction() const { return prediction_; } // 2. Leaf Node Mathematics (Only used if is_leaf == true);  e.g., +1.0 (Up) or -1.0 (Down).
+      size_t feature_index() const { return feature_index_; } // The j index
+      double threshold() const { return threshold_; }  // The tau threshold
       const std::unique_ptr<RandomForestNode> &left() const { return left_; }
       const std::unique_ptr<RandomForestNode> &right() const { return right_; }
 
@@ -234,26 +234,44 @@ namespace timeseries::classifiers {
 
   class RandomForest : public BinaryClassifier {
     private:
+      std::vector<std::unique_ptr<RandomForestNode>> forest_;
       double predict_tree(const RandomForestNode* node, const slice::Span2D& X_test, size_t row_i);
       double predict_forest(const std::vector<std::unique_ptr<RandomForestNode>>& forest, const slice::Span2D& X_test, size_t row_i);
+      
     public:
+      // Constructor
+      explicit RandomForest(std::vector<std::unique_ptr<RandomForestNode>> forest): forest_(std::move(forest)) {}
+
+      // Copy constructor (deep copy via RandomForestNode's copy ctor)
+      RandomForest(const RandomForest &other);
+      // Copy assignment operator (copy-and-swap)
+      RandomForest &operator = (const RandomForest &other);
+      // Move constructor
+      RandomForest(RandomForest &&other);
+      // Move assignment operator
+      RandomForest &operator = (RandomForest &&other);
+
       std::expected<slice::MutableSlice2D, TuxedoError> predict(
         const slice::Span2D &X // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
       ) override; // returns (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
 
-    static std::expected<std::unique_ptr<RadialSupportVectorMachine>, TuxedoError> Create(
-      const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
-      const slice::Span2D& y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
-    );      
+      static std::expected<std::unique_ptr<RadialSupportVectorMachine>, TuxedoError> Create(
+        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+        const slice::Span2D& y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
+      );     
+      
+    // Destructor
+      ~RandomForest() override = default;
+
   };
 
   class DirectionalCategory {
     private:
       slice::MutableSlice2D
           μ_; // The resulting $μ^+$ or $ μ^-$ must have (Nx1) shape
-      slice::MutableSlice2D X_; // Rows from original $X$ with the same direction of
-                                // resulting $μ^+$ or $ μ^-$
+      slice::MutableSlice2D X_; // Rows from original $X$ with the same direction of resulting $μ^+$ or $ μ^-$
       slice::MutableSlice2D σ_; // Covariance matrixes sum.
+
     public:
       DirectionalCategory(DirectionalCategory &&) = default;
       DirectionalCategory &operator=(DirectionalCategory &&) = default;
