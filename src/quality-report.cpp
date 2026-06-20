@@ -25,6 +25,13 @@ using namespace timeseries::regression::data;
 using namespace forecast;
 
 namespace reports {
+    using BinaryClassifierProducer = std::function<std::unique_ptr<BinaryClassifier>(const RegressionData &)>;
+    
+    BinaryConfusionMatrix confusion_matrix(const RegressionData & regression_data, const BinaryClassifierProducer& binary_classifier_factory) {
+        auto binary_classifier = binary_classifier_factory(regression_data);
+        auto confusion_matrix_result = binary_classifier->confusion_matrix(regression_data.X_test(), regression_data.Y_test());
+        return confusion_matrix_result.value();
+    }
 
     unique_ptr<QualityReport> quality(const string & full_file_path) {
         try {
@@ -38,30 +45,24 @@ namespace reports {
             auto & df = dataframe_result.value();
             input_stream.close();
 
-            auto regression_data_result = RegressionData::CreateWithZScore(df);
-            assert(regression_data_result.has_value());
+            auto regression_zscore_data_result = RegressionData::CreateWithZScore(df);
+            assert(regression_zscore_data_result.has_value());
+            auto & regression_zscore_data = regression_zscore_data_result.value();
+        
+            auto regression_data_pct_change_result = RegressionData::CreateWithPctChange(df);
+            assert(regression_data_pct_change_result.has_value());
+            auto & regression_data_pct_change = regression_data_pct_change_result.value();
 
-            auto & regression_data = regression_data_result.value();
-            auto & X_train = regression_data.X_train();
-            auto & X_test = regression_data.X_test();
-            auto & Y_train = regression_data.Y_train();
-            auto & Y_test = regression_data.Y_test();
-                        
-            // 0. Lambda Factories
-            
-            // 1. Create the classifiers
-            auto logistic_regression = LogisticRegression::Create(X_train, Y_train);
-            auto lda = LinearDiscriminant::Create(X_train, Y_train);
-            auto qda = QuadraticDiscriminant::Create(X_train, Y_train);
-            auto rsvm = RadialSupportVectorMachine::Create(X_train, Y_train, 1 / static_cast<double>(X_train.cols()) , 1);
-            auto random_forex = RandomForest::Create(X_train, Y_train);
+            auto regression_data_log_change_result = RegressionData::CreateWithLogChange(df);
+            assert(regression_data_log_change_result.has_value());
+            auto & regression_data_log_change = regression_data_log_change_result.value();
 
             // 2. Compute confusion matrices immediately
-            auto logistic_matrix = logistic_regression.value()->confusion_matrix(X_test, Y_test).value();
-            auto lda_matrix = lda.value()->confusion_matrix(X_test, Y_test).value();
-            auto qda_matrix = qda.value()->confusion_matrix(X_test, Y_test).value();
-            auto rsvm_matrix = rsvm.value()->confusion_matrix(X_test, Y_test).value();
-            auto random_matrix = random_forex.value()->confusion_matrix(X_test, Y_test).value();
+            auto logistic_matrix = confusion_matrix(regression_data_pct_change, [](const RegressionData & d) -> std::unique_ptr<BinaryClassifier> { return std::move(LogisticRegression::Create(d.X_train(), d.Y_train()).value()); });
+            auto lda_matrix = confusion_matrix(regression_data_log_change, [](const RegressionData & d) -> std::unique_ptr<BinaryClassifier> { return std::move(LinearDiscriminant::Create(d.X_train(), d.Y_train()).value()); });
+            auto qda_matrix = confusion_matrix(regression_data_pct_change, [](const RegressionData & d) -> std::unique_ptr<BinaryClassifier> { return std::move(QuadraticDiscriminant::Create(d.X_train(), d.Y_train()).value()); });
+            auto rsvm_matrix = confusion_matrix(regression_zscore_data, [](const RegressionData & d) -> std::unique_ptr<BinaryClassifier> { return std::move(RadialSupportVectorMachine::Create(d.X_train(), d.Y_train(), 1.0/d.X_train().cols(), 1).value());});
+            auto random_matrix = confusion_matrix(regression_zscore_data, [](const RegressionData & d) -> std::unique_ptr<BinaryClassifier> { return std::move(RandomForest::Create(d.X_train(), d.Y_train()).value());});
 
             // 3. Create the report using the confusion matrices (not the unique_ptr<Classifier>)
             return make_unique<QualityReport>(full_file_path, logistic_matrix, lda_matrix, qda_matrix, rsvm_matrix, random_matrix);
