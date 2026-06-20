@@ -32,15 +32,13 @@ namespace forecast {
             inline slice::Span2D & confusion_matrix() { return confusion_matrix_; }            
     };
 
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source, const std::string & volume_column_name, const std::string & price_column_name, size_t lags);
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source,const std::string & volume_column_name, std::string && price_column_name, size_t lags);
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source,std::string && volume_column_name, const std::string & price_column_name, size_t lags);
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> created_lagged_timeseries(timeseries::dataframe::DataFrame & source,std::string && volume_column_name, std::string && price_column_name, size_t lags);
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_log_change(const timeseries::dataframe::DataFrame & source, const std::string  & price_column_name, size_t n);
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_log_change(const timeseries::dataframe::DataFrame && source, const std::string && price_column_name, size_t n);
 
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_momentum(const timeseries::dataframe::DataFrame & source, const std::string  & price_column_name, size_t momentum);
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_momentum(const timeseries::dataframe::DataFrame && source, const std::string && price_column_name, size_t momentum);
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_z_score(const timeseries::dataframe::DataFrame & source, const std::string  & price_column_name, size_t n);
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_z_score(const timeseries::dataframe::DataFrame && source, const std::string && price_column_name, size_t n);
 
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_z_score(const timeseries::dataframe::DataFrame & source, const std::string  & price_column_name, size_t t);
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_z_score(const timeseries::dataframe::DataFrame && source, const std::string && price_column_name, size_t t);
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_pct_change(const timeseries::dataframe::DataFrame & source, const std::string  & price_column_name, size_t n);
+    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_pct_change(const timeseries::dataframe::DataFrame && source, const std::string && price_column_name, size_t n);    
 };
 #endif

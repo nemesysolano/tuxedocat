@@ -6,17 +6,19 @@
 #include <fstream>
 #include <cassert>
 #include "forecast.h"
-#include "timeseries-momenta.h"
+#include "timeseries-features.h"
+#include "timeseries-regression-data.h"
 
 using namespace std;
 using namespace timeseries::classifiers;
 using namespace slice;
 using namespace timeseries::dataframe;
 using namespace forecast;
-using namespace timeseries::momenta;
+using namespace timeseries::features;
+using namespace timeseries::regression::data;
 
 void regression_test_impl(
-    slice::Slice2D & X_train, slice::Slice2D & X_test, slice::Slice2D & Y_train, slice::Slice2D & Y_test,
+    slice::Span2D & X_train, slice::Span2D & X_test, slice::Span2D & Y_train, slice::Span2D & Y_test,
     BinaryClassifier & binary_classifier, 
     std::string && classifier_name
 ) {
@@ -39,43 +41,17 @@ void regression_test(const char * current_program_path) {
     assert(dataframe_result.has_value());
     auto & df = dataframe_result.value();
 
-    auto momenta_result = Features::CreateMomenta(df);
-    assert(momenta_result.has_value());
-    auto & momenta = momenta_result.value();
+    auto regression_data_result = RegressionData::CreateWithPctChange(df);
+    assert(regression_data_result.has_value());
+    auto & regression_data = regression_data_result.value();
 
-    const DataFrame & momentum_df = momenta.data_frame();
-    const std::vector<std::string> & momentum_column_names = momenta.momentum_column_names();
-    size_t train_end_row = momentum_df.rows() * 0.8;
-
-    auto X_result = momentum_df.copy(momentum_column_names, momentum_column_names);
-    assert(X_result.has_value());
-    auto & X = X_result.value();
-
-
-    auto X_train_result = X.slice_to(train_end_row);
-    assert(X_train_result.has_value());
-    auto & X_train = X_train_result.value();
-
-    auto X_test_result = X.slice_from(train_end_row);
-    assert(X_test_result.has_value());
-    auto & X_test = X_test_result.value();    
-
-    auto Y_result = momentum_df.copy({"Direction"}, {"Direction"});
-    assert(Y_result.has_value());
-    auto & Y = Y_result.value();;
-
-    auto Y_train_result = Y.slice_to(train_end_row);
-    assert(Y_train_result.has_value());
-    auto & Y_train = Y_train_result.value();
-
-    auto Y_test_result = Y.slice_from(train_end_row);
-    assert(Y_test_result.has_value());
-    auto & Y_test = Y_test_result.value();
+    auto X_train = regression_data.X_train();
+    auto X_test = regression_data.X_test();
+    auto Y_train = regression_data.Y_train();
+    auto Y_test = regression_data.Y_test();
 
     assert(Y_test.rows() == X_test.rows());
     assert(Y_train.rows() == X_train.rows());    
-    assert(Y_test.rows() + Y_train.rows() ==  momentum_df.rows());
-    assert(X_test.rows() + X_train.rows() ==  momentum_df.rows());    
     
     /* Logictic Regression */
     auto logistic_regression_result = LogisticRegression::Create(X_train, Y_train);
@@ -92,9 +68,15 @@ void regression_test(const char * current_program_path) {
     assert(quadratic_discriminant_result.has_value());
     auto & quadratic_discriminant = *quadratic_discriminant_result.value();
     
+    // Radial Support Vector Machine */
+    auto support_vector_machine_result = RadialSupportVectorMachine::Create(X_train, Y_train, 0.01, 1);
+    assert(support_vector_machine_result.has_value());
+    auto & support_vector_machine_rbf = *support_vector_machine_result.value();
+    
     regression_test_impl(X_train, X_test, Y_train, Y_test, logistic_regression, "LogisticRegression");
     regression_test_impl(X_train, X_test, Y_train, Y_test, linear_discriminant, "LinearDiscriminant");
     regression_test_impl(X_train, X_test, Y_train, Y_test, quadratic_discriminant, "QuadraticDiscriminant");
+    regression_test_impl(X_train, X_test, Y_train, Y_test, support_vector_machine_rbf, "RadialSupportVectorMachine");
     
 }
 
@@ -461,4 +443,5 @@ void inverse_test() {
 
     std::cout << "[PASSED] inverse_test" << std::endl;
 }
+
 #endif

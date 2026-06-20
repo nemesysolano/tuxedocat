@@ -1,7 +1,7 @@
 #include "timeseries-classifiers.h"
 #include <Eigen/Dense>
 #include <cmath>
-#include <vector>
+#include <random>
 #include <algorithm>
 #include <iomanip>
 #include <Eigen/Dense>
@@ -1032,11 +1032,177 @@ namespace timeseries::classifiers {
         return std::unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
     }
 
-    std::expected<std::unique_ptr<RadialSupportVectorMachine>, TuxedoError> RandomForest::Create(
-      const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
-      const slice::Span2D& y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
+    double RandomForest::evaluate_split(
+        RandomForestTreeBuilderContext & context
     ) {
-        return std::unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+        size_t feature_j = context.feature_j;
+        double threshold = context.threshold;
+
+        int left_up = 0, left_down = 0;
+        int right_up = 0, right_down = 0;
+
+        // 1. Route the data virtually
+        for (size_t row_i : context.current_indices) {
+            double feature_val = context.X[row_i, feature_j].value();
+            double target_val = context.y[row_i, 0].value();
+
+            if (feature_val <= threshold) {
+                (target_val > 0.0) ? left_up++ : left_down++;
+            } else {
+                (target_val > 0.0) ? right_up++ : right_down++;
+            }
+        }
+
+        double total_left = left_up + left_down;
+        double total_right = right_up + right_down;
+
+        // 2. Calculate Gini for Left Branch: 1.0 - (P_up^2 + P_down^2)
+        double gini_left = 0.0;
+        if (total_left > 0) {
+            double p_up = left_up / total_left;
+            double p_down = left_down / total_left;
+            gini_left = 1.0 - (p_up * p_up + p_down * p_down);
+        }
+
+        // 3. Calculate Gini for Right Branch
+        double gini_right = 0.0;
+        if (total_right > 0) {
+            double p_up = right_up / total_right;
+            double p_down = right_down / total_right;
+            gini_right = 1.0 - (p_up * p_up + p_down * p_down);
+        }
+
+        // 4. Return the Weighted Average Impurity
+        double total_samples = context.current_indices.size();
+        return (total_left / total_samples) * gini_left + (total_right / total_samples) * gini_right;
+    }    
+
+    std::unique_ptr<RandomForestNode> RandomForest::build_tree(
+        RandomForestTreeBuilderContext & context
+    ) {
+        auto node = std::make_unique<RandomForestNode>();
+
+        // --- STEP 1: Stopping Criteria ---
+        int total_up = 0, total_down = 0;
+        for (size_t row_i : context.current_indices) {
+            (context.y[row_i, 0].value() > 0.0) ? total_up++ : total_down++;
+        }
+
+        // Stop if perfectly pure, max depth reached, or too few samples to split safely
+        if (total_up == 0 || total_down == 0 || context.current_depth >= context.max_depth || context.current_indices.size() < 5) {
+            node->is_leaf_ = true;
+            node->prediction_ = (total_up >= total_down) ? 1.0 : -1.0; // The Mode
+            return node;
+        }
+
+        // --- STEP 2: Random Feature Subspace (The Magic of the Forest) ---
+        size_t total_features = context.X.cols();
+        size_t features_to_check = std::max<size_t>(1, std::sqrt(total_features)); 
+        
+        std::vector<size_t> feature_pool(total_features);
+        std::iota(feature_pool.begin(), feature_pool.end(), 0); // Fill with 0, 1, ..., N-1
+        std::shuffle(feature_pool.begin(), feature_pool.end(), context.gen); // Randomize
+        
+        // --- STEP 3: Find the Best Split ---
+        double best_gini = std::numeric_limits<double>::infinity();
+        size_t best_feature = 0;
+        double best_threshold = 0.0;
+
+        // Only iterate through our random subset of features
+        for (size_t f = 0; f < features_to_check; ++f) {
+            size_t j = feature_pool[f];
+
+            // Test empirical thresholds (the actual values in the dataset)
+            for (size_t row_i : context.current_indices) {
+                double candidate_tau = context.X[row_i, j].value();
+                
+                // Notice: We pass context, but pass `j` and `candidate_tau` individually!
+                context.feature_j = j;
+                context.threshold = candidate_tau;
+                double current_gini = evaluate_split(context);
+
+                if (current_gini < best_gini) {
+                    best_gini = current_gini;
+                    best_feature = j;
+                    best_threshold = candidate_tau;
+                }
+            }
+        }
+
+        // --- STEP 4: Partition the Indices ---
+        std::vector<size_t> left_indices;
+        std::vector<size_t> right_indices;
+        
+        for (size_t row_i : context.current_indices) {
+            if (context.X[row_i, best_feature].value() <= best_threshold) {
+                left_indices.push_back(row_i);
+            } else {
+                right_indices.push_back(row_i);
+            }
+        }
+
+        // Fallback if the best split puts everything in one branch (avoids infinite loops)
+        if (left_indices.empty() || right_indices.empty()) {
+            node->is_leaf_ = true;
+            node->prediction_ = (total_up >= total_down) ? 1.0 : -1.0;
+            return node;
+        }
+
+        // --- STEP 5: Recursive Tree Growth ---
+        node->is_leaf_ = false;
+        node->feature_index_ = best_feature;
+        node->threshold_ = best_threshold;
+        
+        // Generate new contexts for the recursion stack
+        RandomForestTreeBuilderContext left_context = {
+            .X = context.X, 
+            .y = context.y, 
+            .current_indices = std::move(left_indices), 
+            .current_depth = context.current_depth + 1, 
+            .max_depth = context.max_depth, 
+            .gen = context.gen
+        };
+
+        RandomForestTreeBuilderContext right_context = {
+            .X = context.X, 
+            .y = context.y, 
+            .current_indices = std::move(right_indices), 
+            .current_depth = context.current_depth + 1, 
+            .max_depth = context.max_depth, 
+            .gen = context.gen
+        };
+
+        node->left_ = build_tree(left_context);
+        node->right_ = build_tree(right_context);
+
+        return node;
+    }  
+
+    std::expected<std::unique_ptr<RandomForest>, TuxedoError> RandomForest::Create(
+        const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
+        const slice::Span2D& y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
+    )  {
+        if (!(X.rows() == y.rows() && y.cols() == 1)) {
+            return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
+        }
+        std::vector<size_t> current_indices;
+        int current_depth = 0;
+        int max_depth = 8;
+        std::mt19937 gen;
+        
+        RandomForestTreeBuilderContext context = {
+            .X = X,
+            .y = y,
+            .current_indices = current_indices,
+            .current_depth = current_depth,
+            .max_depth = max_depth,
+            .gen = gen
+        };
+
+        std::vector<std::unique_ptr<RandomForestNode>> forest_;
+        forest_.push_back(build_tree(context));
+
+        return std::make_unique<RandomForest>(std::move(forest_));
     }          
 
     std::expected<BinaryConfusionMatrix, TuxedoError> BinaryClassifier::confusion_matrix(

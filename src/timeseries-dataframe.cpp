@@ -5,6 +5,7 @@
 #include <algorithm> // <-- Required for std::set_intersection
 #include <iterator>  // <-- Required for std::inserter
 #include <cmath>
+#include "timeseries-log.h"
 using namespace std;
 
 namespace timeseries::dataframe {
@@ -674,6 +675,7 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
         // 1. Validate that the source column actually exists
         auto src_it = source.column_name_to_column_index_.find(source_column_name);
         if (src_it == source.column_name_to_column_index_.end()) {
+            trace();
             return TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS; 
         }
         size_t src_col_idx = src_it->second;
@@ -684,7 +686,7 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
         }
 
         // 3. Ensure both dataframes have identically aligned timelines
-        if (this->rows() != source.rows() || this->timestamps_ != source.timestamps_) {
+        if (this->rows() != source.rows() || this->timestamps_ != source.timestamps_) {            
             return TuxedoError::ERR_BAD_INPUT_DIMESNSIONS;
         }
 

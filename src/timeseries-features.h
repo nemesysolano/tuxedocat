@@ -6,7 +6,7 @@
 using namespace timeseries::dataframe;
 using namespace std;
 
-namespace timeseries::momenta {
+namespace timeseries::features {
     extern const string DIRECTION_COLUMN_NAME;
     class Features {
         private:
@@ -21,8 +21,9 @@ namespace timeseries::momenta {
             const DataFrame & data_frame() const { return data_frame_; }
             const std::vector<std::string> & momentum_column_names() const { return momentum_column_names_; }
 
-            static std::expected<Features, TuxedoError> CreateMomenta(const DataFrame & df);
-            static std::expected<Features, TuxedoError> CreateZScores(const DataFrame & df);
+            static std::expected<Features, TuxedoError> CreateWithLogChange(const DataFrame & df);
+            static std::expected<Features, TuxedoError> CreateWithZScore(const DataFrame & df);
+            static std::expected<Features, TuxedoError> CreateWithPctChange(const DataFrame & df);
             
     };    
 }

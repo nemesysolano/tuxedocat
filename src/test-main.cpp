@@ -69,7 +69,6 @@ int test_main(int argc, char* argv[]) {
     shift_test();
     pct_change_test();
     append_column_test();    
-    created_lagged_timeseries_tests(argv[0]);
     print_binary_confusion_matrix_test();
     up_category_test();
     down_category_test();
@@ -78,11 +77,11 @@ int test_main(int argc, char* argv[]) {
     outer_product_test();
     covariances_test();
     scatter_matrices_test();
-    linear_discriminant_weights_test();
-    regression_test(argv[0]);
+    linear_discriminant_weights_test();    
     category_covariance_test();
     determinant_test();
     inverse_test();
+    regression_test(argv[0]);
     return 0;
 }
 

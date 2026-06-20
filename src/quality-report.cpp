@@ -5,7 +5,7 @@
 #include <iterator>
 #include "timeseries-classifiers.h"
 #include "timeseries-dataframe.h"
-#include "timeseries-momenta.h"
+#include "timeseries-features.h"
 #include <iostream>
 #include <algorithm>
 #include <string_view>
@@ -17,7 +17,7 @@ using namespace std;
 using namespace std::filesystem;
 using namespace timeseries::classifiers;
 using namespace timeseries::dataframe;
-using namespace timeseries::momenta;
+using namespace timeseries::features;
 
 namespace reports {
     unique_ptr<QualityReport> quality(const string & full_file_path) {
@@ -32,7 +32,7 @@ namespace reports {
             auto & df = dataframe_result.value();
             input_stream.close();
 
-            auto momenta_result = Features::CreateZScores(df);
+            auto momenta_result = Features::CreateWithZScore(df);
             if(!momenta_result.has_value()) {
                 return nullptr;
             }
@@ -64,15 +64,17 @@ namespace reports {
             auto lda_result = LinearDiscriminant::Create(X_train, Y_train);
             auto qda_result = QuadraticDiscriminant::Create(X_train, Y_train);
             auto rsvm_result = RadialSupportVectorMachine::Create(X_train, Y_train, 1 / static_cast<double>(X_train.cols()) , 1);
+            auto random_forex_result = RandomForest::Create(X_train, Y_train);
 
             // 2. Compute confusion matrices immediately
             auto logistic_matrix = logistic_result.value()->confusion_matrix(X_test, Y_test).value();
             auto lda_matrix = lda_result.value()->confusion_matrix(X_test, Y_test).value();
             auto qda_matrix = qda_result.value()->confusion_matrix(X_test, Y_test).value();
             auto rsvm_matrix = rsvm_result.value()->confusion_matrix(X_test, Y_test).value();
+            auto random_forex = random_forex_result.value()->confusion_matrix(X_test, Y_test).value();
 
             // 3. Create the report using the confusion matrices (not the unique_ptr<Classifier>)
-            return make_unique<QualityReport>(full_file_path, logistic_matrix, lda_matrix, qda_matrix, rsvm_matrix);
+            return make_unique<QualityReport>(full_file_path, logistic_matrix, lda_matrix, qda_matrix, rsvm_matrix, random_forex);
         } catch (const exception & e) {
             cout << "failed to process " << full_file_path << endl;
             return nullptr;
@@ -104,13 +106,13 @@ void quality(const vector<string> & files) {
         
         // 1. Print Exact ASCII Headers
         cout << "                                                                                                             CLASSIFIERS REPORT" << endl;
-        cout << "|------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
-        cout << "|Ticker|                                 Logistic                                            |                                 Linear Discriminant Analysis                        |                                Quadratic Discriminant Analysis                      |                                Rarial Support Vector Machine.                       |" << endl;
-        cout << "+------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
-        cout << "|      |              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|" << endl;
-        cout << "|      |----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+" << endl;
-        cout << "|      |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |" << endl;
-        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
+        cout << "|------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
+        cout << "|Ticker|                                 Logistic                                            |                                 Linear Discriminant Analysis                        |                                Quadratic Discriminant Analysis                      |                                Rarial Support Vector Machine.                       |                                Random Forex                                         |" << endl;
+        cout << "+------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
+        cout << "|      |              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|" << endl;
+        cout << "|      |----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+" << endl;
+        cout << "|      |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |" << endl;
+        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
 
         // 2. Lambda to format and print a single classifier's metrics
         auto print_metrics = [](const BinaryConfusionMatrix& m) {
@@ -145,12 +147,15 @@ void quality(const vector<string> & files) {
                 
                 // Print RSVM Block
                 print_metrics(report->rsvm());                
+
+                // Print RandomForex Block
+                print_metrics(report->random_forex());
                 cout << "|" << endl;                
             }
         }
         
         // 4. Print Footer
-        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
+        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
     }
 
 }

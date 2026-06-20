@@ -6,6 +6,7 @@
 #include <memory>
 #include <span>
 #include <vector>
+#include <random>
 
 namespace timeseries::classifiers {
   class BinaryConfusionMatrix {
@@ -181,8 +182,9 @@ namespace timeseries::classifiers {
 
       // All-args constructor
       RandomForestNode(bool is_leaf, double prediction, size_t feature_index, double threshold, std::unique_ptr<RandomForestNode> left, std::unique_ptr<RandomForestNode> right) : is_leaf_(is_leaf), prediction_(prediction), feature_index_(feature_index), threshold_(threshold), left_(std::move(left)), right_(std::move(right)) {}
-      
+            
     public:
+      RandomForestNode() : is_leaf_(false), prediction_(0.0), feature_index_(0), threshold_(0.0), left_(nullptr), right_(nullptr) {}
       // Copy constructor (deep copy)
       RandomForestNode(const RandomForestNode &other): is_leaf_(other.is_leaf_), prediction_(other.prediction_), feature_index_(other.feature_index_), threshold_(other.threshold_), left_(clone(other.left_)), right_(clone(other.right_)) {}
 
@@ -232,12 +234,26 @@ namespace timeseries::classifiers {
       ~RandomForestNode() = default;
   };
 
+  struct RandomForestTreeBuilderContext {
+      const slice::Span2D& X;
+      const slice::Span2D& y;
+      std::vector<size_t> current_indices;
+      int current_depth;
+      int max_depth;
+      std::mt19937& gen;
+      size_t feature_j;
+      double threshold;
+  };
+
   class RandomForest : public BinaryClassifier {
     private:
       std::vector<std::unique_ptr<RandomForestNode>> forest_;
       double predict_tree(const RandomForestNode* node, const slice::Span2D& X_test, size_t row_i);
       double predict_forest(const std::vector<std::unique_ptr<RandomForestNode>>& forest, const slice::Span2D& X_test, size_t row_i);
-      
+
+      static double evaluate_split(RandomForestTreeBuilderContext & context);
+      static std::unique_ptr<RandomForestNode> build_tree(RandomForestTreeBuilderContext & context);
+
     public:
       // Constructor
       explicit RandomForest(std::vector<std::unique_ptr<RandomForestNode>> forest): forest_(std::move(forest)) {}
@@ -255,7 +271,7 @@ namespace timeseries::classifiers {
         const slice::Span2D &X // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
       ) override; // returns (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
 
-      static std::expected<std::unique_ptr<RadialSupportVectorMachine>, TuxedoError> Create(
+      static std::expected<std::unique_ptr<RandomForest>, TuxedoError> Create(
         const slice::Span2D & X, // (M×N) lags span containing where each row contains `Today`, `Lag[1]`, `Lag[2]`,...,`Lag[N-1]`
         const slice::Span2D& y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
       );     
