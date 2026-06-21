@@ -1,7 +1,5 @@
 
-#ifdef __TEST_MAIN__
-#include "test-main.h"
-#endif
+#ifdef __CLI_MAIN__
 
 
 #include "quality-report.h"
@@ -13,8 +11,6 @@
 using namespace std::filesystem;
 using namespace std;
 using namespace reports;
-
-#if defined(__TEST_MAIN__) || defined(__CLI_MAIN__) 
 
 vector<string> read_lines_from_file(const char* current_program_path) {
     auto exe_path = canonical(current_program_path).parent_path();
@@ -53,12 +49,7 @@ vector<string> read_lines_from_file(const char* current_program_path) {
 }
 
 int main(int argc, char* argv[]) {
-#if defined(__TEST_MAIN__)
-    test_main(argc, argv);    
-#elif defined(__CLI_MAIN__) 
     auto symbols = read_lines_from_file(argv[0]);
     quality(symbols);
-#endif
-
 }
 #endif 

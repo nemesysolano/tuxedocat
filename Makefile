@@ -1,11 +1,11 @@
 CC := clang++
-# Added -MMD -MP to generate header dependency tracking files
-CFLAGS := -Wall -Wextra -Iinclude -O3 -I/opt/homebrew/include/eigen3 -DEIGEN_USE_BLAS -std=c++23 -MMD -MP
+# Added -Isrc/main to the include paths so test files can find main headers
+CFLAGS := -Wall -Wextra -Iinclude -Isrc/main -O3 -I/opt/homebrew/include/eigen3 -DEIGEN_USE_BLAS -std=c++23 -MMD -MP
 SRC_DIR := src
 OBJ_DIR := obj
 BIN_DIR := bin
 
-# `find` naturally searches recursively, grabbing all .cpp files in src/ and its subfolders.
+# `find` naturally searches recursively, grabbing all .cpp files in src/main and src/test.
 SRCS := $(shell find $(SRC_DIR) -type f -name "*.cpp")
 OBJS := $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
@@ -14,12 +14,13 @@ DEPS := $(OBJS:.o=.d)
 
 LDFLAGS := -framework Accelerate
 
+# Evaluate definitions and default to shared library if neither __TEST_MAIN__ nor __CLI_MAIN__ is provided
 ifneq ($(filter 1,$(if $(__TEST_MAIN__),1)$(if $(__CLI_MAIN__),1)),)
     TARGET := $(BIN_DIR)/tuxedocat    
-    $(if $(__TEST_MAIN__),$(eval CFLAGS += -D__TEST_MAIN__))
+    $(if $(__TEST_MAIN__),$(eval CFLAGS += -D__TEST_MAIN__)) #ok
     $(if $(__CLI_MAIN__),$(eval CFLAGS += -D__CLI_MAIN__))
 else
-    TARGET := $(BIN_DIR)/libtuxedocat.dylib
+    TARGET := $(BIN_DIR)/libtuxedocat.dylib # OK
     CFLAGS += -fPIC
     LDFLAGS += -shared 
 endif

@@ -16,10 +16,9 @@
 
 using namespace std;
 
-int test_main(int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
-    /**/
     evaluate_test();
     evaluate_reversed_test();
     mac_kinnon_p_test();
@@ -81,5 +80,4 @@ int test_main(int argc, char* argv[]) {
     regression_test(argv[0]);
     return 0;
 }
-
 #endif
