@@ -2,7 +2,6 @@
 #include "slice.h"
 #include "polynomials.h"
 #include "distributions.h"
-#include "operations-span2D.h"
 #include "tuxedo-error.h"
 #include <tuple>
 #include <Eigen/Dense>

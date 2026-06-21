@@ -1,10 +1,17 @@
 CC := clang++
-CFLAGS := -Wall -Wextra -Iinclude -O3 -I/opt/homebrew/include/eigen3 -DEIGEN_USE_BLAS -std=c++23 
+# Added -MMD -MP to generate header dependency tracking files
+CFLAGS := -Wall -Wextra -Iinclude -O3 -I/opt/homebrew/include/eigen3 -DEIGEN_USE_BLAS -std=c++23 -MMD -MP
 SRC_DIR := src
 OBJ_DIR := obj
 BIN_DIR := bin
+
+# `find` naturally searches recursively, grabbing all .cpp files in src/ and its subfolders.
 SRCS := $(shell find $(SRC_DIR) -type f -name "*.cpp")
 OBJS := $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
+
+# Define dependency files matching the object files
+DEPS := $(OBJS:.o=.d)
+
 LDFLAGS := -framework Accelerate
 
 ifneq ($(filter 1,$(if $(__TEST_MAIN__),1)$(if $(__CLI_MAIN__),1)),)
@@ -37,14 +44,17 @@ $(TARGET): $(OBJS) | $(BIN_DIR)
 	$(CC) $(OBJS) $(LDFLAGS) -o $@ 
 	@cp toolchain/test-data/*.csv bin
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR)
+# Adjusted to create nested directories dynamically before compiling
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BIN_DIR) $(OBJ_DIR):
+$(BIN_DIR):
 	mkdir -p $@
 
 clean:
 	@if [ -d $(OBJ_DIR) ]; then find $(OBJ_DIR) -type f ! -name '.gitkeep' -delete; fi
 	@if [ -d $(BIN_DIR) ]; then find $(BIN_DIR) -type f ! -name '.gitkeep' -delete; fi
 
-.PHONY: all clean
+# Include the generated dependency files so Make knows when headers change
+-include $(DEPS)

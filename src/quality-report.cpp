@@ -93,12 +93,12 @@ void quality(const vector<string> & files) {
     std::vector<std::unique_ptr<QualityReport>> reports;
     reports.reserve(files.size());
 
-    /* *
+    /*
     for (const auto& file : files) {
         trace_with_message(file);
         reports.push_back(quality(file));
     }
-    /* */
+    */
     std::vector<std::future<std::unique_ptr<QualityReport>>> futures;
     futures.reserve(files.size());
     

@@ -1,6 +1,5 @@
 #ifdef __TEST_MAIN__
 #include "polynomials-tests.h"
-#include "row_span_tests.h"
 #include "distributions.h"
 #include "timeseries-adf.h" // Required for mac_kinnon_p and RegressionType
 #include <iostream>
@@ -10,11 +9,9 @@
 #include "distributions-tests.h"
 #include "timeseries-adf-tests.h"
 #include "slice-tests.h"
-#include "operations-span2D-tests.h"
 #include "timeseries-hurst-tests.h"
 #include "timeseries-dataframe-tests.h"
 #include "ols-tests.h"
-#include "forecast-tests.h"
 #include "timeseries-classifiers-tests.h"
 
 using namespace std;
