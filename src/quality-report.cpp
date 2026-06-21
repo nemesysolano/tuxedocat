@@ -14,6 +14,7 @@
 #include <future>
 #include "forecast.h"
 #include "timeseries-regression-data.h"
+#include "timeseries-log.h"
 #include <cassert>
 
 using namespace std;
@@ -39,22 +40,37 @@ namespace reports {
             auto dataframe_result = DataFrame::Create(input_stream);
 
             if(!dataframe_result) {
-                cout << "Can't load " << full_file_path << endl;            
+                trace_with_message(std::format("{} can't beloaded", full_file_path));
                 return nullptr;            
             }
+
             auto & df = dataframe_result.value();
             input_stream.close();
 
+            if(df.rows() < 1) {
+                trace_with_message(std::format("{} is empty.", full_file_path));
+                return nullptr;
+            }
+
             auto regression_zscore_data_result = RegressionData::CreateWithZScore(df);
-            assert(regression_zscore_data_result.has_value());
+            if(!regression_zscore_data_result.has_value()) {
+                trace_with_message(std::format("{} generated regression_zscore_data_result.", full_file_path));
+                return nullptr;                
+            }
             auto & regression_zscore_data = regression_zscore_data_result.value();
         
             auto regression_data_pct_change_result = RegressionData::CreateWithPctChange(df);
-            assert(regression_data_pct_change_result.has_value());
+            if(!regression_data_pct_change_result.has_value()){
+                trace_with_message(std::format("{} generated regression_data_pct_change_result.", full_file_path));
+                return nullptr;
+            }
             auto & regression_data_pct_change = regression_data_pct_change_result.value();
 
             auto regression_data_log_change_result = RegressionData::CreateWithLogChange(df);
-            assert(regression_data_log_change_result.has_value());
+            if(!regression_data_log_change_result.has_value()){
+                trace_with_message(std::format("{} generated regression_data_log_change_result..", full_file_path));
+                return nullptr;
+            }
             auto & regression_data_log_change = regression_data_log_change_result.value();
 
             // 2. Compute confusion matrices immediately
@@ -74,9 +90,18 @@ namespace reports {
     }
 
 void quality(const vector<string> & files) {        
+    std::vector<std::unique_ptr<QualityReport>> reports;
+    reports.reserve(files.size());
+
+    /* *
+    for (const auto& file : files) {
+        trace_with_message(file);
+        reports.push_back(quality(file));
+    }
+    /* */
     std::vector<std::future<std::unique_ptr<QualityReport>>> futures;
     futures.reserve(files.size());
-
+    
    //  1. Dispatch all tasks asynchronously 
     for (const auto& file : files) {
         futures.push_back(std::async(std::launch::async, [&file]() {
@@ -84,8 +109,7 @@ void quality(const vector<string> & files) {
         }));
     }
     
-    // 2. Gather results, blocking until each thread finishes, and filter
-    std::vector<std::unique_ptr<QualityReport>> reports;
+    // 2. Gather results, blocking until each thread finishes, and filter    
     for (auto& fut : futures) {
         auto report = fut.get();
         if (report != nullptr) {
@@ -93,61 +117,62 @@ void quality(const vector<string> & files) {
         }
     }
 
-        // --- NEW: Tabulated Output Engine ---
-        
-        // 1. Print Exact ASCII Headers
-        cout << "                                                                                                             CLASSIFIERS REPORT" << endl;
-        cout << "|------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
-        cout << "|Ticker|                                 Logistic                                            |                                 Linear Discriminant Analysis                        |                                Quadratic Discriminant Analysis                      |                                Rarial Support Vector Machine.                       |                                Random Forex                                         |" << endl;
-        cout << "+------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
-        cout << "|      |              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|" << endl;
-        cout << "|      |----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+" << endl;
-        cout << "|      |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |" << endl;
-        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
 
-        // 2. Lambda to format and print a single classifier's metrics
-        auto print_metrics = [](const BinaryConfusionMatrix& m) {
-            cout << "|" << std::right << std::setw(10) << m.true_positives()
-                 << "|" << std::right << std::setw(11) << m.false_positives()
-                 << "|" << std::right << std::setw(10) << m.true_negatives()
-                 << "|" << std::right << std::setw(11) << m.false_negatives()
-                 << "|" << std::right << std::setw(9) << std::fixed << std::setprecision(7) << m.accuracy()
-                 << "|" << std::right << std::setw(9) << std::fixed << std::setprecision(7) << m.precision()
-                 << "|" << std::right << std::setw(9) << std::fixed << std::setprecision(7) << m.recall()
-                 << "|" << std::right << std::setw(9) << std::fixed << std::setprecision(7) << m.f1_score();
-        };
+    // --- NEW: Tabulated Output Engine ---
+    
+    // 1. Print Exact ASCII Headers
+    cout << "                                                                                                             CLASSIFIERS REPORT" << endl;
+    cout << "|------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
+    cout << "|Ticker|                                 Logistic                                            |                                 Linear Discriminant Analysis                        |                                Quadratic Discriminant Analysis                      |                                Rarial Support Vector Machine.                       |                                Random Forex                                         |" << endl;
+    cout << "+------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------+" << endl;
+    cout << "|      |              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|              Positive|              Negative| Accuracy|Precision|   Recall| F1_Score|" << endl;
+    cout << "|      |----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+----------------------+----------------------+---------+---------+---------+---------+" << endl;
+    cout << "|      |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |      True|      False|      True|      False|                                       |" << endl;
+    cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
 
-        // 3. Print Data Rows
-        for (const auto& report : reports) {
-            if (report) {
-                // Extract ticker from filename and clamp to 6 characters to prevent layout breaking
-                string ticker = std::filesystem::path(report->file_path()).stem().string();
-                if (ticker.length() > 6) ticker = ticker.substr(0, 6); 
+    // 2. Lambda to format and print a single classifier's metrics
+    auto print_metrics = [](const BinaryConfusionMatrix& m) {
+        cout << "|" << std::right << std::setw(10) << m.true_positives()
+                << "|" << std::right << std::setw(11) << m.false_positives()
+                << "|" << std::right << std::setw(10) << m.true_negatives()
+                << "|" << std::right << std::setw(11) << m.false_negatives()
+                << "|" << std::right << std::setw(9) << std::fixed << std::setprecision(7) << m.accuracy()
+                << "|" << std::right << std::setw(9) << std::fixed << std::setprecision(7) << m.precision()
+                << "|" << std::right << std::setw(9) << std::fixed << std::setprecision(7) << m.recall()
+                << "|" << std::right << std::setw(9) << std::fixed << std::setprecision(7) << m.f1_score();
+    };
 
-                // Ticker column
-                cout << "|" << std::left << std::setw(6) << ticker;
+    // 3. Print Data Rows
+    for (const auto& report : reports) {
+        if (report) {
+            // Extract ticker from filename and clamp to 6 characters to prevent layout breaking
+            string ticker = std::filesystem::path(report->file_path()).stem().string();
+            if (ticker.length() > 6) ticker = ticker.substr(0, 6); 
 
-                // Print Logistic Block
-                print_metrics(report->logistic());
+            // Ticker column
+            cout << "|" << std::left << std::setw(6) << ticker;
 
-                // Print LDA Block
-                print_metrics(report->linear_discriminant());
-                
-                // Print LDA Block
-                print_metrics(report->quadratic_discriminant());                
-                
-                // Print RSVM Block
-                print_metrics(report->rsvm());                
+            // Print Logistic Block
+            print_metrics(report->logistic());
 
-                // Print RandomForex Block
-                print_metrics(report->random_forex());
-                cout << "|" << endl;                
-            }
+            // Print LDA Block
+            print_metrics(report->linear_discriminant());
+            
+            // Print LDA Block
+            print_metrics(report->quadratic_discriminant());                
+            
+            // Print RSVM Block
+            print_metrics(report->rsvm());                
+
+            // Print RandomForex Block
+            print_metrics(report->random_forex());
+            cout << "|" << endl;                
         }
-        
-        // 4. Print Footer
-        cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
     }
+    
+    // 4. Print Footer
+    cout << "+------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+----------+-----------+----------+-----------+---------+---------+---------+---------+" << endl;
+}
 
 }
 /* 

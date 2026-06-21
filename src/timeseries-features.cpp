@@ -73,6 +73,7 @@ std::expected<Features, TuxedoError> Features::CreateWithZScore(const DataFrame 
     // 1. Initialize the master dataframe safely
     auto momentum_result = get_nth_z_score(df, price_column_name, 2); 
     if(!momentum_result.has_value()) {
+        trace();
         return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
     }
     auto & momentum = momentum_result.value();
@@ -82,6 +83,7 @@ std::expected<Features, TuxedoError> Features::CreateWithZScore(const DataFrame 
     for (size_t h : prime_horizons) {
         auto momentum_h_result = get_nth_z_score(df, price_column_name, h);
         if(!momentum_h_result.has_value()) {
+            trace();
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
         }
         

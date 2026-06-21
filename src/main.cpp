@@ -19,9 +19,10 @@ using namespace reports;
 vector<string> read_lines_from_file(const char* current_program_path) {
     auto exe_path = canonical(current_program_path).parent_path();
     auto test_data_dir = exe_path.string() + "/../toolchain/test-data";
-    auto symbols_file = exe_path.string() + "/../documents/active.csv";
+    auto symbols_file = exe_path.string() + "/../documents/russell3000.csv";
     vector<string> lines;
 
+    cout << symbols_file << endl;
     if(!(
         filesystem::exists(test_data_dir) && 
         filesystem::is_directory(test_data_dir) &&

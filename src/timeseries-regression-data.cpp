@@ -45,21 +45,28 @@ std::expected<RegressionData, TuxedoError> RegressionData::split(const timeserie
 
 std::expected<RegressionData, TuxedoError> RegressionData::CreateWithLogChange(timeseries::dataframe::DataFrame & df){    
     auto features_result = Features::CreateWithLogChange(df);
-    assert(features_result.has_value());
+    if(!features_result.has_value()){
+        return std::unexpected(features_result.error());
+    }
     auto & momenta = features_result.value();
 
     return RegressionData::split(momenta);    
 }
 std::expected<RegressionData, TuxedoError> RegressionData::CreateWithZScore(timeseries::dataframe::DataFrame & df){
     auto features_result = Features::CreateWithZScore(df);
-    assert(features_result.has_value());
+    if(!features_result.has_value()) {
+        return std::unexpected(features_result.error());
+    }
     auto & momenta = features_result.value();
 
     return RegressionData::split(momenta);        
 }
 std::expected<RegressionData, TuxedoError> RegressionData::CreateWithPctChange(timeseries::dataframe::DataFrame & df){
     auto features_result = Features::CreateWithPctChange(df);
-    assert(features_result.has_value());
+    if(!features_result.has_value()){
+        return std::unexpected(features_result.error());
+    }
+
     auto & momenta = features_result.value();
 
     return RegressionData::split(momenta);            
