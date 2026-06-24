@@ -26,5 +26,6 @@ void copy_column_test();
 void shift_test();
 void pct_change_test();
 void append_column_test();
+void test_dataframe_reindex();
 #endif
 #endif

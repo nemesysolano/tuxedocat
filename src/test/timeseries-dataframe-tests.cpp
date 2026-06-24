@@ -614,4 +614,77 @@ void append_column_test() {
     assert(success);
 }
 
+void test_dataframe_reindex() {
+    // 1. Create a sparse original dataframe with NaNs to test independent column propagation
+    std::string csv_data =
+        "Date,A,B\n"
+        "2023-01-02 00:00:00,10.0,20.0\n"
+        "2023-01-04 00:00:00,NaN,40.0\n"  // 'A' is missing here
+        "2023-01-07 00:00:00,50.0,NaN\n"; // 'B' is missing here
+
+    std::istringstream stream(csv_data);
+    auto df_res = DataFrame::Create(stream, ',');
+    assert(df_res.has_value());
+    auto& df = df_res.value();
+
+    // Use modern C++20 Chrono to guarantee mathematically perfect UTC timestamps
+    // and completely avoid POSIX `timegm` and `struct tm` platform bugs.
+    auto make_ts = [](int y, int m, int d) {
+        return std::chrono::time_point_cast<std::chrono::seconds>(
+            std::chrono::sys_days{std::chrono::year{y} / m / d}
+        );
+    };
+
+    // 2. Define the new denser target index
+    std::vector<std::chrono::sys_seconds> target_ts = {
+        make_ts(2023, 1, 1), // Before start -> should be padded
+        make_ts(2023, 1, 2), // Exact match
+        make_ts(2023, 1, 3), // Pad from 01-02
+        make_ts(2023, 1, 6), // Pad from 01-04
+        make_ts(2023, 1, 7), // Exact match
+        make_ts(2023, 1, 8)  // Pad from 01-07
+    };
+
+    // 3. Reindex using the new behavior (no explicit padding value argument needed)
+    df.reindex(target_ts);
+
+    // --- DIAGNOSTICS: Catch missing state updates before asserting ---
+    if (df.rows() != 6) {
+        std::cerr << "\n[CRITICAL ERROR] df.rows() is " << df.rows() << ", but expected 6.\n";
+        std::cerr << "-> Please check timeseries-dataframe.cpp inside your DataFrame::reindex method.\n";
+        std::cerr << "-> Ensure the very last line is exactly: rows_ = new_timestamps.size();\n";
+        std::cerr << "-> Also, ensure you saved timeseries-dataframe.cpp before running `make`.\n\n";
+    }
+    // -----------------------------------------------------------------
+
+    // 4. Validation
+    assert(df.rows() == 6);
+    assert(df.cols() == 2);
+
+    // Check 2023-01-01 (Before earliest date -> filled with NaN)
+    assert(std::isnan(df[0, 0].value()));
+    assert(std::isnan(df[0, 1].value()));
+
+    // Check 2023-01-02 (Exact match)
+    assert(std::abs(df[1, 0].value() - 10.0) < 1e-6);
+    assert(std::abs(df[1, 1].value() - 20.0) < 1e-6);
+
+    // Check 2023-01-03 (Pad from 01-02)
+    assert(std::abs(df[2, 0].value() - 10.0) < 1e-6);
+    assert(std::abs(df[2, 1].value() - 20.0) < 1e-6);
+
+    // Check 2023-01-06 (Pad from 01-04: A was NaN, carries 10.0 from 01-02)
+    assert(std::abs(df[3, 0].value() - 10.0) < 1e-6);
+    assert(std::abs(df[3, 1].value() - 40.0) < 1e-6);
+
+    // Check 2023-01-07 (Exact match: B was NaN, carries 40.0 from 01-04)
+    assert(std::abs(df[4, 0].value() - 50.0) < 1e-6);
+    assert(std::abs(df[4, 1].value() - 40.0) < 1e-6);
+
+    // Check 2023-01-08 (Pad from 01-07)
+    assert(std::abs(df[5, 0].value() - 50.0) < 1e-6);
+    assert(std::abs(df[5, 1].value() - 40.0) < 1e-6);
+
+    std::cout << "[PASSED] test_dataframe_reindex" << std::endl;
+}
 #endif

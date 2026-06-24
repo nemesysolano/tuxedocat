@@ -43,7 +43,7 @@ all: prebuild $(TARGET)
 
 $(TARGET): $(OBJS) | $(BIN_DIR)
 	$(CC) $(OBJS) $(LDFLAGS) -o $@ 
-	@cp toolchain/test-data/*.csv bin
+#	@cp toolchain/test-data/*.csv bin
 
 # Adjusted to create nested directories dynamically before compiling
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp

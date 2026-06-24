@@ -1,4 +1,5 @@
 #include "timeseries-dataframe.h"
+#include <fstream>
 #include <sstream>
 #include <set>
 #include <cassert>
@@ -6,6 +7,7 @@
 #include <iterator>  // <-- Required for std::inserter
 #include <cmath>
 #include "timeseries-log.h"
+#include "tuxedo-error.h"
 using namespace std;
 
 namespace timeseries::dataframe {
@@ -456,6 +458,20 @@ namespace timeseries::dataframe {
         return DataFrame::Create(input, ',');
     }
 
+    std::expected<DataFrame, TuxedoError> DataFrame::Create(const std::string & file_path) {
+        std::ifstream file(file_path);
+        if(!file.is_open()) {
+            return std::unexpected(TuxedoError::ERR_CANT_OPEN_FILE);
+        }
+        auto dataframe_result = DataFrame::Create(file);
+        file.close();
+        if(!dataframe_result.has_value()) {
+            return std::unexpected(TuxedoError::ERR_CANT_OPEN_FILE);
+        }
+        return dataframe_result.value();
+
+    }
+
     // Optional but highly recommended: expose the index lookup
     std::expected<size_t, TuxedoError> DataFrame::column_index(const std::string& col_name) const {
         auto it = column_name_to_column_index_.find(col_name);
@@ -737,7 +753,7 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
         return timestamps_;
     }
 
-    std::expected<slice::Slice2D, TuxedoError> DataFrame::slice(size_t start_row, size_t end_row) {
+    std::expected<slice::Slice2D, TuxedoError> DataFrame::slice(size_t start_row, size_t end_row) const {
         // 1. Boundary Checks
         if (start_row >= end_row || end_row > this->rows()) {
             return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
@@ -763,7 +779,74 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
         return slice::Slice2D(start_ptr, row_count, cols);
     }
 
-// 2. Implement the common_timestamps intersection logic
+    // Equivalent to pandas.DataFrame.reindex(index = timestamps, method='pad');
+    void DataFrame::reindex(std::span<std::chrono::sys_seconds> target_timestamps) {
+        std::vector<double> new_data;
+        std::map<std::chrono::sys_seconds, size_t> new_timestamp_to_row_index;
+        std::set<std::chrono::sys_seconds> new_timestamps;
+
+        size_t new_cols = this->cols();
+        new_data.reserve(target_timestamps.size() * new_cols);
+
+        // 1. Pre-forward-fill the original data to ensure O(1) last-valid-observation lookups
+        std::vector<double> ffilled_data = data_;
+        if (!timestamps_.empty()) {
+            auto it = timestamps_.begin();
+            auto prev_it = it;
+            ++it;
+            for (; it != timestamps_.end(); ++it, ++prev_it) {
+                size_t curr_row = timestamp_to_row_index_.at(*it);
+                size_t prev_row = timestamp_to_row_index_.at(*prev_it);
+                for (size_t c = 0; c < new_cols; ++c) {
+                    if (std::isnan(ffilled_data[curr_row * new_cols + c])) {
+                        // Propagate the last valid observation forward
+                        ffilled_data[curr_row * new_cols + c] = ffilled_data[prev_row * new_cols + c];
+                    }
+                }
+            }
+        }
+
+        size_t current_new_row = 0;
+
+        for (const auto& ts : target_timestamps) {
+            // Enforce unique timestamps in the dataframe (ignore duplicates in target)
+            if (new_timestamps.find(ts) != new_timestamps.end()) {
+                continue;
+            }
+
+            // Find the first timestamp strictly greater than our target
+            auto it = timestamps_.upper_bound(ts);
+
+            if (it == timestamps_.begin()) {
+                // Target is before the very first available record. Pad with standard NaN.
+                for (size_t c = 0; c < new_cols; ++c) {
+                    new_data.push_back(std::nan(""));
+                }
+            } else {
+                // Step back to get the greatest timestamp <= ts (forward fill / pad)
+                --it;
+                size_t old_row_idx = timestamp_to_row_index_.at(*it);
+                for (size_t c = 0; c < new_cols; ++c) {
+                    // Grab from the pre-filled matrix, guaranteeing the last valid observation!
+                    new_data.push_back(ffilled_data[old_row_idx * new_cols + c]);
+                }
+            }
+
+            new_timestamps.insert(ts);
+            new_timestamp_to_row_index[ts] = current_new_row;
+            current_new_row++;
+        }
+
+        // Safely swap state
+        data_ = std::move(new_data);
+        rows_ = new_timestamps.size(); // Protected member from Span2D
+        timestamps_ = std::move(new_timestamps);
+        timestamp_to_row_index_ = std::move(new_timestamp_to_row_index);        
+        
+        cout << "DEBUG: rows_ = " << rows_ << endl;
+    }
+
+    // 2. Implement the common_timestamps intersection logic
     std::set<std::chrono::sys_seconds> common_timestamps(std::list<std::reference_wrapper<const DataFrame>> data_frames) {
         std::set<std::chrono::sys_seconds> result;
 

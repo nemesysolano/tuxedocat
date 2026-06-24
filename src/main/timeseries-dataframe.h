@@ -63,6 +63,7 @@ namespace timeseries::dataframe {
 
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input, char field_delimiter);
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input);
+            static std::expected<DataFrame, TuxedoError> Create(const std::string & file_path);
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns) const;
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> && target_columns) const;
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> && source_columns, const std::vector<std::string> & target_columns) const;
@@ -119,18 +120,19 @@ namespace timeseries::dataframe {
             std::expected<slice::Slice2D, TuxedoError>  slice(
                 size_t start_row, /* inclusive */
                 size_t end_row /* exclusive */
-            ); // returns rows in `[start_row, end_row)` range
+            ) const ; // returns rows in `[start_row, end_row)` range
             
-            inline std::expected<slice::Slice2D, TuxedoError> slice_from(size_t start_row) {
+            inline std::expected<slice::Slice2D, TuxedoError> slice_from(size_t start_row) const {
                 // Range [start_row, this->rows())
                 return slice(start_row, this->rows());
             }
 
-            inline std::expected<slice::Slice2D, TuxedoError> slice_to(size_t end_row) {
+            inline std::expected<slice::Slice2D, TuxedoError> slice_to(size_t end_row) const {
                 // Range [0, end_row)
                 return slice(0, end_row);
             }
 
+            void reindex(std::span<std::chrono::sys_seconds> target_timestamps);
             friend std::ostream & operator << (std::ostream & out, DataFrame & df);
             virtual ~DataFrame();
     };

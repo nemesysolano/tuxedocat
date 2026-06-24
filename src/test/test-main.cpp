@@ -13,7 +13,7 @@
 #include "timeseries-dataframe-tests.h"
 #include "ols-tests.h"
 #include "timeseries-classifiers-tests.h"
-
+#include "trading-engine-portfolio-tests.h"
 using namespace std;
 
 int main(int argc, char* argv[]) {
@@ -60,6 +60,7 @@ int main(int argc, char* argv[]) {
     ols_flat_tests();
     test_dataframe_create_from_column_index();
     test_dataframe_create_from_column_name();
+    test_dataframe_reindex();
     augmented_dickey_fuller_cointegration_test(argv[0]);
     copy_column_test();
     shift_test();
@@ -78,6 +79,7 @@ int main(int argc, char* argv[]) {
     determinant_test();
     inverse_test();
     regression_test(argv[0]);
+    test_create_drawdowns();
     return 0;
 }
 #endif
