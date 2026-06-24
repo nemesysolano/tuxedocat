@@ -1,30 +1,24 @@
 #include "trading-engine-datahandler.h"
 #include "tuxedo-error.h"
 #include <expected>
+#include <algorithm>
+
 using namespace std;
 
 namespace trading::engine::datahandler {
-    HistoricCSVdataHandler::HistoricCSVdataHandler(queue<shared_ptr<Bar>> events, const string & csv_dir , vector<string> & symbol_list, map<string, shared_ptr<DataFrame>> dataframe_list, bool continue_backtest): 
+    HistoricCSVdataHandler::HistoricCSVdataHandler(Queue<shared_ptr<Event>> events, vector<string> & symbol_list, map<string, shared_ptr<DataFrame>> symbol_data, bool continue_backtest, size_t iterator_size): 
         events_(std::move(events)),
-        csv_dir_(csv_dir),
         symbol_list_(std::move(symbol_list)),
-        dataframe_list_(std::move(dataframe_list)),
-        continue_backtest_(continue_backtest){                    
+        symbol_data_(std::move(symbol_data)),
+        continue_backtest_(continue_backtest),
+        latest_symbol_data_({}),
+        iterator_index_(0),
+        iterator_size_(iterator_size)
+        {
 
     }    
 
-    HistoricCSVdataHandler::HistoricCSVdataHandler(queue<shared_ptr<Bar>> events, const string & csv_dir , vector<string> & symbol_list): 
-        HistoricCSVdataHandler(
-            events,
-            csv_dir,
-            symbol_list,
-            {},
-            true
-        ) {
-
-    };    
-
-    expected<unique_ptr<HistoricCSVdataHandler>, TuxedoError> HistoricCSVdataHandler::Create(queue<shared_ptr<Bar>> events, const string & csv_dir , vector<string> & symbol_list) {
+    expected<unique_ptr<HistoricCSVdataHandler>, TuxedoError> HistoricCSVdataHandler::Create(Queue<shared_ptr<Event>> events, const string & csv_dir , vector<string> & symbol_list) {
         /* 
         Store all timestamps from loaded CSV files
         */
@@ -33,11 +27,11 @@ namespace trading::engine::datahandler {
         /* 
         Data frames map.
         */
-        map<string, shared_ptr<DataFrame>> dataframe_list;
+        map<string, shared_ptr<DataFrame>> symbol_data;
         
         /*
         Open CSV files from data directory, converting them into DataFrames and stores them
-        into the data frames map (namely `dataframe_list`). It is assume that data is taken from Yahoo Finance.
+        into the data frames map (namely `symbol_data`). It is assumed that data is taken from Yahoo Finance.
         */
        
         for(const auto & symbol : symbol_list) {
@@ -46,46 +40,59 @@ namespace trading::engine::datahandler {
                 return unexpected(dataframe_result.error());
             }
 
-            dataframe_list[symbol] = make_shared<DataFrame>(std::move(dataframe_result.value()));
-            auto const & data_frame = * dataframe_list[symbol].get();
+            symbol_data[symbol] = make_shared<DataFrame>(std::move(dataframe_result.value()));
+            auto const & data_frame = * symbol_data[symbol].get();
 
             for(auto const & timestamp : data_frame.timestamps()) {
                 timestamps.insert(timestamp);
             }
-
-            /* 
-            Reindex dataframes.
-            */
-            for(auto const & string : symbol_list) {
-                auto const & data_frame = *dataframe_list[string];
-                
-            }
         }
 
-        return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+        /* 
+        Reindex dataframes.
+        */
+        vector<sys_seconds> target_timestamps(timestamps.begin(), timestamps.end());
+
+        for(const auto & symbol : symbol_list) {
+            auto & data_frame = *symbol_data[symbol];
+            data_frame.reindex(target_timestamps);                
+        }        
+        
+        return unique_ptr<HistoricCSVdataHandler>(new HistoricCSVdataHandler(std::move(events), symbol_list, std::move(symbol_data), true, timestamps.size()));
     }
 
-    expected<sys_seconds, TuxedoError> HistoricCSVdataHandler::latest_bar_datetime() const {
-        return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+    expected<sys_seconds, TuxedoError> HistoricCSVdataHandler::latest_bar_datetime(const string & symbol) const {
+        return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);      
     }
 
     expected<double, TuxedoError> HistoricCSVdataHandler::latest_bar_value(const string & symbol, BarValue value) const {
         return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
     }
 
-    expected<vector<string>, TuxedoError> HistoricCSVdataHandler::symbol_list() const {
-        return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+    const vector<string> & HistoricCSVdataHandler::symbol_list() const {
+        return symbol_list_;
     }
 
     expected<const shared_ptr<Bar>, TuxedoError> HistoricCSVdataHandler::latest_bar(const string & symbol) const {   // get_latest_bar in python.   
-        return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);         
+        return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
     }
 
-    expected<const vector<shared_ptr<Bar>>, TuxedoError> HistoricCSVdataHandler::latest_bars(const string & symbol, size_t N) const {  // get_latest_bars in python.
+    expected<vector<shared_ptr<Bar>>, TuxedoError> HistoricCSVdataHandler::latest_bars(const string & symbol, size_t N) const {  // get_latest_bars in python.
         return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
     }
 
     TuxedoError HistoricCSVdataHandler::update_bars() {
+        if(iterator_index_ == iterator_size_) {
+            continue_backtest_ = false;
+        }
+
+        
+
+        iterator_index_++;
         return TuxedoError::ERR_NOT_IMPLEMENTED;
+    }
+
+    const map<string, shared_ptr<DataFrame>> & HistoricCSVdataHandler::symbol_data() const {
+        return symbol_data_;
     }
 };

@@ -14,6 +14,8 @@
 #include "ols-tests.h"
 #include "timeseries-classifiers-tests.h"
 #include "trading-engine-portfolio-tests.h"
+#include "trading-engine-datahandler-tests.h"
+
 using namespace std;
 
 int main(int argc, char* argv[]) {
@@ -80,6 +82,7 @@ int main(int argc, char* argv[]) {
     inverse_test();
     regression_test(argv[0]);
     test_create_drawdowns();
+    test_historic_csv_data_handler_create(argv[0]);
     return 0;
 }
 #endif

@@ -842,8 +842,7 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
         rows_ = new_timestamps.size(); // Protected member from Span2D
         timestamps_ = std::move(new_timestamps);
         timestamp_to_row_index_ = std::move(new_timestamp_to_row_index);        
-        
-        cout << "DEBUG: rows_ = " << rows_ << endl;
+
     }
 
     // 2. Implement the common_timestamps intersection logic

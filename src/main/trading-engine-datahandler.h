@@ -15,6 +15,40 @@ using namespace std;
 using namespace timeseries::dataframe;
 
 namespace trading::engine::datahandler {
+    template <typename T> class Queue : public std::queue<T> {
+        public:
+            Queue(): std::queue<T>() {}
+            Queue(const Queue<T>& other): std::queue<T>(other) {}
+            Queue(Queue<T>&& other) noexcept: std::queue<T>(std::move(other)) {}
+            Queue<T>& operator=(const Queue<T>& other) {
+                if(this != &other) {
+                    std::queue<T>::operator=(other);
+                }
+                return *this;
+            }
+            Queue<T>& operator=(Queue<T>&& other) noexcept {
+                if(this != &other) {
+                    std::queue<T>::operator=(std::move(other));
+                }
+                return *this;
+            }
+            // Expose index access using operator[]
+            expected<T, TuxedoError> operator[](size_t index) const {
+                if(index >= this->size()) {
+                    return unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+                }
+                // 'this->c' points to the underlying std::deque container
+                return this->c[index]; 
+            }
+
+            expected<T&, TuxedoError> operator[](size_t index) {
+                if(index >= this->size()) {
+                    return unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+                }
+                return this->c[index];
+            }
+    };
+
     struct Bar {
         const sys_seconds timestamp_;
         const double open_price_;
@@ -43,34 +77,43 @@ namespace trading::engine::datahandler {
 
     class DataHandler {
         public:
-            virtual expected<sys_seconds, TuxedoError> latest_bar_datetime() const  = 0;
+            virtual expected<sys_seconds, TuxedoError> latest_bar_datetime(const string & symbol) const  = 0;
             virtual expected<double, TuxedoError> latest_bar_value(const string & symbol, BarValue value) const  = 0;
-            virtual expected<vector<string>, TuxedoError> symbol_list() const  = 0;
+            virtual const vector<string> & symbol_list() const  = 0;
             virtual expected<const shared_ptr<Bar>, TuxedoError> latest_bar(const string & symbol) const  = 0; // get_latest_bar in python.            
-            virtual expected<const vector<shared_ptr<Bar>>, TuxedoError> latest_bars(const string & symbol, size_t N) const  = 0; // get_latest_bars in python.
+            virtual expected<vector<shared_ptr<Bar>>, TuxedoError> latest_bars(const string & symbol, size_t N) const  = 0; // get_latest_bars in python.
             virtual TuxedoError update_bars() = 0;        
-            inline  expected<const vector<shared_ptr<Bar>>, TuxedoError> latest_bars(const string & symbol) const { return latest_bars(symbol, 1);}            
+            inline  expected<vector<shared_ptr<Bar>>, TuxedoError> latest_bars(const string & symbol) const { return latest_bars(symbol, 1);}         
+            virtual ~DataHandler() = default;   
     };
 
+    
     class HistoricCSVdataHandler: public DataHandler {
         private:
-            queue<shared_ptr<Bar>> events_;
+            Queue<shared_ptr<Event>> events_;
             string csv_dir_;
             vector<string> symbol_list_;
-            map<string, shared_ptr<DataFrame>> dataframe_list_; // This field name is misleading, but we will keep it for consistency with the python version.
+            map<string, shared_ptr<DataFrame>> symbol_data_; // This field name is misleading, but we will keep it for consistency with the python version.
             bool continue_backtest_;
-        
-            HistoricCSVdataHandler(queue<shared_ptr<Bar>> events, const string & csv_dir , vector<string> & symbol_list, map<string, shared_ptr<DataFrame>> dataframe_list, bool continue_backtest);
-            HistoricCSVdataHandler(queue<shared_ptr<Bar>> events, const string & csv_dir , vector<string> & symbol_list);
+            map<string, shared_ptr<Bar>> latest_symbol_data_;
+            size_t iterator_index_;
+            size_t iterator_size_;
+
+            HistoricCSVdataHandler(
+                Queue<shared_ptr<Event>> events, vector<string> & symbol_list, map<string, shared_ptr<DataFrame>> symbol_data, bool continue_backtest, size_t iterator_size
+            );
+            
         public:
-             expected<sys_seconds, TuxedoError> latest_bar_datetime() const override;
-             expected<double, TuxedoError> latest_bar_value(const string & symbol, BarValue value) const override;
-             expected<vector<string>, TuxedoError> symbol_list() const override;
-             expected<const shared_ptr<Bar>, TuxedoError> latest_bar(const string & symbol) const override; // get_latest_bar in python.            
-             expected<const vector<shared_ptr<Bar>>, TuxedoError> latest_bars(const string & symbol, size_t N) const override; // get_latest_bars in python.
-             TuxedoError update_bars() override;                    
-        
-            static expected<unique_ptr<HistoricCSVdataHandler>, TuxedoError> Create(queue<shared_ptr<Bar>> events, const string & csv_dir , vector<string> & symbol_list);
+            expected<sys_seconds, TuxedoError> latest_bar_datetime(const string & symbol) const override;
+            expected<double, TuxedoError> latest_bar_value(const string & symbol, BarValue value) const override;
+            const vector<string> & symbol_list() const override;
+            expected<const shared_ptr<Bar>, TuxedoError> latest_bar(const string & symbol) const override; // get_latest_bar in python.            
+            expected<vector<shared_ptr<Bar>>, TuxedoError> latest_bars(const string & symbol, size_t N) const override; // get_latest_bars in python.
+            TuxedoError update_bars() override;                        
+            ~HistoricCSVdataHandler() override = default;
+
+            static expected<unique_ptr<HistoricCSVdataHandler>, TuxedoError> Create(Queue<shared_ptr<Event>> events, const string & csv_dir , vector<string> & symbol_list);
+            const map<string, shared_ptr<DataFrame>> & symbol_data() const;
     };
 };
 
