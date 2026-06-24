@@ -57,7 +57,7 @@ namespace trading::engine::datahandler {
         const double close_price_;
         const double volume_; 
 
-        Bar(const sys_seconds &timestamp, double open_price, double high_price, double low_price, double close_price, double volume) : 
+        inline Bar(const sys_seconds &timestamp, double open_price, double high_price, double low_price, double close_price, double volume) : 
             timestamp_(timestamp), 
             open_price_(open_price), 
             high_price_(high_price), 
@@ -65,6 +65,8 @@ namespace trading::engine::datahandler {
             close_price_(close_price), 
             volume_(volume) {}
 
+        inline Bar(const Bar & source ): Bar(source.timestamp_, source.open_price_, source.high_price_, source.low_price_, source.close_price_, source.volume_) {
+        }
     };
 
     enum class BarValue {
@@ -80,10 +82,10 @@ namespace trading::engine::datahandler {
             virtual expected<sys_seconds, TuxedoError> latest_bar_datetime(const string & symbol) const  = 0;
             virtual expected<double, TuxedoError> latest_bar_value(const string & symbol, BarValue value) const  = 0;
             virtual const vector<string> & symbol_list() const  = 0;
-            virtual expected<const shared_ptr<Bar>, TuxedoError> latest_bar(const string & symbol) const  = 0; // get_latest_bar in python.            
-            virtual expected<vector<shared_ptr<Bar>>, TuxedoError> latest_bars(const string & symbol, size_t N) const  = 0; // get_latest_bars in python.
+            virtual expected<reference_wrapper<Bar>, TuxedoError> latest_bar(const string & symbol) const  = 0; // get_latest_bar in python.            
+            virtual expected<vector<reference_wrapper<Bar>>, TuxedoError> latest_bars(const string & symbol, size_t N) const  = 0; // get_latest_bars in python.
             virtual TuxedoError update_bars() = 0;        
-            inline  expected<vector<shared_ptr<Bar>>, TuxedoError> latest_bars(const string & symbol) const { return latest_bars(symbol, 1);}         
+            inline  expected<vector<reference_wrapper<Bar>>, TuxedoError> latest_bars(const string & symbol) const { return latest_bars(symbol, 1);}         
             virtual ~DataHandler() = default;   
     };
 
@@ -95,20 +97,20 @@ namespace trading::engine::datahandler {
             vector<string> symbol_list_;
             map<string, shared_ptr<DataFrame>> symbol_data_; // This field name is misleading, but we will keep it for consistency with the python version.
             bool continue_backtest_;
-            map<string, shared_ptr<Bar>> latest_symbol_data_;
+            map<string, vector<Bar>> latest_symbol_data_;
             size_t iterator_index_;
             size_t iterator_size_;
 
             HistoricCSVdataHandler(
-                Queue<shared_ptr<Event>> events, vector<string> & symbol_list, map<string, shared_ptr<DataFrame>> symbol_data, bool continue_backtest, size_t iterator_size
+                Queue<shared_ptr<Event>> events, vector<string> & symbol_list, map<string, shared_ptr<DataFrame>> symbol_data, bool continue_backtest, map<string, vector<Bar>> latest_symbol_data, size_t iterator_size
             );
             
         public:
             expected<sys_seconds, TuxedoError> latest_bar_datetime(const string & symbol) const override;
             expected<double, TuxedoError> latest_bar_value(const string & symbol, BarValue value) const override;
             const vector<string> & symbol_list() const override;
-            expected<const shared_ptr<Bar>, TuxedoError> latest_bar(const string & symbol) const override; // get_latest_bar in python.            
-            expected<vector<shared_ptr<Bar>>, TuxedoError> latest_bars(const string & symbol, size_t N) const override; // get_latest_bars in python.
+            expected<reference_wrapper<Bar>, TuxedoError> latest_bar(const string & symbol) const override; // get_latest_bar in python.            
+            expected<vector<reference_wrapper<Bar>>, TuxedoError> latest_bars(const string & symbol, size_t N) const override; // get_latest_bars in python.
             TuxedoError update_bars() override;                        
             ~HistoricCSVdataHandler() override = default;
 
