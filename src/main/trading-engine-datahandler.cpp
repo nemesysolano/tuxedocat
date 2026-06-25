@@ -59,10 +59,7 @@ namespace trading::engine::datahandler {
                 timestamps.insert(timestamp);
             }
         }
-
-        /* 
-        Reindex dataframes.
-        */
+        
         vector<sys_seconds> target_timestamps(timestamps.begin(), timestamps.end());
         map<string, vector<Bar>> latest_symbol_data;
         size_t open_price_index;
@@ -141,19 +138,45 @@ namespace trading::engine::datahandler {
             return TuxedoError::ERR_NO_OBSERVATIONS;
         }
 
-        // for(const string & symbol: symbol_list_) {            
-        //     DataFrame & data_frame = symbol_data_.at(symbol);
-        //     vector<Bar> & bars_vector = latest_symbol_data_.at(symbol);            
+        for(const string & symbol: symbol_list_) {            
+            DataFrame & data_frame = symbol_data_.at(symbol);
+            vector<Bar> & bars_vector = latest_symbol_data_.at(symbol);            
   
-        //     auto open_result = data_frame[timestamp, OPEN_PRICE];
-        //     auto high_result = data_frame[timestamp, HIGH_PRICE];
-        //     auto low_result = data_frame[timestamp, LOW_PRICE];
-        //     auto close_result = data_frame[timestamp, CLOSE_PRICE];
-        //     auto volume_result = data_frame[timestamp, VOLUME];
-            
-            
-        // }
+            auto open_result = data_frame[iterator_index_, open_price_index_];
+            if(!open_result.has_value()) {
+                return open_result.error();
+            }
+            auto open_price = open_result.value();
+
+            auto high_result = data_frame[iterator_index_, high_price_index_];
+            if(!high_result.has_value()) {
+                return high_result.error();
+            }
+            auto high_price = high_result.value();
+
+            auto low_result = data_frame[iterator_index_, low_price_index_];
+            if(!low_result.has_value()) {
+                return low_result.error();
+            }
+            auto low_price = low_result.value();
+
+            auto close_result = data_frame[iterator_index_, close_price_index_];
+            if(!close_result.has_value()) {
+                return close_result.error();
+            }
+            auto close_price = close_result.value();
+
+            auto volume_result = data_frame[iterator_index_, volume_index_];
+            if(!volume_result.has_value()) {
+                return volume_result.error();
+            }
+            auto volume = volume_result.value();
+
+            auto timestamp = data_frame.timestamps_vector().at(iterator_index_);
+            bars_vector.emplace_back(timestamp, open_price, high_price, low_price, close_price, volume);
+        }
         iterator_index_++;
+        this->events_.push(make_shared<MarketEvent>());
         return TuxedoError::NO_ERROR;
     }
 
