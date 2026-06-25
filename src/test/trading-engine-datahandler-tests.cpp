@@ -59,12 +59,12 @@ void test_historic_csv_data_handler_create(const char * current_program_path) {
     auto df2 = symbol_data.at(symbol2);
 
     // Both should now have 6 rows because the union of the two disjoint 3-day sets is 6 days.
-    assert(df1->rows() == 6);
-    assert(df2->rows() == 6);
+    assert(df1.rows() == 6);
+    assert(df2.rows() == 6);
 
     // 4. Validate that they share the exact same dates
-    const auto& ts1 = df1->timestamps();
-    const auto& ts2 = df2->timestamps();
+    const auto& ts1 = df1.timestamps();
+    const auto& ts2 = df2.timestamps();
 
     assert(ts1.size() == 6);
     assert(ts2.size() == 6);

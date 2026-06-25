@@ -15,6 +15,12 @@ using namespace std;
 using namespace timeseries::dataframe;
 
 namespace trading::engine::datahandler {
+    extern const string OPEN_PRICE;
+    extern const string HIGH_PRICE;
+    extern const string LOW_PRICE;
+    extern const string CLOSE_PRICE;
+    extern const string VOLUME;
+
     template <typename T> class Queue : public std::queue<T> {
         public:
             Queue(): std::queue<T>() {}
@@ -95,17 +101,31 @@ namespace trading::engine::datahandler {
             Queue<shared_ptr<Event>> events_;
             string csv_dir_;
             vector<string> symbol_list_;
-            map<string, shared_ptr<DataFrame>> symbol_data_; // This field name is misleading, but we will keep it for consistency with the python version.
+            map<string, DataFrame> symbol_data_; // This field name is misleading, but we will keep it for consistency with the python version.
             bool continue_backtest_;
             map<string, vector<Bar>> latest_symbol_data_;
             size_t iterator_index_;
             size_t iterator_size_;
-
-            HistoricCSVdataHandler(
-                Queue<shared_ptr<Event>> events, vector<string> & symbol_list, map<string, shared_ptr<DataFrame>> symbol_data, bool continue_backtest, map<string, vector<Bar>> latest_symbol_data, size_t iterator_size
-            );
-            
+            size_t open_price_index_;
+            size_t high_price_index_;
+            size_t low_price_index_;
+            size_t close_price_index_;
+            size_t volume_index_;
         public:
+            HistoricCSVdataHandler(
+                Queue<shared_ptr<Event>> events,
+                vector<string> & symbol_list,
+                map<string, DataFrame>
+                symbol_data,
+                bool continue_backtest,
+                map<string, vector<Bar>> latest_symbol_data,
+                size_t iterator_size,
+                size_t open_price_index,
+                size_t high_price_index,
+                size_t low_price_index,
+                size_t close_price_index,
+                size_t volume_index           
+            );        
             expected<sys_seconds, TuxedoError> latest_bar_datetime(const string & symbol) const override;
             expected<double, TuxedoError> latest_bar_value(const string & symbol, BarValue value) const override;
             const vector<string> & symbol_list() const override;
@@ -115,7 +135,7 @@ namespace trading::engine::datahandler {
             ~HistoricCSVdataHandler() override = default;
 
             static expected<unique_ptr<HistoricCSVdataHandler>, TuxedoError> Create(Queue<shared_ptr<Event>> events, const string & csv_dir , vector<string> & symbol_list);
-            const map<string, shared_ptr<DataFrame>> & symbol_data() const;
+            const map<string, DataFrame> & symbol_data() const;
     };
 };
 

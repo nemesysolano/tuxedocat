@@ -15,7 +15,7 @@ namespace timeseries::features {
 
 
         public:
-            Features(DataFrame data_frame, std::vector<std::string> momentum_column_names): data_frame_(data_frame), momentum_column_names_(momentum_column_names) {}                
+            Features(DataFrame data_frame, std::vector<std::string> momentum_column_names): data_frame_(std::move(data_frame)), momentum_column_names_(momentum_column_names) {}                
             
             const std::string & direction_column_name() const { return DIRECTION_COLUMN_NAME; }
             const DataFrame & data_frame() const { return data_frame_; }

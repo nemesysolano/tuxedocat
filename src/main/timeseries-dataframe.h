@@ -18,6 +18,7 @@
 #include <ctime>   // <-- Add this for timegm
 #include <functional>
 #include <list>
+#include <vector>
 
 namespace timeseries::dataframe {
     class DataFrame: public slice::Span2D {
@@ -26,39 +27,56 @@ namespace timeseries::dataframe {
             std::map<std::string, size_t> column_name_to_column_index_;
             std::map<std::chrono::sys_seconds, size_t> timestamp_to_row_index_;
             std::set<std::chrono::sys_seconds> timestamps_;
+            std::vector<std::chrono::sys_seconds> timestamps_vector_;
 
             // Pass by value and move idiom for safe ownership transfer
-            DataFrame(size_t rows, size_t cols, 
-                      std::vector<double> data,
-                      std::map<std::string, size_t> column_name_to_column_index,
-                      std::map<std::chrono::sys_seconds, size_t> timestamp_to_row_index,
-                      std::set<std::chrono::sys_seconds> timestamps)
+            DataFrame(
+                size_t rows,
+                size_t cols, 
+                std::vector<double> data,
+                std::map<std::string, size_t> column_name_to_column_index,
+                std::map<std::chrono::sys_seconds, size_t> timestamp_to_row_index,
+                std::set<std::chrono::sys_seconds> timestamps,
+                std::vector<std::chrono::sys_seconds> timestamps_vector
+            )
                 : Span2D(rows, cols), 
                   data_(std::move(data)),
                   column_name_to_column_index_(std::move(column_name_to_column_index)),
                   timestamp_to_row_index_(std::move(timestamp_to_row_index)),
-                  timestamps_(std::move(timestamps))
+                  timestamps_(std::move(timestamps)),
+                  timestamps_vector_(std::move(timestamps_vector))
             {}             
             
         public:
             const double * data_handle() const override;
-            
-            DataFrame(const DataFrame& other)
-                : slice::Span2D(other.rows_, other.cols_),
-                  data_(other.data_),
-                  column_name_to_column_index_(other.column_name_to_column_index_),
-                  timestamp_to_row_index_(other.timestamp_to_row_index_),
-                  timestamps_(other.timestamps_)
-            {}
+            DataFrame(const DataFrame&) = default;
+            DataFrame& operator = (const DataFrame&) = default;
 
-            DataFrame(DataFrame&& other) noexcept
-                : slice::Span2D(other.rows_, other.cols_),
+            inline DataFrame(DataFrame&& other) noexcept: slice::Span2D(other.rows_, other.cols_),
                   data_(std::move(other.data_)),
                   column_name_to_column_index_(std::move(other.column_name_to_column_index_)),
                   timestamp_to_row_index_(std::move(other.timestamp_to_row_index_)),
-                  timestamps_(std::move(other.timestamps_)) {
+                  timestamps_(std::move(other.timestamps_)),
+                  timestamps_vector_(std::move(other.timestamps_vector_)) {
                 other.rows_ = 0;
                 other.cols_ = 0;
+            }
+
+            inline constexpr DataFrame& operator = (DataFrame && other) noexcept{
+                if (this == &other) {
+                    return *this; 
+                }
+
+                DataFrame & self = *this;
+
+                self.rows_ = other.rows_;
+                self.cols_ = other.cols_;
+                self.data_ = std::move(other.data_);
+                self.column_name_to_column_index_ = std::move(other.column_name_to_column_index_);
+                self.timestamp_to_row_index_ = std::move(other.timestamp_to_row_index_);
+                self.timestamps_ = std::move(other.timestamps_);
+                self.timestamps_vector_ = std::move(other.timestamps_vector_);
+                return self;
             }
 
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input, char field_delimiter);
@@ -116,21 +134,10 @@ namespace timeseries::dataframe {
             std::expected<size_t, TuxedoError> column_index(const std::string& col_name) const;
     
             const std::set<std::chrono::sys_seconds>& timestamps() const;
-            
-            std::expected<slice::Slice2D, TuxedoError>  slice(
-                size_t start_row, /* inclusive */
-                size_t end_row /* exclusive */
-            ) const ; // returns rows in `[start_row, end_row)` range
-            
-            inline std::expected<slice::Slice2D, TuxedoError> slice_from(size_t start_row) const {
-                // Range [start_row, this->rows())
-                return slice(start_row, this->rows());
-            }
-
-            inline std::expected<slice::Slice2D, TuxedoError> slice_to(size_t end_row) const {
-                // Range [0, end_row)
-                return slice(0, end_row);
-            }
+            inline const std::vector<std::chrono::sys_seconds>& timestamps_vector() const { return timestamps_vector_; }
+            std::expected<slice::Slice2D, TuxedoError>  slice(size_t start_row, /* inclusive */size_t end_row /* exclusive */) const ; // returns rows in `[start_row, end_row)` range
+            inline std::expected<slice::Slice2D, TuxedoError> slice_from(size_t start_row) const {/* Range [start_row, this->rows()) */ return slice(start_row, this->rows());}
+            inline std::expected<slice::Slice2D, TuxedoError> slice_to(size_t end_row) const {/* Range [0, end_row) */return slice(0, end_row);}
 
             void reindex(std::span<std::chrono::sys_seconds> target_timestamps);
             friend std::ostream & operator << (std::ostream & out, DataFrame & df);

@@ -17,7 +17,8 @@ namespace timeseries::dataframe {
         std::map<std::string, size_t> column_name_to_column_index_;
         std::map<std::chrono::sys_seconds, size_t> timestamp_to_row_index_;
         std::set<std::chrono::sys_seconds> timestamps_;
-        
+        std::vector<std::chrono::sys_seconds> timestamps_vector_;
+
         size_t rows = 0;
         size_t expected_cols = 0;
         std::string line;
@@ -81,6 +82,7 @@ namespace timeseries::dataframe {
                     
                     timestamp_to_row_index_[row_time] = rows;
                     timestamps_.insert(row_time);
+                    timestamps_vector_.push_back(row_time);
                 } else {
                     // Parse Numbers (Subsequent columns)
                     try {
@@ -108,7 +110,7 @@ namespace timeseries::dataframe {
         }
 
         // The Span2D bounds cover only the numeric data grid (expected_cols - 1)
-        return DataFrame(rows, expected_cols - 1, std::move(data), std::move(column_name_to_column_index_), std::move(timestamp_to_row_index_), std::move(timestamps_));
+        return DataFrame(rows, expected_cols - 1, std::move(data), std::move(column_name_to_column_index_), std::move(timestamp_to_row_index_), std::move(timestamps_), std::move(timestamps_vector_));
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns) const {
@@ -158,6 +160,7 @@ namespace timeseries::dataframe {
         // The timestamp mappings remain structurally identical, just clone them
         std::map<std::chrono::sys_seconds, size_t> new_row_map = this->timestamp_to_row_index_;
         std::set<std::chrono::sys_seconds> new_timestamps = this->timestamps_;
+        std::vector<std::chrono::sys_seconds> new_timestamps_vector = this->timestamps_vector_;
 
         // Use the internal constructor to emit the newly sliced DataFrame
         return DataFrame(
@@ -166,7 +169,8 @@ namespace timeseries::dataframe {
             std::move(new_data), 
             std::move(new_col_map), 
             std::move(new_row_map), 
-            std::move(new_timestamps)
+            std::move(new_timestamps),
+            std::move(new_timestamps_vector)
         );
     }
 
@@ -218,6 +222,7 @@ namespace timeseries::dataframe {
         std::map<std::string, size_t> new_col_map = this->column_name_to_column_index_;
         std::map<std::chrono::sys_seconds, size_t> new_row_map = this->timestamp_to_row_index_;
         std::set<std::chrono::sys_seconds> new_timestamps = this->timestamps_;
+        std::vector<std::chrono::sys_seconds> new_timestamps_vector = this->timestamps_vector_;
 
         // Emit the newly shifted DataFrame
         return DataFrame(
@@ -226,7 +231,8 @@ namespace timeseries::dataframe {
             std::move(new_data), 
             std::move(new_col_map), 
             std::move(new_row_map), 
-            std::move(new_timestamps)
+            std::move(new_timestamps),
+            std::move(new_timestamps_vector)
         );
     }
 
@@ -273,7 +279,7 @@ namespace timeseries::dataframe {
         std::map<std::string, size_t> new_col_map = this->column_name_to_column_index_;
         std::map<std::chrono::sys_seconds, size_t> new_row_map = this->timestamp_to_row_index_;
         std::set<std::chrono::sys_seconds> new_timestamps = this->timestamps_;
-
+        std::vector<std::chrono::sys_seconds> new_timestamps_vector = this->timestamps_vector_;
         // Emit the newly calculated DataFrame
         return DataFrame(
             num_rows, 
@@ -281,7 +287,8 @@ namespace timeseries::dataframe {
             std::move(new_data), 
             std::move(new_col_map), 
             std::move(new_row_map), 
-            std::move(new_timestamps)
+            std::move(new_timestamps),
+            std::move(new_timestamps_vector)
         );
     }
 
@@ -331,7 +338,8 @@ namespace timeseries::dataframe {
         // Rebuild row map in linear order for the new data array
         std::map<std::chrono::sys_seconds, size_t> new_row_map;
         std::set<std::chrono::sys_seconds> new_timestamps = this->timestamps_;
-        
+        std::vector<std::chrono::sys_seconds> new_timestamps_vector = this->timestamps_vector_;
+
         size_t new_idx = 0;
         for (const auto& ts : new_timestamps) {
             new_row_map[ts] = new_idx++;
@@ -343,7 +351,8 @@ namespace timeseries::dataframe {
             std::move(new_data), 
             std::move(new_col_map), 
             std::move(new_row_map), 
-            std::move(new_timestamps)
+            std::move(new_timestamps),
+            std::move(new_timestamps_vector)
         );
     }
 
@@ -399,11 +408,13 @@ namespace timeseries::dataframe {
         // 5. Return a fresh DataFrame containing the Z-Scores
         // (Assuming your constructor supports this instantiation)
         return DataFrame(
-            this->rows(), this->cols(), 
+            this->rows(), 
+            this->cols(), 
             std::move(z_data), 
             this->column_name_to_column_index_, 
             this->timestamp_to_row_index_, 
-            this->timestamps_
+            this->timestamps_,
+            this->timestamps_vector_
         );
     }
 
@@ -442,6 +453,7 @@ namespace timeseries::dataframe {
         // 4. The timeline remains completely untouched
         std::map<std::chrono::sys_seconds, size_t> new_row_map = this->timestamp_to_row_index_;
         std::set<std::chrono::sys_seconds> new_timestamps = this->timestamps_;
+        std::vector<std::chrono::sys_seconds> new_timestamps_vector = this->timestamps_vector_;
 
         // 5. Emit the newly calculated DataFrame
         return DataFrame(
@@ -450,7 +462,8 @@ namespace timeseries::dataframe {
             std::move(new_data), 
             std::move(new_col_map), 
             std::move(new_row_map), 
-            std::move(new_timestamps)
+            std::move(new_timestamps),
+            std::move(new_timestamps_vector)
         );
     }
 
@@ -468,7 +481,7 @@ namespace timeseries::dataframe {
         if(!dataframe_result.has_value()) {
             return std::unexpected(TuxedoError::ERR_CANT_OPEN_FILE);
         }
-        return dataframe_result.value();
+        return std::move(dataframe_result.value());
 
     }
 
@@ -561,6 +574,7 @@ namespace timeseries::dataframe {
         std::vector<double> new_data;
         std::map<std::chrono::sys_seconds, size_t> new_row_map;
         std::set<std::chrono::sys_seconds> new_timestamps;
+        std::vector<std::chrono::sys_seconds> new_timestamps_vector;
 
         size_t new_row_idx = 0;
 
@@ -586,6 +600,7 @@ namespace timeseries::dataframe {
                 // Track the new metadata indices
                 new_timestamps.insert(ts);
                 new_row_map[ts] = new_row_idx;
+                new_timestamps_vector.push_back(ts);
                 new_row_idx++;
             }
         }
@@ -605,7 +620,8 @@ namespace timeseries::dataframe {
             std::move(new_data), 
             std::move(new_col_map), 
             std::move(new_row_map), 
-            std::move(new_timestamps)
+            std::move(new_timestamps),
+            std::move(new_timestamps_vector)
         );
     }
 
@@ -637,6 +653,7 @@ namespace timeseries::dataframe {
         
         std::map<std::chrono::sys_seconds, size_t> new_row_map;
         std::set<std::chrono::sys_seconds> new_timestamps;
+        std::vector<std::chrono::sys_seconds> new_timestamps_vector;
 
         // 4. Iterate through the target timestamps (std::set keeps them ordered chronologically)
         size_t current_row = 0;
@@ -657,7 +674,7 @@ namespace timeseries::dataframe {
             // Record the new mapping
             new_row_map[ts] = current_row;
             new_timestamps.insert(ts);
-            
+            new_timestamps_vector.push_back(ts);
             current_row++;
         }
 
@@ -668,7 +685,8 @@ namespace timeseries::dataframe {
             std::move(new_data), 
             std::move(new_col_map), 
             std::move(new_row_map), 
-            std::move(new_timestamps)
+            std::move(new_timestamps),
+            std::move(new_timestamps_vector)
         );
     }
 

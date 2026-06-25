@@ -59,7 +59,7 @@ std::expected<Features, TuxedoError> Features::CreateWithLogChange(const DataFra
     if(!momentum_without_nans_result.has_value()) {
         return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
     }
-    auto momentum_without_nans = momentum_without_nans_result.value();
+    auto momentum_without_nans = std::move(momentum_without_nans_result.value());
 
     return Features(std::move(momentum_without_nans), std::move(momentum_column_names));
 }
@@ -114,9 +114,8 @@ std::expected<Features, TuxedoError> Features::CreateWithZScore(const DataFrame 
     if(!momentum_without_nans_result.has_value()) {
         return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
     }
-    auto momentum_without_nans = momentum_without_nans_result.value();
 
-    return Features(std::move(momentum_without_nans), std::move(momentum_column_names));
+    return Features(std::move(momentum_without_nans_result.value()), std::move(momentum_column_names));
 }
 
 std::expected<Features, TuxedoError> Features::CreateWithPctChange(const DataFrame & df) { 
@@ -169,7 +168,6 @@ std::expected<Features, TuxedoError> Features::CreateWithPctChange(const DataFra
     if(!momentum_without_nans_result.has_value()) {
         return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
     }
-    auto momentum_without_nans = momentum_without_nans_result.value();
 
-    return Features(std::move(momentum_without_nans), std::move(momentum_column_names));
+    return Features(std::move(momentum_without_nans_result.value()), std::move(momentum_column_names));
 }

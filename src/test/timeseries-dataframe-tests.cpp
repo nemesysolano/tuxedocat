@@ -687,4 +687,45 @@ void test_dataframe_reindex() {
 
     std::cout << "[PASSED] test_dataframe_reindex" << std::endl;
 }
+
+void test_dataframe_check_timestamps_vector_keeps_elements_order() {
+    // 1. Create a CSV string with explicitly OUT-OF-ORDER dates
+    std::string csv_data =
+        "Date,A,B\n"
+        "2023-01-05 00:00:00,10.0,20.0\n"  // 1st parsed: Jan 5
+        "2023-01-02 00:00:00,30.0,40.0\n"  // 2nd parsed: Jan 2 (Earlier)
+        "2023-01-07 00:00:00,50.0,60.0\n"; // 3rd parsed: Jan 7 (Later)
+
+    std::istringstream stream(csv_data);
+    auto df_res = DataFrame::Create(stream, ',');
+    assert(df_res.has_value());
+    auto& df = df_res.value();
+
+    // Modern C++20 Chrono helper for mathematically perfect UTC timestamps
+    auto make_ts = [](int y, int m, int d) {
+        return std::chrono::time_point_cast<std::chrono::seconds>(
+            std::chrono::sys_days{std::chrono::year{y} / m / d}
+        );
+    };
+
+    // 2. Extract the timestamps_vector
+    const auto& ts_vector = df.timestamps_vector();
+
+    // --- DIAGNOSTICS: Catch sorting overrides before asserting ---
+    if (ts_vector.size() == 3 && ts_vector[0] == make_ts(2023, 1, 2)) {
+        std::cerr << "\n[CRITICAL ERROR] The vector is automatically sorting the dates!\n";
+        std::cerr << "-> Your DataFrame constructor is likely initializing from the std::set.\n\n";
+    }
+    // -------------------------------------------------------------
+
+    // 3. Validate size
+    assert(ts_vector.size() == 3);
+
+    // 4. Validate exact original parsing order from the CSV (NOT chronologically sorted)
+    assert(ts_vector[0] == make_ts(2023, 1, 5));
+    assert(ts_vector[1] == make_ts(2023, 1, 2));
+    assert(ts_vector[2] == make_ts(2023, 1, 7));
+
+    std::cout << "[PASSED] test_dataframe_check_timestamps_vector_keeps_elements_order" << std::endl;
+}
 #endif
