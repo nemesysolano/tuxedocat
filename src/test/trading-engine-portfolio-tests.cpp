@@ -71,7 +71,7 @@ void test_portfolio_create(const char * current_program_path) {
 
     auto start_dt = make_ts(2023, 1, 1);
     double init_cap = 100000.0;
-    Queue<Event> empty_events;
+    Queue<Event> empty_events; // Note: updated to shared_ptr wrapper to match the Handler requirements
 
     // --- 1. WRONG PATH: Nullptr for DataHandler ---
     // The Portfolio should gracefully intercept a null dependency without segfaulting
@@ -80,19 +80,29 @@ void test_portfolio_create(const char * current_program_path) {
     assert(err_res.error() == TuxedoError::ERR_INVALID_DATA_FORMAT);
 
     // --- 2. HAPPY PATH ---
-    // Setup temporary CSV files
-    std::string csv_dir = ".";
+    // Setup temporary CSV files with multi-day non-overlapping dates
+    std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
+    string csv_dir = exe_path.string();   
     std::string symbol1 = "TEST_PORT_A";
     std::string symbol2 = "TEST_PORT_B";
 
-    std::ofstream file1(csv_dir + "/" + symbol1 + ".csv");
+    std::string file_name_1 = csv_dir + '/' + symbol1 + ".csv";
+    std::string file_name_2 = csv_dir + '/' + symbol2 + ".csv";
+
+    // DataFrame 1: 3 Records (Jan 1, Jan 4, Jan 7 -> 2 days gap between dates)
+    std::ofstream file1(file_name_1);
     file1 << "Date,Open,High,Low,Close,Adj Close,Volume\n";
     file1 << "2023-01-01 00:00:00,10.0,11.0,9.0,10.5,10.5,1000\n";
+    file1 << "2023-01-04 00:00:00,10.5,12.0,10.0,11.0,11.0,1100\n";
+    file1 << "2023-01-07 00:00:00,11.0,13.0,11.0,12.0,12.0,1200\n";
     file1.close();
 
-    std::ofstream file2(csv_dir + "/" + symbol2 + ".csv");
+    // DataFrame 2: 3 Records (Jan 10, Jan 13, Jan 16 -> 2 days gap, completely non-overlapping)
+    std::ofstream file2(file_name_2);
     file2 << "Date,Open,High,Low,Close,Adj Close,Volume\n";
-    file2 << "2023-01-01 00:00:00,20.0,21.0,19.0,20.5,20.5,2000\n";
+    file2 << "2023-01-10 00:00:00,20.0,21.0,19.0,20.5,20.5,2000\n";
+    file2 << "2023-01-13 00:00:00,20.5,22.0,20.0,21.0,21.0,2100\n";
+    file2 << "2023-01-16 00:00:00,21.0,23.0,21.0,22.0,22.0,2200\n";
     file2.close();
 
     std::vector<std::string> symbols = {symbol1, symbol2};
@@ -119,6 +129,7 @@ void test_portfolio_create(const char * current_program_path) {
     assert(syms[0] == symbol1 || syms[1] == symbol1);
 
     // Validate 0th state of `all_positions`
+    // Even though the handler has 6 combined dates of history, Portfolio initializes at exactly start_dt
     const auto& all_pos = portfolio.all_positions();
     assert(all_pos.size() == 1);
     assert(all_pos[0].datetime == start_dt);
@@ -151,8 +162,8 @@ void test_portfolio_create(const char * current_program_path) {
     assert(portfolio.events().empty()); 
 
     // 4. Cleanup temporary test files
-    std::remove((csv_dir + "/" + symbol1 + ".csv").c_str());
-    std::remove((csv_dir + "/" + symbol2 + ".csv").c_str());
+    std::remove(file_name_1.c_str());
+    std::remove(file_name_2.c_str());
 
     std::cout << "[PASSED] test_portfolio_create" << std::endl;
 }
