@@ -135,5 +135,16 @@ namespace trading::engine::portfolio {
         return Portfolio(std::move(bars), std::move(events), start_date, initial_capital, std::move(all_positions), std::move(current_positions), std::move(all_holdings), std::move(current_holdings));
     }
 
-    
+    TuxedoError Portfolio::update_timeindex(const MarketEvent  & market_event) {
+        /* 
+        Adds a new record to the positions matrix for the current market data bar.
+        This reflects the PREVIOUS bar, i.e. all current market data at this stage is known (OHLCV).
+
+        Makes use of MarketEvent from events queue.
+        */
+    }
+
+    TuxedoError Portfolio::update_timeindex(const MarketEvent && market_event) {
+        return update_timeindex(market_event);
+    }
 };

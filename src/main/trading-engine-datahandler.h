@@ -9,6 +9,7 @@
 #include <map>
 #include "timeseries-dataframe.h"
 #include <functional>
+#include <memory>
 
 using namespace std::chrono;
 using namespace std;

@@ -116,6 +116,7 @@ namespace trading::engine::portfolio {
                 return *this;
             };
             
+            // Accessors
             inline const DataHandler & bars() const { return *bars_; }
             inline const Queue<Event> & events() const { return events_; }
             const vector<string> & symbol_list() const { return symbol_list_; } // bars_.symbol_list();
@@ -126,6 +127,9 @@ namespace trading::engine::portfolio {
             const vector<Holding> & all_holdings() const { return all_holdings_; }
             const Holding & current_holdings() const { return current_holdings_; }
 
+            // Operations
+            TuxedoError update_timeindex(const MarketEvent  & market_event);
+            TuxedoError update_timeindex(const MarketEvent && market_event);
             static expected<Portfolio, TuxedoError> Create(unique_ptr<DataHandler> bars, Queue<Event> events, sys_seconds start_date, double initial_capital);
     };
 
