@@ -83,6 +83,7 @@ int main(int argc, char* argv[]) {
     regression_test(argv[0]);
     test_create_drawdowns();
     test_historic_csv_data_handler_create(argv[0]);
+    test_historic_csv_data_handler_update_bars(argv[0]);
     return 0;
 }
 #endif

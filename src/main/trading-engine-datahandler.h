@@ -115,8 +115,7 @@ namespace trading::engine::datahandler {
             HistoricCSVdataHandler(
                 Queue<shared_ptr<Event>> events,
                 vector<string> & symbol_list,
-                map<string, DataFrame>
-                symbol_data,
+                map<string, DataFrame> symbol_data,
                 bool continue_backtest,
                 map<string, vector<Bar>> latest_symbol_data,
                 size_t iterator_size,

@@ -2,6 +2,7 @@
 #include "tuxedo-error.h"
 #include <expected>
 #include <algorithm>
+#include "timeseries-log.h"
 
 using namespace std;
 
@@ -12,6 +13,10 @@ namespace trading::engine::datahandler {
     const string CLOSE_PRICE="Close";
     const string VOLUME="Volume";
 
+    /* 
+        std::move(events), symbol_list, std::move(symbol_data), true, std::move(latest_symbol_data), timestamps.size(),
+        open_price_index, high_price_index, low_price_index, close_price_index, volume_index
+    */
     HistoricCSVdataHandler::HistoricCSVdataHandler(
         Queue<shared_ptr<Event>> events, vector<string> & symbol_list, map<string, DataFrame> symbol_data, bool continue_backtest, map<string, vector<Bar>> latest_symbol_data, size_t iterator_size, size_t open_price_index, size_t high_price_index, size_t low_price_index, size_t close_price_index, size_t volume_index): 
         events_(std::move(events)),
@@ -112,11 +117,48 @@ namespace trading::engine::datahandler {
     }
 
     expected<sys_seconds, TuxedoError> HistoricCSVdataHandler::latest_bar_datetime(const string & symbol) const {
-        return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);      
+        auto it = latest_symbol_data_.find(symbol);
+        if (it == latest_symbol_data_.end()) {
+            return unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS); // Or appropriate error for not found
+        }
+        
+        const auto& bars_vector = it->second;
+
+        if (bars_vector.empty()) {
+            return unexpected(TuxedoError::ERR_EMPTY_VECTOR); // Or appropriate error for empty vector
+        }
+
+        return bars_vector.back().timestamp_;
     }
 
     expected<double, TuxedoError> HistoricCSVdataHandler::latest_bar_value(const string & symbol, BarValue value) const {
-        return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+        auto it = latest_symbol_data_.find(symbol);
+        
+        if (it == latest_symbol_data_.end()) {
+            return unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS); // Or appropriate error for not found
+        }
+
+        const auto& bars_vector = it->second;        
+
+        if (bars_vector.empty()) {
+            return unexpected(TuxedoError::ERR_EMPTY_VECTOR); // Or appropriate error for empty vector
+        }
+
+
+        switch(value) {
+            case BarValue::OPEN:
+                return bars_vector.back().open_price_;
+            case BarValue::HIGH:
+                return bars_vector.back().high_price_;
+            case BarValue::LOW:
+                return bars_vector.back().low_price_;
+            case BarValue::CLOSE:
+                return bars_vector.back().close_price_;
+            case BarValue::VOLUME:
+                return bars_vector.back().volume_;
+            default:
+                return unexpected(TuxedoError::ERR_INVALID_REGRESSION_TYPE); // Or appropriate error for invalid value
+        }
     }
 
     const vector<string> & HistoricCSVdataHandler::symbol_list() const {
@@ -124,24 +166,53 @@ namespace trading::engine::datahandler {
     }
 
     expected<reference_wrapper<Bar>, TuxedoError> HistoricCSVdataHandler::latest_bar(const string & symbol) const {   // get_latest_bar in python.   
-        return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+        auto it = latest_symbol_data_.find(symbol);
+        if (it == latest_symbol_data_.end()) {
+            return unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS); // Or appropriate error for not found
+        }
+
+        const auto& bars_vector = it->second;
+
+        if (bars_vector.empty()) {
+            return unexpected(TuxedoError::ERR_EMPTY_VECTOR); // Or appropriate error for empty vector
+        }
+
+        // Since this method is const, we need to use const_cast to return a mutable reference_wrapper<Bar>
+        return std::ref(const_cast<Bar&>(bars_vector.back()));
     }
 
-    expected<vector<reference_wrapper<Bar>>, TuxedoError> HistoricCSVdataHandler::latest_bars(const string & symbol, size_t N) const {  // get_latest_bars in python.
-        return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+    expected<vector<reference_wrapper<Bar>>, TuxedoError> HistoricCSVdataHandler::latest_bars(const string & symbol, size_t N) const {
+        auto it = latest_symbol_data_.find(symbol);
+        if (it == latest_symbol_data_.end()) {
+            return unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+        }
+
+        const auto& bars_vector = it->second;
+
+        if (N > bars_vector.size()) {
+            return unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS); 
+        }
+
+        vector<reference_wrapper<Bar>> result;
+        result.reserve(N);
+
+        auto start_it = bars_vector.end() - N;
+        for (auto bar_it = start_it; bar_it != bars_vector.end(); ++bar_it) {
+            result.push_back(std::ref(const_cast<Bar&>(*bar_it)));
+        }
+
+        return result;
     }
 
     TuxedoError HistoricCSVdataHandler::update_bars() {
-        if(iterator_index_ == iterator_size_) {
-            continue_backtest_ = false;
-        } else {
+        if(!continue_backtest_) {
             return TuxedoError::ERR_NO_OBSERVATIONS;
         }
 
         for(const string & symbol: symbol_list_) {            
             DataFrame & data_frame = symbol_data_.at(symbol);
             vector<Bar> & bars_vector = latest_symbol_data_.at(symbol);            
-  
+            
             auto open_result = data_frame[iterator_index_, open_price_index_];
             if(!open_result.has_value()) {
                 return open_result.error();
@@ -177,6 +248,11 @@ namespace trading::engine::datahandler {
         }
         iterator_index_++;
         this->events_.push(make_shared<MarketEvent>());
+
+        if(iterator_index_ == iterator_size_) {
+            continue_backtest_ = false;
+        } 
+        
         return TuxedoError::NO_ERROR;
     }
 

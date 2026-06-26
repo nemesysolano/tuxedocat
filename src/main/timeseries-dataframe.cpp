@@ -797,14 +797,17 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
         return slice::Slice2D(start_ptr, row_count, cols);
     }
 
-    // Equivalent to pandas.DataFrame.reindex(index = timestamps, method='pad');
     void DataFrame::reindex(std::span<std::chrono::sys_seconds> target_timestamps) {
         std::vector<double> new_data;
         std::map<std::chrono::sys_seconds, size_t> new_timestamp_to_row_index;
         std::set<std::chrono::sys_seconds> new_timestamps;
+        
+        // --- THE FIX: Create the new vector to match the new dimensions ---
+        std::vector<std::chrono::sys_seconds> new_timestamps_vector; 
 
         size_t new_cols = this->cols();
         new_data.reserve(target_timestamps.size() * new_cols);
+        new_timestamps_vector.reserve(target_timestamps.size());
 
         // 1. Pre-forward-fill the original data to ensure O(1) last-valid-observation lookups
         std::vector<double> ffilled_data = data_;
@@ -852,15 +855,20 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
 
             new_timestamps.insert(ts);
             new_timestamp_to_row_index[ts] = current_new_row;
+            
+            // --- THE FIX: Push the timestamp in the exact new chronological order ---
+            new_timestamps_vector.push_back(ts); 
+            
             current_new_row++;
         }
 
         // Safely swap state
         data_ = std::move(new_data);
-        rows_ = new_timestamps.size(); // Protected member from Span2D
+        rows_ = new_timestamps.size(); 
         timestamps_ = std::move(new_timestamps);
-        timestamp_to_row_index_ = std::move(new_timestamp_to_row_index);        
-
+        timestamp_to_row_index_ = std::move(new_timestamp_to_row_index);
+        timestamps_vector_ = std::move(new_timestamps_vector); 
+        
     }
 
     // 2. Implement the common_timestamps intersection logic
