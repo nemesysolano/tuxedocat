@@ -91,18 +91,18 @@ void test_portfolio_create(const char * current_program_path) {
 
     // DataFrame 1: 3 Records (Jan 1, Jan 4, Jan 7 -> 2 days gap between dates)
     std::ofstream file1(file_name_1);
-    file1 << "Date,Open,High,Low,Close,Adj Close,Volume\n";
-    file1 << "2023-01-01 00:00:00,10.0,11.0,9.0,10.5,10.5,1000\n";
-    file1 << "2023-01-04 00:00:00,10.5,12.0,10.0,11.0,11.0,1100\n";
-    file1 << "2023-01-07 00:00:00,11.0,13.0,11.0,12.0,12.0,1200\n";
+    file1 << "Date,Open,High,Low,Close,Adj Close,Volume" << endl;
+    file1 << "2023-01-01 00:00:00,10.0,11.0,9.0,10.5,10.5,1000" << endl;
+    file1 << "2023-01-04 00:00:00,10.5,12.0,10.0,11.0,11.0,1100" << endl;
+    file1 << "2023-01-07 00:00:00,11.0,13.0,11.0,12.0,12.0,1200" << endl;
     file1.close();
 
     // DataFrame 2: 3 Records (Jan 10, Jan 13, Jan 16 -> 2 days gap, completely non-overlapping)
     std::ofstream file2(file_name_2);
-    file2 << "Date,Open,High,Low,Close,Adj Close,Volume\n";
-    file2 << "2023-01-10 00:00:00,20.0,21.0,19.0,20.5,20.5,2000\n";
-    file2 << "2023-01-13 00:00:00,20.5,22.0,20.0,21.0,21.0,2100\n";
-    file2 << "2023-01-16 00:00:00,21.0,23.0,21.0,22.0,22.0,2200\n";
+    file2 << "Date,Open,High,Low,Close,Adj Close,Volume" << endl;
+    file2 << "2023-01-10 00:00:00,20.0,21.0,19.0,20.5,20.5,2000" << endl;
+    file2 << "2023-01-13 00:00:00,20.5,22.0,20.0,21.0,21.0,2100" << endl;
+    file2 << "2023-01-16 00:00:00,21.0,23.0,21.0,22.0,22.0,2200" << endl;
     file2.close();
 
     std::vector<std::string> symbols = {symbol1, symbol2};
