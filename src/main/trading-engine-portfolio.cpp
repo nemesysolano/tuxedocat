@@ -1,6 +1,10 @@
 #include "trading-engine-portfolio.h"
 #include <cmath>
 #include "slice.h"
+#include <utility>
+#include <format>
+#include "timeseries-log.h"
+#include <format>
 
 using namespace std;
 
@@ -123,10 +127,10 @@ namespace trading::engine::portfolio {
             return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
         }
         auto all_positions = create_all_positions(bars->symbol_list(), start_date);
-        map<string, double> current_positions = [&bars]() {
-            map<string, double> positions;
+        map<string, int32_t> current_positions = [&bars]() {
+            map<string, int32_t> positions;
             for(const auto & symbol : bars->symbol_list()) {
-                positions[symbol] = 0.0;
+                positions[symbol] = 0;
             }
             return positions;
         }();
@@ -167,7 +171,7 @@ namespace trading::engine::portfolio {
         */
         Holding dh {
             .balances = [this]() {
-                map<string, int32_t> balances;
+                map<string, double> balances;
                 for(const auto & symbol : symbol_list_) {
                     balances[symbol] = 0;
                 }
@@ -180,13 +184,15 @@ namespace trading::engine::portfolio {
         };
 
         for(const auto & symbol: symbol_list_) {
-            auto latest_bar_result = bars().latest_bar(symbol);
-            if(!latest_bar_result.has_value()) {
-                return latest_bar_result.error();
+            auto latest_bar_value_result = bars().latest_bar_value(symbol, BarValue::CLOSE);
+            if(!latest_bar_value_result.has_value()) {
+                latest_bar_value_result.error();
             }
-            const Bar & bar = latest_bar_result.value().get();
-            dh.balances[symbol] = current_positions_.at(symbol);
-            dh.total += dh.balances[symbol] * bar.close_price_;
+            auto latest_bar_value = latest_bar_value_result.value();
+            auto market_value = latest_bar_value * current_positions_[symbol];
+            dh.balances[symbol] = market_value;
+            dh.total += market_value;
+         
         }
 
         all_holdings_.push_back(std::move(dh));
@@ -196,5 +202,32 @@ namespace trading::engine::portfolio {
 
     TuxedoError Portfolio::update_timeindex(const MarketEvent && market_event) {
         return update_timeindex(market_event);
+    }
+
+
+    TuxedoError Portfolio::update_holdings_from_fill(const FillEvent & fill_event) {
+        const DataHandler & bars = * bars_.get();
+        cout << "DEBUG: " << fill_event << endl;
+        if(bars.latest_bar_datetime(fill_event.symbol()).has_value() == false) {
+            return TuxedoError::ERR_NO_OBSERVATIONS;
+        } 
+        int32_t fill_dir = std::to_underlying(fill_event.fill_direction());
+        
+        double fill_cost = bars.latest_bar_value(fill_event.symbol(), BarValue::CLOSE).value_or(0.0);
+        double cost = fill_dir * fill_cost * fill_event.quantity();        
+        current_holdings_.balances[fill_event.symbol()] = cost;
+        current_holdings_.commission += fill_event.commission();
+        current_holdings_.cash -= (cost + fill_event.commission());
+        current_holdings_.total -= (cost + fill_event.commission());
+ 
+        trace_with_message(std::format(
+            "Symbol = {} Quantity = {}, cost = {}, Direction = {}, commission={}, cash = {}, total = {}",
+            fill_event.symbol(), fill_event.quantity(), fill_cost, fill_dir, fill_event.commission(), current_holdings_.cash, current_holdings_.total
+        ));
+        return TuxedoError::NO_ERROR;
+    }
+
+    TuxedoError Portfolio::update_holdings_from_fill(const FillEvent && fill_event) {
+        return update_holdings_from_fill(fill_event);
     }
 };

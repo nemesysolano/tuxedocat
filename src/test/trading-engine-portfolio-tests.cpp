@@ -1,3 +1,4 @@
+#ifdef __TEST_MAIN__
 #include "trading-engine-portfolio.h"
 #include "slice.h"
 #include <vector>
@@ -6,6 +7,8 @@
 #include <cassert>
 #include <fstream>
 #include <trading-engine.h>
+#include "timeseries-log.h"
+
 using namespace trading::engine::portfolio;
 using namespace slice;
 using namespace trading::engine::datahandler;
@@ -274,3 +277,107 @@ void test_portfolio_update_timeindex(const char * current_program_path) {
 
     std::cout << "[PASSED] test_portfolio_update_timeindex" << std::endl;
 }
+
+void test_update_holdings_from_fill(const char * current_program_path) {
+    std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
+    std::string csv_dir = exe_path.string();   
+    std::string symbol1 = "TEST_PORT_A";
+    std::string symbol2 = "TEST_PORT_B";
+
+    std::string file_name_1 = csv_dir + '/' + symbol1 + ".csv";
+    std::string file_name_2 = csv_dir + '/' + symbol2 + ".csv";
+
+    // DataFrame 1: 3 Records without gaps (Jan 2, Jan 3, Jan 4)
+    std::ofstream file1(file_name_1);
+    file1 << "Date,Open,High,Low,Close,Adj Close,Volume\n";
+    file1 << "2023-01-02 00:00:00,10.0,11.0,9.0,10.5,10.5,1000\n";
+    file1 << "2023-01-03 00:00:00,10.5,12.0,10.0,11.0,11.0,1100\n";
+    file1 << "2023-01-04 00:00:00,11.0,13.0,11.0,12.0,12.0,1200\n";
+    file1.close();
+
+    // DataFrame 2: 3 Records without gaps (Jan 2, Jan 3, Jan 4)
+    std::ofstream file2(file_name_2);
+    file2 << "Date,Open,High,Low,Close,Adj Close,Volume\n";
+    file2 << "2023-01-02 00:00:00,20.0,21.0,19.0,20.5,20.5,2000\n";
+    file2 << "2023-01-03 00:00:00,20.5,22.0,20.0,21.0,21.0,2100\n";
+    file2 << "2023-01-04 00:00:00,21.0,23.0,21.0,22.0,22.0,2200\n";
+    file2.close();
+
+    auto make_ts = [](int y, int m, int d) {
+        return std::chrono::time_point_cast<std::chrono::seconds>(
+            std::chrono::sys_days{std::chrono::year{y} / m / d}
+        );
+    };
+
+    auto start_dt = make_ts(2023, 1, 1);
+    double init_cap = 100000.0;
+    Queue<unique_ptr<Event>> empty_events; 
+    std::vector<std::string> symbols = {symbol1, symbol2};
+
+    // Instantiate the DataHandler (Passed from disk)
+    auto handler_res = HistoricCSVdataHandler::Create(std::move(empty_events), csv_dir, symbols);
+    assert(handler_res.has_value());
+    
+    // Transfer ownership to a unique_ptr required by the Portfolio
+    auto handler_ptr = std::make_unique<HistoricCSVdataHandler>(std::move(handler_res.value()));
+    
+    // Create the Portfolio Engine
+    Queue<unique_ptr<Event>> port_events;
+    auto port_res = Portfolio::Create(std::move(handler_ptr), std::move(port_events), start_dt, init_cap);
+    assert(port_res.has_value());
+    
+    auto& portfolio = port_res.value();
+
+    // --- 1. WRONG PATH: Update holding with an invalid Symbol ---
+    // If a trade executes for a ticker we don't track, the engine must safely reject it.
+    FillEvent invalid_fill(make_ts(2023, 1, 2), "INVALID_SYM", "ARCA", 100, 10.5, 1.0, FillEventDirection::BUY);
+    TuxedoError err1 = portfolio.update_holdings_from_fill(invalid_fill);
+    assert(err1 != TuxedoError::NO_ERROR);
+
+    // --- 2. HAPPY PATH ---
+    // 2.1 Advance timeline to Jan 2 so Portfolio has an active timestamp
+    auto& handler_ref = const_cast<DataHandler&>(portfolio.bars());
+    handler_ref.update_bars();
+    MarketEvent market_event;
+    portfolio.update_timeindex(market_event);
+
+    // 2.2 Submit a Valid BUY Fill (Opening a Position)
+    FillEvent valid_buy(make_ts(2023, 1, 2), symbol1, "ARCA", 100, 5.0, 10.5, FillEventDirection::BUY);
+    TuxedoError err2 = portfolio.update_holdings_from_fill(valid_buy);
+    assert(err2 == TuxedoError::NO_ERROR);
+
+    // 2.3 Validate internal state correctly reflects the new Long position
+    const auto& cur_pos = portfolio.current_positions();
+    trace_with_message(std::format("cur_pos.at({}) = {}", symbol1, cur_pos.at(symbol1)));
+    assert(cur_pos.at(symbol1) == 0);
+    assert(cur_pos.at(symbol2) == 0);
+
+    const auto& cur_hold = portfolio.current_holdings();
+    // Cash deduction: 100 shares @ $10.50 = $1,050.00. Plus $5.00 commission.
+    assert(cur_hold.cash == (init_cap - 1050.0 - 5.0));
+    assert(cur_hold.commission == 5.0);
+    // Total Equity should equal Initial Capital - Commission (Total represents Cash + Market Value)
+    assert(std::abs(cur_hold.total - (init_cap - 5.0)) < 1e-6);
+
+    // 2.4 Submit a Valid SELL Fill (Partial Exit)    
+    FillEvent valid_sell(make_ts(2023, 1, 3), symbol1, "ARCA", 50, 11.0, 5.0, FillEventDirection::SELL);
+    TuxedoError err3 = portfolio.update_holdings_from_fill(valid_sell);
+    assert(err3 == TuxedoError::NO_ERROR);
+
+    // 2.5 Validate internal state correctly tracks the partial exit
+    const auto& cur_pos2 = portfolio.current_positions();
+    assert(cur_pos2.at(symbol1) == 50.0); // 100 - 50 = 50 remain
+
+    const auto& cur_hold2 = portfolio.current_holdings();
+    // Cash addition: Sold 50 shares @ $11.00 = +$550.00. Minus $5.00 commission.
+    assert(cur_hold2.cash == (init_cap - 1050.0 - 5.0 + 550.0 - 5.0));
+    assert(cur_hold2.commission == 10.0); // Total accumulated commissions
+
+    // 3. Cleanup temporary test files
+    std::remove(file_name_1.c_str());
+    std::remove(file_name_2.c_str());
+
+    std::cout << "[PASSED] test_update_holdings_from_fill" << std::endl;
+}
+
+#endif

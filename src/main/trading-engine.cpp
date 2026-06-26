@@ -86,7 +86,7 @@ namespace trading::engine {
         os << "OrderEvent("
             << order_event.symbol() << ','
             << order_event.order_type() << ','
-                << order_event.quantity() << ','
+            << order_event.quantity() << ','
             << order_event.direction() << ')';
         return os;
     }
@@ -101,6 +101,18 @@ namespace trading::engine {
             << fill_event.fill_cost() << ')';
         return os;
     }  
+
+    ostream & operator<< (ostream &os, const FillEventDirection &fill_direction) {
+        switch(fill_direction) {
+            case FillEventDirection::BUY:
+                os << "BUY";
+                break;
+            case FillEventDirection::SELL:
+                os << "SELL";
+                break;
+        }
+        return os;
+    }
     
     double FillEvent::calculate_commission() {
         double full_cost = 1.3;

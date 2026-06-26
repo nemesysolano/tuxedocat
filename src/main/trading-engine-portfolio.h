@@ -36,12 +36,12 @@ namespace trading::engine::portfolio {
     };
 
     struct Position {
-        map<string, double> balances; // symbol -> quantity
+        map<string, int32_t> balances; // symbol -> quantity
         sys_seconds datetime;
     };
 
     struct Holding {
-        map<string, int32_t> balances; // symbol -> quantity
+        map<string, double> balances; // symbol -> quantity
         sys_seconds datetime;
         double cash;
         double commission;
@@ -65,7 +65,7 @@ namespace trading::engine::portfolio {
             sys_seconds start_date_;
             double initial_capital_;
             vector<Position> all_positions_;
-            map<string, double> current_positions_;
+            map<string, int32_t> current_positions_;
             vector<Holding> all_holdings_;
             Holding current_holdings_;
         public:
@@ -75,7 +75,7 @@ namespace trading::engine::portfolio {
                 sys_seconds start_date,
                 double initial_capital,
                 vector<Position> all_positions,
-                map<string, double> current_positions,
+                map<string, int32_t> current_positions,
                 vector<Holding> all_holdings,
                 Holding current_holdings
             ): bars_(std::move(bars)),
@@ -123,13 +123,16 @@ namespace trading::engine::portfolio {
             const sys_seconds start_date() const { return start_date_; }
             double initial_capital() const { return initial_capital_; }
             const vector<Position> & all_positions() const { return all_positions_; }
-            const map<string, double> & current_positions() const { return current_positions_; }
+            const map<string, int32_t> & current_positions() const { return current_positions_; }
             const vector<Holding> & all_holdings() const { return all_holdings_; }
             const Holding & current_holdings() const { return current_holdings_; }
 
             // Operations
             TuxedoError update_timeindex(const MarketEvent  & market_event);
             TuxedoError update_timeindex(const MarketEvent && market_event);
+
+            TuxedoError update_holdings_from_fill(const FillEvent & fill_event);
+            TuxedoError update_holdings_from_fill(const FillEvent && fill_event);
             static expected<Portfolio, TuxedoError> Create(unique_ptr<DataHandler> bars, Queue<unique_ptr<Event>> events, sys_seconds start_date, double initial_capital);
     };
 

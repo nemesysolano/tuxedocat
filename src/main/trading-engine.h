@@ -140,6 +140,12 @@ namespace trading::engine {
     };
     ostream & operator<< (ostream &os, const FillEventType &fill_type);
 
+    enum class FillEventDirection {
+        BUY = 1,
+        SELL = -1
+    };
+    ostream & operator<< (ostream &os, const FillEventDirection &fill_direction);
+    
     /* 
         Encapsulates the notion of a Filled Order, as returned from a brokerage.
         Stores the qeuantity of an instrument that has been filled and at what price. In 
@@ -153,13 +159,19 @@ namespace trading::engine {
             uint32_t quantity_;
             uint32_t commission_;
             double fill_cost_;
+            FillEventDirection fill_direction_;
 
         protected:
             virtual double calculate_commission();
         public: 
             inline FillEvent(
-                sys_seconds timeindex, string symbol, string exchange, uint32_t quantity, uint32_t commission, double fill_cost
-            ): Event(EventType::FILL), timeindex_(timeindex), symbol_(symbol), exchange_(exchange), quantity_(quantity), commission_(commission), fill_cost_(fill_cost) {
+                sys_seconds timeindex, string symbol, string exchange, uint32_t quantity, double commission, double fill_cost, FillEventDirection fill_direction
+            ): Event(EventType::FILL), timeindex_(timeindex), symbol_(symbol), exchange_(exchange), quantity_(quantity), commission_(commission), fill_cost_(fill_cost), fill_direction_(fill_direction) {
+            }
+
+            inline FillEvent(
+                sys_seconds timeindex, string symbol, string exchange, uint32_t quantity, double fill_cost, FillEventDirection fill_direction
+            ): Event(EventType::FILL), timeindex_(timeindex), symbol_(symbol), exchange_(exchange), quantity_(quantity), commission_(0.0), fill_cost_(fill_cost), fill_direction_(fill_direction) {
                 commission_ = calculate_commission();
             }
 
@@ -172,8 +184,9 @@ namespace trading::engine {
             inline const string& symbol() const { return symbol_; }
             inline const string& exchange() const { return exchange_; }
             inline uint32_t quantity() const { return quantity_; }
-            inline uint32_t commission() const { return commission_; }
+            inline double commission() const { return commission_; }
             inline double fill_cost() const { return fill_cost_; }
+            inline FillEventDirection fill_direction() const { return fill_direction_; }
     };
     ostream & operator<< (ostream &os, const FillEvent &fill_event);
     

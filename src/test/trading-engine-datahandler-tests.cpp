@@ -1,7 +1,4 @@
 #ifdef __TEST_MAIN__
-#ifndef __TEST_ENGINE_DATAHANDLER_TESTS__
-#define __TEST_ENGINE_DATAHANDLER_TESTS__
-
 #include "trading-engine-datahandler.h"
 #include "timeseries-dataframe.h"
 #include "trading-engine.h"
@@ -242,6 +239,4 @@ void test_historic_csv_data_handler_update_bars(const char * current_program_pat
     std::cout << "[PASSED] test_historic_csv_data_handler_update_bars" << std::endl;
 }
 
-
-#endif // __TEST_ENGINE_DATAHANDLER_TESTS__
 #endif // __TEST_MAIN__

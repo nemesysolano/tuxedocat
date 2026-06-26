@@ -86,6 +86,7 @@ int main(int argc, char* argv[]) {
     test_historic_csv_data_handler_update_bars(argv[0]);
     test_portfolio_create(argv[0]);
     test_portfolio_update_timeindex(argv[0]);
+    test_update_holdings_from_fill(argv[0]);
     return 0;
 }
 #endif
