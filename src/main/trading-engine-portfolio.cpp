@@ -103,7 +103,7 @@ namespace trading::engine::portfolio {
     vector<Holding> create_all_holdings(const vector<string> & symbol_list_, sys_seconds start_date, double initial_capital) {
         Holding holding {.balances = {}, .datetime = start_date, .cash = initial_capital, .commission = 0.0, .total = initial_capital};     
         for(const auto & symbol : symbol_list_) {
-            holding.balances[symbol] = 0.0;
+            holding.balances[symbol] = 0;
         }
 
         return vector<Holding>{holding};
@@ -112,13 +112,13 @@ namespace trading::engine::portfolio {
     Holding create_current_holdings(const vector<string> & symbol_list, double initial_capital) {
         Holding holding {.balances = {}, .datetime = sys_seconds{}, .cash = initial_capital, .commission = 0.0, .total = initial_capital};     
         for(const auto & symbol : symbol_list) {
-            holding.balances[symbol] = 0.0;
+            holding.balances[symbol] = 0;
         }
 
         return holding;
     }
 
-    expected<Portfolio, TuxedoError> Portfolio::Create(unique_ptr<DataHandler> bars, Queue<Event> events, sys_seconds start_date, double initial_capital) {
+    expected<Portfolio, TuxedoError> Portfolio::Create(unique_ptr<DataHandler> bars, Queue<unique_ptr<Event>> events, sys_seconds start_date, double initial_capital) {
         if(!bars) {
             return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
         }
@@ -142,6 +142,56 @@ namespace trading::engine::portfolio {
 
         Makes use of MarketEvent from events queue.
         */
+
+        auto latest_datetime_result = bars().latest_bar_datetime(symbol_list_[0]);
+        if(!latest_datetime_result.has_value()) {
+            return latest_datetime_result.error();
+        }
+        auto latest_datetime = latest_datetime_result.value();
+
+        /* 
+        Update Positions    
+        */
+        Position dp {
+            .balances = current_positions_,
+            .datetime = latest_datetime
+        };
+
+        /* 
+        Append the current positions
+        */
+        all_positions_.push_back(std::move(dp));
+
+        /* 
+        Update Holdings
+        */
+        Holding dh {
+            .balances = [this]() {
+                map<string, int32_t> balances;
+                for(const auto & symbol : symbol_list_) {
+                    balances[symbol] = 0;
+                }
+                return balances;
+            }(),
+            .datetime = latest_datetime,
+            .cash = current_holdings_.cash,
+            .commission = current_holdings_.commission,
+            .total = current_holdings_.cash
+        };
+
+        for(const auto & symbol: symbol_list_) {
+            auto latest_bar_result = bars().latest_bar(symbol);
+            if(!latest_bar_result.has_value()) {
+                return latest_bar_result.error();
+            }
+            const Bar & bar = latest_bar_result.value().get();
+            dh.balances[symbol] = current_positions_.at(symbol);
+            dh.total += dh.balances[symbol] * bar.close_price_;
+        }
+
+        all_holdings_.push_back(std::move(dh));
+
+       return TuxedoError::NO_ERROR;
     }
 
     TuxedoError Portfolio::update_timeindex(const MarketEvent && market_event) {

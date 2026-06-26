@@ -1,3 +1,7 @@
+#ifdef __TEST_MAIN__
+#ifndef __TEST_ENGINE_DATAHANDLER_TESTS__
+#define __TEST_ENGINE_DATAHANDLER_TESTS__
+
 #include "trading-engine-datahandler.h"
 #include "timeseries-dataframe.h"
 #include "trading-engine.h"
@@ -44,10 +48,10 @@ void test_historic_csv_data_handler_create(const char * current_program_path) {
 
     trace_with_message("2. Instantiate HistoricCSVdataHandler");
     // 2. Instantiate HistoricCSVdataHandler
-    Queue<Event> events;
+    Queue<unique_ptr<Event>> events;
     vector<string> symbols = {symbol1, symbol2};
     
-    auto handler_exp = HistoricCSVdataHandler::Create(events, csv_dir, symbols);
+    auto handler_exp = HistoricCSVdataHandler::Create(std::move(events), csv_dir, symbols);
     assert(handler_exp.has_value());
     auto handler = std::move(handler_exp.value());
 
@@ -117,10 +121,10 @@ void test_historic_csv_data_handler_update_bars(const char * current_program_pat
 
     // 2. Instantiate HistoricCSVdataHandler
     trace_with_message("2. Instantiate HistoricCSVdataHandler");
-    Queue<Event> events;
+    Queue<unique_ptr<Event>> events;
     vector<string> symbols = {symbol1, symbol2};
     
-    auto handler_exp = HistoricCSVdataHandler::Create(events, csv_dir, symbols);
+    auto handler_exp = HistoricCSVdataHandler::Create(std::move(events), csv_dir, symbols);
     assert(handler_exp.has_value());
     auto handler = std::move(handler_exp.value());
 
@@ -238,3 +242,6 @@ void test_historic_csv_data_handler_update_bars(const char * current_program_pat
     std::cout << "[PASSED] test_historic_csv_data_handler_update_bars" << std::endl;
 }
 
+
+#endif // __TEST_ENGINE_DATAHANDLER_TESTS__
+#endif // __TEST_MAIN__

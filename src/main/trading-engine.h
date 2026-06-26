@@ -25,6 +25,17 @@ namespace trading::engine {
         infrastructure.
     */
     class Event {
+        private:
+            EventType event_type_;
+        public:
+            inline Event(EventType event_type): event_type_(event_type) {}
+
+            inline Event(const Event&) = default;
+            inline Event(Event&&) = default;
+            inline Event& operator=(const Event&) = default;
+            inline Event& operator=(Event&&) = default;
+
+            inline EventType event_type() const { return event_type_; }
     };
     
     enum class MarketEventType {
@@ -40,8 +51,14 @@ namespace trading::engine {
             MarketEventType market_event_type_;
             
         public:
-            inline MarketEvent(): market_event_type_(MarketEventType::MARKET) {}
-            inline MarketEvent(MarketEventType market_event_type_): market_event_type_(market_event_type_) {}
+            inline MarketEvent(): Event(EventType::MARKET), market_event_type_(MarketEventType::MARKET) {}
+            inline MarketEvent(MarketEventType market_event_type): Event(EventType::MARKET), market_event_type_(market_event_type) {}
+
+            inline MarketEvent(const MarketEvent&) = default;
+            inline MarketEvent(MarketEvent&&) = default;
+            inline MarketEvent& operator=(const MarketEvent&) = default;
+            inline MarketEvent& operator=(MarketEvent&&) = default;
+
             inline MarketEventType market_event_type() const { return market_event_type_; }
             
     };
@@ -67,7 +84,12 @@ namespace trading::engine {
         public:
             inline SignalEvent(
                 int32_t strategy_id, string symbol, sys_seconds datetime, SignalEventType signal_type, double strength
-            ):  strategy_id_(strategy_id), symbol_(symbol), datetime_(datetime), signal_type_(signal_type), strength_(strength) {}  
+            ): Event(EventType::SIGNAL), strategy_id_(strategy_id), symbol_(symbol), datetime_(datetime), signal_type_(signal_type), strength_(strength) {}  
+
+            inline SignalEvent(const SignalEvent&) = default;
+            inline SignalEvent(SignalEvent&&) = default;
+            inline SignalEvent& operator=(const SignalEvent&) = default;
+            inline SignalEvent& operator=(SignalEvent&&) = default;
 
             inline int32_t strategy_id() const { return strategy_id_; }  
             inline const string& symbol() const { return symbol_; }
@@ -99,7 +121,12 @@ namespace trading::engine {
         public:
             OrderEvent(
                 string symbol, OrderEventType order_type, uint32_t quantity, int32_t direction
-            ):  symbol_(symbol), order_type_(order_type), quantity_(quantity), direction_(direction) {}
+            ): Event(EventType::ORDER), symbol_(symbol), order_type_(order_type), quantity_(quantity), direction_(direction) {}
+
+            inline OrderEvent(const OrderEvent&) = default;
+            inline OrderEvent(OrderEvent&&) = default;
+            inline OrderEvent& operator=(const OrderEvent&) = default;
+            inline OrderEvent& operator=(OrderEvent&&) = default;
 
             inline const string& symbol() const { return symbol_; }
             inline OrderEventType order_type() const { return order_type_; }
@@ -132,9 +159,14 @@ namespace trading::engine {
         public: 
             inline FillEvent(
                 sys_seconds timeindex, string symbol, string exchange, uint32_t quantity, uint32_t commission, double fill_cost
-            ):  timeindex_(timeindex), symbol_(symbol), exchange_(exchange), quantity_(quantity), commission_(commission), fill_cost_(fill_cost) {
+            ): Event(EventType::FILL), timeindex_(timeindex), symbol_(symbol), exchange_(exchange), quantity_(quantity), commission_(commission), fill_cost_(fill_cost) {
                 commission_ = calculate_commission();
             }
+
+            inline FillEvent(const FillEvent&) = default;
+            inline FillEvent(FillEvent&&) = default;
+            inline FillEvent& operator=(const FillEvent&) = default;
+            inline FillEvent& operator=(FillEvent&&) = default;
 
             inline const sys_seconds& timeindex() const { return timeindex_; }
             inline const string& symbol() const { return symbol_; }

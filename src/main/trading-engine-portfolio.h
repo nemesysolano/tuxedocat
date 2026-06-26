@@ -41,7 +41,7 @@ namespace trading::engine::portfolio {
     };
 
     struct Holding {
-        map<string, double> balances; // symbol -> quantity
+        map<string, int32_t> balances; // symbol -> quantity
         sys_seconds datetime;
         double cash;
         double commission;
@@ -60,7 +60,7 @@ namespace trading::engine::portfolio {
     class Portfolio {
         private:
             unique_ptr<DataHandler> bars_;
-            Queue<Event> events_;
+            Queue<unique_ptr<Event>> events_;
             const vector<string> & symbol_list_; // bars_.symbol_list();
             sys_seconds start_date_;
             double initial_capital_;
@@ -71,7 +71,7 @@ namespace trading::engine::portfolio {
         public:
             inline Portfolio(
                 unique_ptr<DataHandler> bars,
-                Queue<Event> events,
+                Queue<unique_ptr<Event>> events,
                 sys_seconds start_date,
                 double initial_capital,
                 vector<Position> all_positions,
@@ -118,7 +118,7 @@ namespace trading::engine::portfolio {
             
             // Accessors
             inline const DataHandler & bars() const { return *bars_; }
-            inline const Queue<Event> & events() const { return events_; }
+            inline const Queue<unique_ptr<Event>> & events() const { return events_; }
             const vector<string> & symbol_list() const { return symbol_list_; } // bars_.symbol_list();
             const sys_seconds start_date() const { return start_date_; }
             double initial_capital() const { return initial_capital_; }
@@ -130,7 +130,7 @@ namespace trading::engine::portfolio {
             // Operations
             TuxedoError update_timeindex(const MarketEvent  & market_event);
             TuxedoError update_timeindex(const MarketEvent && market_event);
-            static expected<Portfolio, TuxedoError> Create(unique_ptr<DataHandler> bars, Queue<Event> events, sys_seconds start_date, double initial_capital);
+            static expected<Portfolio, TuxedoError> Create(unique_ptr<DataHandler> bars, Queue<unique_ptr<Event>> events, sys_seconds start_date, double initial_capital);
     };
 
     vector<Position> create_all_positions(const vector<string> & symbol_list_, sys_seconds start_date);
