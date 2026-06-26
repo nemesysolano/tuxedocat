@@ -98,7 +98,7 @@ namespace trading::engine::datahandler {
     
     class HistoricCSVdataHandler: public DataHandler {
         private:
-            Queue<shared_ptr<Event>> events_;
+            Queue<Event> events_;
             string csv_dir_;
             vector<string> symbol_list_;
             map<string, DataFrame> symbol_data_; // This field name is misleading, but we will keep it for consistency with the python version.
@@ -113,7 +113,7 @@ namespace trading::engine::datahandler {
             size_t volume_index_;
         public:
             HistoricCSVdataHandler(
-                Queue<shared_ptr<Event>> events,
+                Queue<Event> events,
                 vector<string> & symbol_list,
                 map<string, DataFrame> symbol_data,
                 bool continue_backtest,
@@ -124,7 +124,13 @@ namespace trading::engine::datahandler {
                 size_t low_price_index,
                 size_t close_price_index,
                 size_t volume_index           
-            );        
+            );
+
+            HistoricCSVdataHandler(HistoricCSVdataHandler&& other) noexcept;
+            HistoricCSVdataHandler& operator=(HistoricCSVdataHandler&& other) noexcept;
+            HistoricCSVdataHandler(HistoricCSVdataHandler & other) = delete;
+            HistoricCSVdataHandler& operator=(HistoricCSVdataHandler & other) = delete;
+
             expected<sys_seconds, TuxedoError> latest_bar_datetime(const string & symbol) const override;
             expected<double, TuxedoError> latest_bar_value(const string & symbol, BarValue value) const override;
             const vector<string> & symbol_list() const override;
@@ -133,7 +139,7 @@ namespace trading::engine::datahandler {
             TuxedoError update_bars() override;                        
             ~HistoricCSVdataHandler() override = default;
 
-            static expected<unique_ptr<HistoricCSVdataHandler>, TuxedoError> Create(Queue<shared_ptr<Event>> events, const string & csv_dir , vector<string> & symbol_list);
+            static expected<HistoricCSVdataHandler, TuxedoError> Create(Queue<Event> events, const string & csv_dir , vector<string> & symbol_list);
             const map<string, DataFrame> & symbol_data() const;
     };
 };

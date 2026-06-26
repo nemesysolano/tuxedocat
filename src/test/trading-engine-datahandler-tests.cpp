@@ -44,7 +44,7 @@ void test_historic_csv_data_handler_create(const char * current_program_path) {
 
     trace_with_message("2. Instantiate HistoricCSVdataHandler");
     // 2. Instantiate HistoricCSVdataHandler
-    Queue<shared_ptr<Event>> events;
+    Queue<Event> events;
     vector<string> symbols = {symbol1, symbol2};
     
     auto handler_exp = HistoricCSVdataHandler::Create(events, csv_dir, symbols);
@@ -53,7 +53,7 @@ void test_historic_csv_data_handler_create(const char * current_program_path) {
 
     trace_with_message("3. Verify the Dataframes");
     // 3. Verify the Dataframes    
-    const auto& symbol_data = handler->symbol_data();
+    const auto& symbol_data = handler.symbol_data();
     
     assert(symbol_data.find(symbol1) != symbol_data.end());
     assert(symbol_data.find(symbol2) != symbol_data.end());
@@ -117,7 +117,7 @@ void test_historic_csv_data_handler_update_bars(const char * current_program_pat
 
     // 2. Instantiate HistoricCSVdataHandler
     trace_with_message("2. Instantiate HistoricCSVdataHandler");
-    Queue<shared_ptr<Event>> events;
+    Queue<Event> events;
     vector<string> symbols = {symbol1, symbol2};
     
     auto handler_exp = HistoricCSVdataHandler::Create(events, csv_dir, symbols);
@@ -131,7 +131,7 @@ void test_historic_csv_data_handler_update_bars(const char * current_program_pat
         );
     };
 
-    const auto& symbol_data = handler->symbol_data();
+    const auto& symbol_data = handler.symbol_data();
     auto df1 = symbol_data.at(symbol1);
     auto df2 = symbol_data.at(symbol2);
 
@@ -141,44 +141,44 @@ void test_historic_csv_data_handler_update_bars(const char * current_program_pat
     // --- WRONG PATHS (Before update_bars) ---
     // 3. Trying to access latest bars before calling update_bars() should safely fail
     trace_with_message("3. Trying to access latest bars before calling update_bars() should safely fail");
-    auto err_bar = handler->latest_bar(symbol1);
+    auto err_bar = handler.latest_bar(symbol1);
     assert(!err_bar.has_value());
     trace_with_message("...3.1 latest_bar failed as expected before update_bars()");
 
-    auto err_bars = handler->latest_bars(symbol1, 1);
+    auto err_bars = handler.latest_bars(symbol1, 1);
     assert(!err_bars.has_value());
     trace_with_message("...3.2 latest_bars failed as expected before update_bars()");
 
-    auto err_dt = handler->latest_bar_datetime(symbol1);
+    auto err_dt = handler.latest_bar_datetime(symbol1);
     assert(!err_dt.has_value());
     trace_with_message("...3.3 latest_bar_datetime failed as expected before update_bars()");
 
-    auto err_val = handler->latest_bar_value(symbol1, BarValue::CLOSE);
+    auto err_val = handler.latest_bar_value(symbol1, BarValue::CLOSE);
     assert(!err_val.has_value()); 
     trace_with_message("...3.4 latest_bar_value failed as expected before update_bars()");
 
     // --- HAPPY PATHS (After 1st update_bars) ---
     // 4. Update bars for the first time (Advances the market tick to 2023-01-01)
     trace_with_message("4. Update bars for the first time (Advances the market tick to 2023-01-01)");
-    TuxedoError err = handler->update_bars();
+    TuxedoError err = handler.update_bars();
     assert(err == TuxedoError::NO_ERROR);
 
     trace_with_message("...4.1 Validate the latest bar datetime and value for Symbol 1");
-    auto dt1 = handler->latest_bar_datetime(symbol1);
+    auto dt1 = handler.latest_bar_datetime(symbol1);
     assert(dt1.has_value());
     assert(dt1.value() == make_ts(2023, 1, 1));
 
     trace_with_message("...4.2 Validate the latest bar value for Symbol 1");
-    auto val1 = handler->latest_bar_value(symbol1, BarValue::CLOSE);
+    auto val1 = handler.latest_bar_value(symbol1, BarValue::CLOSE);
     assert(val1.has_value());
     assert(std::abs(val1.value() - 10.5) < 1e-6); // Value from 01-01
 
     trace_with_message("...4.3 Validate the latest bar datetime and value for Symbol 2");
-    auto bar1 = handler->latest_bar(symbol1);
+    auto bar1 = handler.latest_bar(symbol1);
     assert(bar1.has_value());
 
     trace_with_message("...4.4 Validate the latest bar datetime and value for Symbol 2");
-    auto bars1 = handler->latest_bars(symbol1, 1);
+    auto bars1 = handler.latest_bars(symbol1, 1);
     assert(bars1.has_value());
     assert(bars1.value().size() == 1);
 
@@ -186,45 +186,45 @@ void test_historic_csv_data_handler_update_bars(const char * current_program_pat
     // --- WRONG PATHS (After 1st update_bars) ---
     // 5. Requesting more bars than we currently have available in the history buffer
     trace_with_message("5. Requesting more bars than we currently have available in the history buffer");
-    auto err_too_many = handler->latest_bars(symbol1, 2);
+    auto err_too_many = handler.latest_bars(symbol1, 2);
     assert(!err_too_many.has_value());
 
     // 6. Invalid symbol requests
-    auto err_invalid_sym = handler->latest_bar("INVALID_SYMBOL");
+    auto err_invalid_sym = handler.latest_bar("INVALID_SYMBOL");
     assert(!err_invalid_sym.has_value());
     trace_with_message("6.1 latest_bar failed as expected for INVALID_SYMBOL");
 
 
     // --- HAPPY PATHS (Advancing the timeline) ---
     // 7. Advance 2 more times (2023-01-04, 2023-01-07)
-    handler->update_bars(); 
-    handler->update_bars(); 
+    handler.update_bars(); 
+    handler.update_bars(); 
     
     
     // We now have 3 days of history available
-    auto bars3 = handler->latest_bars(symbol1, 3);
+    auto bars3 = handler.latest_bars(symbol1, 3);
     assert(bars3.has_value());
     assert(bars3.value().size() == 3);
     trace_with_message("7 Validate the latest 3 bars for Symbol 1");
     // Advance the rest of the way through the union index (2023-01-10, 2023-01-13, 2023-01-16)
 
-    handler->update_bars();
+    handler.update_bars();
     trace_with_message("...7.1.a bars updated to the end of the timeline");
-    handler->update_bars();
+    handler.update_bars();
     trace_with_message("...7.1.b bars updated to the end of the timeline");
-    handler->update_bars();
+    handler.update_bars();
     trace_with_message("...7.1.c bars updated to the end of the timeline");
 
     // Validate final state for Symbol 2 (The end of the timeline)
     trace_with_message("...7.2 Validate the final bar datetime and value for Symbol 2");
-    auto dt_final = handler->latest_bar_datetime(symbol2);
+    auto dt_final = handler.latest_bar_datetime(symbol2);
     trace_with_message("...7.2.a Validate the final bar datetime for Symbol 2");
     assert(dt_final.has_value());
     trace_with_message("...7.2.b Validate the final bar datetime for Symbol 2");
     assert(dt_final.value() == make_ts(2023, 1, 16));
     trace_with_message("...7.2.c Validate the final bar datetime for Symbol 2");
 
-    auto val_final = handler->latest_bar_value(symbol2, BarValue::CLOSE);
+    auto val_final = handler.latest_bar_value(symbol2, BarValue::CLOSE);
     assert(val_final.has_value());
     assert(std::abs(val_final.value() - 22.0) < 1e-6);
     trace_with_message("...7.3 Validate the final bar value for Symbol 2");
@@ -237,3 +237,4 @@ void test_historic_csv_data_handler_update_bars(const char * current_program_pat
 
     std::cout << "[PASSED] test_historic_csv_data_handler_update_bars" << std::endl;
 }
+

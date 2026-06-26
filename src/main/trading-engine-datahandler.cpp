@@ -18,7 +18,7 @@ namespace trading::engine::datahandler {
         open_price_index, high_price_index, low_price_index, close_price_index, volume_index
     */
     HistoricCSVdataHandler::HistoricCSVdataHandler(
-        Queue<shared_ptr<Event>> events, vector<string> & symbol_list, map<string, DataFrame> symbol_data, bool continue_backtest, map<string, vector<Bar>> latest_symbol_data, size_t iterator_size, size_t open_price_index, size_t high_price_index, size_t low_price_index, size_t close_price_index, size_t volume_index): 
+        Queue<Event> events, vector<string> & symbol_list, map<string, DataFrame> symbol_data, bool continue_backtest, map<string, vector<Bar>> latest_symbol_data, size_t iterator_size, size_t open_price_index, size_t high_price_index, size_t low_price_index, size_t close_price_index, size_t volume_index): 
         events_(std::move(events)),
         symbol_list_(std::move(symbol_list)),
         symbol_data_(std::move(symbol_data)),
@@ -35,7 +35,40 @@ namespace trading::engine::datahandler {
 
     }    
 
-    expected<unique_ptr<HistoricCSVdataHandler>, TuxedoError> HistoricCSVdataHandler::Create(Queue<shared_ptr<Event>> events, const string & csv_dir , vector<string> & symbol_list) {
+    HistoricCSVdataHandler::HistoricCSVdataHandler(HistoricCSVdataHandler&& other) noexcept
+        : events_(std::move(other.events_)),
+          symbol_list_(std::move(other.symbol_list_)),
+          symbol_data_(std::move(other.symbol_data_)),
+          continue_backtest_(other.continue_backtest_),
+          latest_symbol_data_(std::move(other.latest_symbol_data_)),
+          iterator_index_(other.iterator_index_),
+          iterator_size_(other.iterator_size_),
+          open_price_index_(other.open_price_index_),
+          high_price_index_(other.high_price_index_),
+          low_price_index_(other.low_price_index_),
+          close_price_index_(other.close_price_index_),
+          volume_index_(other.volume_index_) {
+    }
+
+    HistoricCSVdataHandler& HistoricCSVdataHandler::operator=(HistoricCSVdataHandler&& other) noexcept {
+        if (this != &other) {
+            events_ = std::move(other.events_);
+            symbol_list_ = std::move(other.symbol_list_);
+            symbol_data_ = std::move(other.symbol_data_);
+            continue_backtest_ = other.continue_backtest_;
+            latest_symbol_data_ = std::move(other.latest_symbol_data_);
+            iterator_index_ = other.iterator_index_;
+            iterator_size_ = other.iterator_size_;
+            open_price_index_ = other.open_price_index_;
+            high_price_index_ = other.high_price_index_;
+            low_price_index_ = other.low_price_index_;
+            close_price_index_ = other.close_price_index_;
+            volume_index_ = other.volume_index_;
+        }
+        return *this;
+    }
+
+    expected<HistoricCSVdataHandler, TuxedoError> HistoricCSVdataHandler::Create(Queue<Event> events, const string & csv_dir , vector<string> & symbol_list) {
         /* 
         Store all timestamps from loaded CSV files
         */
@@ -110,7 +143,7 @@ namespace trading::engine::datahandler {
             latest_symbol_data.insert({symbol, vector<Bar>()});         
         }        
         
-        return make_unique<HistoricCSVdataHandler>(
+        return HistoricCSVdataHandler(
             std::move(events), symbol_list, std::move(symbol_data), true, std::move(latest_symbol_data), timestamps.size(),
             open_price_index, high_price_index, low_price_index, close_price_index, volume_index
         );
@@ -247,7 +280,7 @@ namespace trading::engine::datahandler {
             bars_vector.emplace_back(timestamp, open_price, high_price, low_price, close_price, volume);
         }
         iterator_index_++;
-        this->events_.push(make_shared<MarketEvent>());
+        this->events_.push(MarketEvent());
 
         if(iterator_index_ == iterator_size_) {
             continue_backtest_ = false;

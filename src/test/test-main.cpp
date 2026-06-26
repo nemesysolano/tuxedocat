@@ -84,6 +84,7 @@ int main(int argc, char* argv[]) {
     test_create_drawdowns();
     test_historic_csv_data_handler_create(argv[0]);
     test_historic_csv_data_handler_update_bars(argv[0]);
+    test_portfolio_create(argv[0]);
     return 0;
 }
 #endif

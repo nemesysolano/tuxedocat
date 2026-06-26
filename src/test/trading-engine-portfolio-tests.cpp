@@ -4,9 +4,13 @@
 #include <iostream>
 #include <cmath>
 #include <cassert>
-
+#include <fstream>
+#include <trading-engine.h>
 using namespace trading::engine::portfolio;
 using namespace slice;
+using namespace trading::engine::datahandler;
+using namespace std;
+using namespace trading::engine;
 
 void test_create_drawdowns() {
     // --- Test 1: Standard Drawdown Curve ---
@@ -55,4 +59,100 @@ void test_create_drawdowns() {
     assert(!empty_result.has_value()); 
 
     std::cout << "PASSED test_create_drawdowns" << std::endl;
+}
+
+void test_portfolio_create(const char * current_program_path) {
+    // Helper for C++20 pure dates
+    auto make_ts = [](int y, int m, int d) {
+        return std::chrono::time_point_cast<std::chrono::seconds>(
+            std::chrono::sys_days{std::chrono::year{y} / m / d}
+        );
+    };
+
+    auto start_dt = make_ts(2023, 1, 1);
+    double init_cap = 100000.0;
+    Queue<Event> empty_events;
+
+    // --- 1. WRONG PATH: Nullptr for DataHandler ---
+    // The Portfolio should gracefully intercept a null dependency without segfaulting
+    auto err_res = Portfolio::Create(nullptr, empty_events, start_dt, init_cap);
+    assert(!err_res.has_value());
+    assert(err_res.error() == TuxedoError::ERR_INVALID_DATA_FORMAT);
+
+    // --- 2. HAPPY PATH ---
+    // Setup temporary CSV files
+    std::string csv_dir = ".";
+    std::string symbol1 = "TEST_PORT_A";
+    std::string symbol2 = "TEST_PORT_B";
+
+    std::ofstream file1(csv_dir + "/" + symbol1 + ".csv");
+    file1 << "Date,Open,High,Low,Close,Adj Close,Volume\n";
+    file1 << "2023-01-01 00:00:00,10.0,11.0,9.0,10.5,10.5,1000\n";
+    file1.close();
+
+    std::ofstream file2(csv_dir + "/" + symbol2 + ".csv");
+    file2 << "Date,Open,High,Low,Close,Adj Close,Volume\n";
+    file2 << "2023-01-01 00:00:00,20.0,21.0,19.0,20.5,20.5,2000\n";
+    file2.close();
+
+    std::vector<std::string> symbols = {symbol1, symbol2};
+    
+    // Instantiate the DataHandler (Passed from disk)
+    auto handler_res = HistoricCSVdataHandler::Create(empty_events, csv_dir, symbols);
+    assert(handler_res.has_value());
+    
+    // Transfer ownership to a unique_ptr required by the Portfolio
+    auto handler_ptr = std::make_unique<HistoricCSVdataHandler>(std::move(handler_res.value()));
+    
+    // Create the Portfolio Engine
+    auto port_res = Portfolio::Create(std::move(handler_ptr), empty_events, start_dt, init_cap);
+    assert(port_res.has_value());
+    
+    auto& portfolio = port_res.value();
+    
+    // --- 3. VALIDATE INTERNAL STATE (Using strictly const accessors) ---
+    assert(portfolio.start_date() == start_dt);
+    assert(portfolio.initial_capital() == init_cap);
+    
+    const auto& syms = portfolio.symbol_list();
+    assert(syms.size() == 2);
+    assert(syms[0] == symbol1 || syms[1] == symbol1);
+
+    // Validate 0th state of `all_positions`
+    const auto& all_pos = portfolio.all_positions();
+    assert(all_pos.size() == 1);
+    assert(all_pos[0].datetime == start_dt);
+    assert(all_pos[0].balances.at(symbol1) == 0.0);
+    assert(all_pos[0].balances.at(symbol2) == 0.0);
+
+    // Validate 0th state of `current_positions`
+    const auto& cur_pos = portfolio.current_positions();
+    assert(cur_pos.size() == 2);
+    assert(cur_pos.at(symbol1) == 0.0);
+    assert(cur_pos.at(symbol2) == 0.0);
+
+    // Validate 0th state of `all_holdings`
+    const auto& all_hold = portfolio.all_holdings();
+    assert(all_hold.size() == 1);
+    assert(all_hold[0].datetime == start_dt);
+    assert(all_hold[0].cash == init_cap);
+    assert(all_hold[0].commission == 0.0);
+    assert(all_hold[0].total == init_cap);
+    assert(all_hold[0].balances.at(symbol1) == 0.0);
+    
+    // Validate 0th state of `current_holdings`
+    const auto& cur_hold = portfolio.current_holdings();
+    assert(cur_hold.cash == init_cap);
+    assert(cur_hold.total == init_cap);
+    assert(cur_hold.balances.at(symbol2) == 0.0);
+    
+    // Verify dereferenced components didn't slice or break
+    assert(portfolio.bars().symbol_list().size() == 2);
+    assert(portfolio.events().empty()); 
+
+    // 4. Cleanup temporary test files
+    std::remove((csv_dir + "/" + symbol1 + ".csv").c_str());
+    std::remove((csv_dir + "/" + symbol2 + ".csv").c_str());
+
+    std::cout << "[PASSED] test_portfolio_create" << std::endl;
 }

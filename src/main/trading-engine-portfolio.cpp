@@ -91,4 +91,49 @@ namespace trading::engine::portfolio {
         return (mean_return / std_dev) * std::sqrt(static_cast<double>(periods));
     }
 
+    vector<Position> create_all_positions(const vector<string> & symbol_list_, sys_seconds start_date) {
+        Position position {.balances = {}, .datetime = start_date};     
+        for(const auto & symbol : symbol_list_) {
+            position.balances[symbol] = 0.0;
+        }
+
+        return vector<Position>{position};
+    }
+
+    vector<Holding> create_all_holdings(const vector<string> & symbol_list_, sys_seconds start_date, double initial_capital) {
+        Holding holding {.balances = {}, .datetime = start_date, .cash = initial_capital, .commission = 0.0, .total = initial_capital};     
+        for(const auto & symbol : symbol_list_) {
+            holding.balances[symbol] = 0.0;
+        }
+
+        return vector<Holding>{holding};
+    }
+
+    Holding create_current_holdings(const vector<string> & symbol_list, double initial_capital) {
+        Holding holding {.balances = {}, .datetime = sys_seconds{}, .cash = initial_capital, .commission = 0.0, .total = initial_capital};     
+        for(const auto & symbol : symbol_list) {
+            holding.balances[symbol] = 0.0;
+        }
+
+        return holding;
+    }
+
+    expected<Portfolio, TuxedoError> Portfolio::Create(unique_ptr<DataHandler> bars, Queue<Event> events, sys_seconds start_date, double initial_capital) {
+        if(!bars) {
+            return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
+        }
+        auto all_positions = create_all_positions(bars->symbol_list(), start_date);
+        map<string, double> current_positions = [&bars]() {
+            map<string, double> positions;
+            for(const auto & symbol : bars->symbol_list()) {
+                positions[symbol] = 0.0;
+            }
+            return positions;
+        }();
+        auto all_holdings = create_all_holdings(bars->symbol_list(), start_date, initial_capital);
+        auto current_holdings = create_current_holdings(bars->symbol_list(), initial_capital);
+        return Portfolio(std::move(bars), std::move(events), start_date, initial_capital, std::move(all_positions), std::move(current_positions), std::move(all_holdings), std::move(current_holdings));
+    }
+
+    
 };
