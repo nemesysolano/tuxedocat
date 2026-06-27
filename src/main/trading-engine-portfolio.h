@@ -118,6 +118,9 @@ namespace trading::engine::portfolio {
             
             // Accessors
             inline const DataHandler & bars() const { return *bars_; }
+#ifdef __TEST_MAIN__
+            inline TuxedoError update_bars() { return bars_->update_bars(); }
+#endif            
             inline const Queue<unique_ptr<Event>> & events() const { return events_; }
             const vector<string> & symbol_list() const { return symbol_list_; } // bars_.symbol_list();
             const sys_seconds start_date() const { return start_date_; }

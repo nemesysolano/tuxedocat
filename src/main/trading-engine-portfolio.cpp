@@ -197,7 +197,7 @@ namespace trading::engine::portfolio {
 
         all_holdings_.push_back(std::move(dh));
 
-       return TuxedoError::NO_ERROR;
+        return TuxedoError::NO_ERROR;
     }
 
     TuxedoError Portfolio::update_timeindex(const MarketEvent && market_event) {
@@ -207,12 +207,17 @@ namespace trading::engine::portfolio {
 
     TuxedoError Portfolio::update_holdings_from_fill(const FillEvent & fill_event) {
         const DataHandler & bars = * bars_.get();
-        cout << "DEBUG: " << fill_event << endl;
         if(bars.latest_bar_datetime(fill_event.symbol()).has_value() == false) {
             return TuxedoError::ERR_NO_OBSERVATIONS;
         } 
         int32_t fill_dir = std::to_underlying(fill_event.fill_direction());
         
+#ifdef __DEBUG__        
+        double initial_total = current_holdings_.total;
+        double initial_cash = current_holdings_.cash;
+        double initial_commission = current_holdings_.commission;
+        trace_with_message(std::format("prev total = {}, prev cash={}, prev commission={}", initial_total, initial_cash, initial_commission));
+#endif
         double fill_cost = bars.latest_bar_value(fill_event.symbol(), BarValue::CLOSE).value_or(0.0);
         double cost = fill_dir * fill_cost * fill_event.quantity();        
         current_holdings_.balances[fill_event.symbol()] = cost;
@@ -221,8 +226,8 @@ namespace trading::engine::portfolio {
         current_holdings_.total -= (cost + fill_event.commission());
  
         trace_with_message(std::format(
-            "Symbol = {} Quantity = {}, cost = {}, Direction = {}, commission={}, cash = {}, total = {}",
-            fill_event.symbol(), fill_event.quantity(), fill_cost, fill_dir, fill_event.commission(), current_holdings_.cash, current_holdings_.total
+            "Symbol = {} Quantity = {}, fill_cost = {}, Direction = {}, new commission={}, new cash = {}, new total = {}",
+            fill_event.symbol(), fill_event.quantity(), fill_cost, fill_dir, current_holdings_.commission, current_holdings_.cash, current_holdings_.total
         ));
         return TuxedoError::NO_ERROR;
     }
