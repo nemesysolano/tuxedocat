@@ -136,6 +136,13 @@ namespace trading::engine::portfolio {
 
             TuxedoError update_holdings_from_fill(const FillEvent & fill_event);
             TuxedoError update_holdings_from_fill(const FillEvent && fill_event);
+
+            TuxedoError update_positions_from_fill(const FillEvent &  fill_event);
+            TuxedoError update_positions_from_fill(const FillEvent && fill_event);
+
+            TuxedoError update_fill(const FillEvent &  fill_event);
+            TuxedoError update_fill(const FillEvent && fill_event);
+
             static expected<Portfolio, TuxedoError> Create(unique_ptr<DataHandler> bars, Queue<unique_ptr<Event>> events, sys_seconds start_date, double initial_capital);
     };
 

@@ -206,6 +206,10 @@ namespace trading::engine::portfolio {
 
 
     TuxedoError Portfolio::update_holdings_from_fill(const FillEvent & fill_event) {
+        /*
+        Takes a FillEvent object and updates the holdings matrix to reflect the 
+        holdings value
+        */
         const DataHandler & bars = * bars_.get();
         if(bars.latest_bar_datetime(fill_event.symbol()).has_value() == false) {
             return TuxedoError::ERR_NO_OBSERVATIONS;
@@ -225,14 +229,56 @@ namespace trading::engine::portfolio {
         current_holdings_.cash -= (cost + fill_event.commission());
         current_holdings_.total -= (cost + fill_event.commission());
  
+#ifdef __DEBUG__        
         trace_with_message(std::format(
             "Symbol = {} Quantity = {}, fill_cost = {}, Direction = {}, new commission={}, new cash = {}, new total = {}",
             fill_event.symbol(), fill_event.quantity(), fill_cost, fill_dir, current_holdings_.commission, current_holdings_.cash, current_holdings_.total
         ));
+#endif        
         return TuxedoError::NO_ERROR;
     }
 
     TuxedoError Portfolio::update_holdings_from_fill(const FillEvent && fill_event) {
         return update_holdings_from_fill(fill_event);
     }
+
+    TuxedoError Portfolio::update_positions_from_fill(const FillEvent &  fill_event) {
+        /* 
+        Takes a FillEvent object and updates the position matrix to
+        reflect new position.
+        */
+        const DataHandler & bars = * bars_.get();
+        if(bars.latest_bar_datetime(fill_event.symbol()).has_value() == false) {
+            return TuxedoError::ERR_NO_OBSERVATIONS;
+        } 
+        int32_t fill_dir = std::to_underlying(fill_event.fill_direction());
+        
+#if __DEBUG__
+        trace_with_message(std::format("Symbol = {}, Direction = {}, Quantity = {}, Current Position Size = {}", fill_event.symbol(), fill_dir, fill_event.quantity(), current_positions_[fill_event.symbol()]));
+#endif        
+        current_positions_[fill_event.symbol()] += fill_dir * fill_event.quantity();
+#if __DEBUG__
+        trace_with_message(std::format("New Position Size", current_positions_[fill_event.symbol()]));
+#endif        
+        return TuxedoError::NO_ERROR;
+    }
+
+    TuxedoError Portfolio::update_positions_from_fill(const FillEvent && fill_event){
+        return update_positions_from_fill(fill_event);
+    }
+
+    TuxedoError Portfolio::update_fill(const FillEvent &  fill_event) {
+        auto update_positions_result = update_positions_from_fill(fill_event);
+        if(update_positions_result != TuxedoError::NO_ERROR) {
+            return update_positions_result;
+        }
+
+        auto update_holdings_result = update_holdings_from_fill(fill_event);
+        return update_holdings_result;
+    }
+
+    TuxedoError Portfolio::update_fill(const FillEvent && fill_event) {
+        return update_fill(fill_event);
+    }
+
 };
