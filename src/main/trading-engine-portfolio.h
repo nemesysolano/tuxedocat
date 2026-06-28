@@ -143,6 +143,12 @@ namespace trading::engine::portfolio {
             TuxedoError update_fill(const FillEvent &  fill_event);
             TuxedoError update_fill(const FillEvent && fill_event);
 
+            expected<OrderEvent, TuxedoError> naive_order(const SignalEvent &  signal_event); // generate_naive_order(self, signal)
+            expected<OrderEvent, TuxedoError> naive_order(const SignalEvent && signal_event);
+
+            expected<OrderEvent, TuxedoError> update_signal(const Event        & signal_event);
+            expected<OrderEvent, TuxedoError> update_signal(const SignalEvent && signal_event);
+
             static expected<Portfolio, TuxedoError> Create(unique_ptr<DataHandler> bars, Queue<unique_ptr<Event>> events, sys_seconds start_date, double initial_capital);
     };
 

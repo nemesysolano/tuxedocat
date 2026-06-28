@@ -33,26 +33,26 @@ namespace trading::engine {
         }
         return os;
     }
-    
-    ostream & operator<< (ostream &os, const SignalEventType &signal_type) {
-        switch(signal_type) {
-            case SignalEventType::LONG:
-                os << "LONG";
-                break;
-            case SignalEventType::SHORT:
-                os << "SHORT";
-                break;
+
+    const std::string LABEL_MARKET = "MARKET";
+    const std::string LABEL_LIMIT = "LIMIT";
+
+    std::string_view to_string(OrderEventType order_event_type) {
+        switch(order_event_type) {
+            case OrderEventType::MARKET:
+                return LABEL_MARKET;
+            case OrderEventType::LIMIT:
+                return LABEL_LIMIT;
         }
-        return os;
     }
-    
+
     ostream & operator<< (ostream &os, const OrderEventType &order_type) {
         switch(order_type) {
             case OrderEventType::MARKET:
-                os << "MARKET";
+                os << LABEL_MARKET;
                 break;
             case OrderEventType::LIMIT:
-                os << "LIMIT";
+                os << LABEL_LIMIT;
                 break;
         }
         return os;
@@ -77,7 +77,7 @@ namespace trading::engine {
             << signal_event.strategy_id() << ','
             << signal_event.datetime() << ','
             << signal_event.symbol() << ','
-            << signal_event.signal_type() << ','
+            << signal_event.direction() << ','
             << signal_event.strength() << ')';
         return os;
     }
@@ -98,17 +98,39 @@ namespace trading::engine {
             << fill_event.exchange() << ','
             << fill_event.quantity() << ','
             << fill_event.commission() << ','
-            << fill_event.fill_cost() << ')';
+            << fill_event.fill_cost() << ','
+            << fill_event.direction() << ')';
         return os;
     }  
 
-    ostream & operator<< (ostream &os, const FillEventDirection &fill_direction) {
-        switch(fill_direction) {
-            case FillEventDirection::BUY:
-                os << "BUY";
+    const string LABEL_BUY("BUY");
+    const string LABEL_SELL("SELL");
+    const string LABEL_EXIT("EXIT");
+
+    std::string_view to_string(EventDirectionType direction) {
+        switch(direction) {
+            case EventDirectionType::BUY:
+                return LABEL_BUY;
                 break;
-            case FillEventDirection::SELL:
-                os << "SELL";
+            case EventDirectionType::SELL:
+                return LABEL_SELL;
+                break;
+            case EventDirectionType::EXIT:
+                return LABEL_EXIT;
+                break;
+        }        
+    }
+
+    ostream & operator<< (ostream &os, const EventDirectionType &fill_direction) {
+        switch(fill_direction) {
+            case EventDirectionType::BUY:
+                os << LABEL_BUY;
+                break;
+            case EventDirectionType::SELL:
+                os << LABEL_SELL;
+                break;
+            case EventDirectionType::EXIT:
+                os << LABEL_EXIT;
                 break;
         }
         return os;

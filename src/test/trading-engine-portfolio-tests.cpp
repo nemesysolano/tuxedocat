@@ -330,7 +330,7 @@ void test_update_holdings_from_fill(const char * current_program_path) {
 
     // --- 1. WRONG PATH: Update holding with an invalid Symbol ---
     // If a trade executes for a ticker we don't track, the engine must safely reject it.
-    FillEvent invalid_fill(make_ts(2023, 1, 2), "INVALID_SYM", "ARCA", 100, 10.5, 1.0, FillEventDirection::BUY);
+    FillEvent invalid_fill(make_ts(2023, 1, 2), "INVALID_SYM", "ARCA", 100, 10.5, 1.0, EventDirectionType::BUY);
     TuxedoError err1 = portfolio.update_holdings_from_fill(invalid_fill);
     assert(err1 != TuxedoError::NO_ERROR);
 
@@ -341,7 +341,7 @@ void test_update_holdings_from_fill(const char * current_program_path) {
     portfolio.update_timeindex(market_event);
 
     // 2.2 Submit a Valid BUY Fill (Opening a Position)
-    FillEvent valid_buy(make_ts(2023, 1, 2), symbol1, "ARCA", 100, 5.0, 0, FillEventDirection::BUY);
+    FillEvent valid_buy(make_ts(2023, 1, 2), symbol1, "ARCA", 100, 5.0, 0, EventDirectionType::BUY);
     TuxedoError err2 = portfolio.update_holdings_from_fill(valid_buy);
     assert(err2 == TuxedoError::NO_ERROR);
 
@@ -360,7 +360,7 @@ void test_update_holdings_from_fill(const char * current_program_path) {
 
     // 2.4 Submit a Valid SELL Fill (Partial Exit)    
     portfolio.update_bars();
-    FillEvent valid_sell(make_ts(2023, 1, 3), symbol1, "ARCA", 50, 6.0, 0, FillEventDirection::SELL);
+    FillEvent valid_sell(make_ts(2023, 1, 3), symbol1, "ARCA", 50, 6.0, 0, EventDirectionType::SELL);
     TuxedoError err3 = portfolio.update_holdings_from_fill(valid_sell);
     assert(err3 == TuxedoError::NO_ERROR);
 
@@ -432,7 +432,7 @@ void test_update_positions_from_fill(const char * current_program_path) {
     auto& portfolio = port_res.value();
 
     // --- 1. WRONG PATH: Update position with an invalid Symbol ---
-    FillEvent invalid_fill(make_ts(2023, 1, 2), "INVALID_SYM", "ARCA", 100, 10.5, 1.0, FillEventDirection::BUY);
+    FillEvent invalid_fill(make_ts(2023, 1, 2), "INVALID_SYM", "ARCA", 100, 10.5, 1.0, EventDirectionType::BUY);
     TuxedoError err1 = portfolio.update_positions_from_fill(invalid_fill);
     assert(err1 != TuxedoError::NO_ERROR);
 
@@ -444,7 +444,7 @@ void test_update_positions_from_fill(const char * current_program_path) {
     portfolio.update_timeindex(market_event);
 
     // 2.2 Submit a Valid BUY Fill (Opening a Position)
-    FillEvent valid_buy(make_ts(2023, 1, 2), symbol1, "ARCA", 100, 10.5, 5.0, FillEventDirection::BUY);
+    FillEvent valid_buy(make_ts(2023, 1, 2), symbol1, "ARCA", 100, 10.5, 5.0, EventDirectionType::BUY);
     TuxedoError err2 = portfolio.update_positions_from_fill(valid_buy);
     assert(err2 == TuxedoError::NO_ERROR);
 
@@ -454,7 +454,7 @@ void test_update_positions_from_fill(const char * current_program_path) {
     assert(cur_pos.at(symbol2) == 0);
 
     // 2.4 Submit a Valid SELL Fill (Partial Exit)
-    FillEvent valid_sell(make_ts(2023, 1, 3), symbol1, "ARCA", 50, 11.0, 5.0, FillEventDirection::SELL);
+    FillEvent valid_sell(make_ts(2023, 1, 3), symbol1, "ARCA", 50, 11.0, 5.0, EventDirectionType::SELL);
     TuxedoError err3 = portfolio.update_positions_from_fill(valid_sell);
     assert(err3 == TuxedoError::NO_ERROR);
 
@@ -527,12 +527,12 @@ void test_update_fill(const char * current_program_path) {
 
     // --- 2. WRONG PATH: Invalid Symbol ---
     // Should return early and reject the operation
-    FillEvent invalid_fill(make_ts(2023, 1, 2), "INVALID_SYM", "ARCA", 100, 10.5, 1.0, FillEventDirection::BUY);
+    FillEvent invalid_fill(make_ts(2023, 1, 2), "INVALID_SYM", "ARCA", 100, 10.5, 1.0, EventDirectionType::BUY);
     TuxedoError err1 = portfolio.update_fill(invalid_fill);
     assert(err1 != TuxedoError::NO_ERROR);
 
     // --- 3. HAPPY PATH: BUY (Full coordinated state change) ---
-    FillEvent valid_buy(make_ts(2023, 1, 2), symbol1, "ARCA", 100, 10.5, 5.0, FillEventDirection::BUY);
+    FillEvent valid_buy(make_ts(2023, 1, 2), symbol1, "ARCA", 100, 10.5, 5.0, EventDirectionType::BUY);
     TuxedoError err2 = portfolio.update_fill(valid_buy);
     assert(err2 == TuxedoError::NO_ERROR);
 
@@ -551,7 +551,7 @@ void test_update_fill(const char * current_program_path) {
     portfolio.update_timeindex(market_event);
 
     // --- 5. HAPPY PATH: SELL (Full coordinated state change) ---
-    FillEvent valid_sell(make_ts(2023, 1, 3), symbol1, "ARCA", 50, 11.0, 5.0, FillEventDirection::SELL);
+    FillEvent valid_sell(make_ts(2023, 1, 3), symbol1, "ARCA", 50, 11.0, 5.0, EventDirectionType::SELL);
     TuxedoError err3 = portfolio.update_fill(valid_sell);
     assert(err3 == TuxedoError::NO_ERROR);
 
@@ -569,4 +569,89 @@ void test_update_fill(const char * current_program_path) {
 
     std::cout << "[PASSED] test_update_fill" << std::endl;
 }
+
+void test_naive_order(const char * current_program_path) {
+    std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
+    std::string csv_dir = exe_path.string();   
+    std::string symbol1 = "TEST_PORT_A";
+
+    std::string file_name_1 = csv_dir + '/' + symbol1 + ".csv";
+
+    std::ofstream file1(file_name_1);
+    file1 << "Date,Open,High,Low,Close,Adj Close,Volume\n";
+    file1 << "2023-01-02 00:00:00,10.0,11.0,9.0,10.5,10.5,1000\n";
+    file1 << "2023-01-03 00:00:00,10.5,12.0,10.0,11.0,11.0,1100\n";
+    file1 << "2023-01-04 00:00:00,11.0,13.0,11.0,12.0,12.0,1200\n";
+    file1.close();
+
+    auto make_ts = [](int y, int m, int d) {
+        return std::chrono::time_point_cast<std::chrono::seconds>(
+            std::chrono::sys_days{std::chrono::year{y} / m / d}
+        );
+    };
+
+    Queue<unique_ptr<Event>> events;
+    vector<string> symbols = {symbol1};
+    auto handler_exp = HistoricCSVdataHandler::Create(std::move(events), csv_dir, symbols);
+    assert(handler_exp.has_value());
+    
+    // Portfolio requires unique_ptr to DataHandler
+    auto handler_ptr = std::make_unique<HistoricCSVdataHandler>(std::move(handler_exp.value()));
+    auto* handler_ref = handler_ptr.get();
+
+    Queue<unique_ptr<Event>> port_events;
+    double init_cap = 100000.0;
+    
+    auto port_exp = Portfolio::Create(std::move(handler_ptr), std::move(port_events), make_ts(2023, 1, 1), init_cap);
+    assert(port_exp.has_value());
+    auto portfolio = std::move(port_exp.value());
+
+    // Update timeindex to make bars available
+    handler_ref->update_bars();
+    portfolio.update_timeindex(MarketEvent());
+
+    // --- 1. Test BUY with 0 position ---
+    SignalEvent sig_buy(symbol1, make_ts(2023, 1, 2), EventDirectionType::BUY, 0);
+    auto order_res = portfolio.naive_order(sig_buy);
+    assert(order_res.has_value());
+    assert(order_res.value().symbol() == symbol1);
+    assert(order_res.value().direction() == EventDirectionType::BUY);
+    assert(order_res.value().quantity() == 100);
+    assert(order_res.value().order_type() == OrderEventType::MARKET);
+
+    // --- 2. Test BUY with existing position ---
+    FillEvent valid_buy(make_ts(2023, 1, 2), symbol1, "ARCA", 100, 10.5, EventDirectionType::BUY);
+    portfolio.update_fill(valid_buy);
+    assert(portfolio.current_positions().at(symbol1) == 100);
+
+    SignalEvent sig_buy2(symbol1, make_ts(2023, 1, 3), EventDirectionType::BUY, 0);
+    auto order_res2 = portfolio.naive_order(sig_buy2);
+    // Position exists, naive_order should return unexpected ERR_BAD_INPUT based on the newly added logic
+    assert(!order_res2.has_value());
+    assert(order_res2.error() == TuxedoError::ERR_BAD_INPUT);
+
+    // --- 3. Test EXIT with existing position ---
+    SignalEvent sig_exit(symbol1, make_ts(2023, 1, 3), EventDirectionType::EXIT, 0);
+    auto order_res3 = portfolio.naive_order(sig_exit);
+    assert(order_res3.has_value());
+    assert(order_res3.value().symbol() == symbol1);
+    assert(order_res3.value().direction() == EventDirectionType::EXIT);
+    assert(order_res3.value().quantity() == 100); // Exiting the 100 shares we bought
+
+    // --- 4. Test EXIT with 0 position ---
+    FillEvent valid_sell(make_ts(2023, 1, 3), symbol1, "ARCA", 100, 11.0, EventDirectionType::SELL);
+    portfolio.update_fill(valid_sell);
+    assert(portfolio.current_positions().at(symbol1) == 0); // Position is now 0
+
+    SignalEvent sig_exit2(symbol1, make_ts(2023, 1, 4), EventDirectionType::EXIT, 0);
+    auto order_res4 = portfolio.naive_order(sig_exit2);
+    // Position is 0, nothing to exit. Should return unexpected ERR_BAD_INPUT
+    assert(!order_res4.has_value());
+    assert(order_res4.error() == TuxedoError::ERR_BAD_INPUT);
+
+    // Cleanup
+    std::remove(file_name_1.c_str());
+    std::cout << "[PASSED] test_naive_order" << std::endl;
+}
+
 #endif

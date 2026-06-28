@@ -8,6 +8,6 @@ void test_portfolio_update_timeindex(const char * current_program_path);
 void test_update_holdings_from_fill(const char * current_program_path);
 void test_update_positions_from_fill(const char * current_program_path);
 void test_update_fill(const char * current_program_path);
-
+void test_naive_order(const char * current_program_path); // Portfolio::naive_order
 #endif
 #endif

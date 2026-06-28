@@ -7,6 +7,7 @@
 #include <format>
 
 using namespace std;
+using namespace trading::engine;
 
 namespace trading::engine::portfolio {
     DrawDowns::DrawDowns(const vector<double> values, double max_drawdown_pct, size_t max_drawdown_duration) :
@@ -214,7 +215,7 @@ namespace trading::engine::portfolio {
         if(bars.latest_bar_datetime(fill_event.symbol()).has_value() == false) {
             return TuxedoError::ERR_NO_OBSERVATIONS;
         } 
-        int32_t fill_dir = std::to_underlying(fill_event.fill_direction());
+        int32_t fill_dir = std::to_underlying(fill_event.direction());
         
 #ifdef __DEBUG__        
         double initial_total = current_holdings_.total;
@@ -251,7 +252,7 @@ namespace trading::engine::portfolio {
         if(bars.latest_bar_datetime(fill_event.symbol()).has_value() == false) {
             return TuxedoError::ERR_NO_OBSERVATIONS;
         } 
-        int32_t fill_dir = std::to_underlying(fill_event.fill_direction());
+        int32_t fill_dir = std::to_underlying(fill_event.direction());
         
 #if __DEBUG__
         trace_with_message(std::format("Symbol = {}, Direction = {}, Quantity = {}, Current Position Size = {}", fill_event.symbol(), fill_dir, fill_event.quantity(), current_positions_[fill_event.symbol()]));
@@ -281,4 +282,60 @@ namespace trading::engine::portfolio {
         return update_fill(fill_event);
     }
 
+    expected<OrderEvent, TuxedoError> Portfolio::naive_order(const SignalEvent &  signal_event){ // generate_naive_order(self, signal)
+        /*
+        Simply files an Order object as a constant quantity sizing of the signal object,
+        without risk management or position sizing considerations.
+ 
+        symbol1, make_ts(2023, 1, 3), EventDirectionType::BUY, 0
+        */
+ 
+        if(!current_positions_.contains(signal_event.symbol())) {
+            return unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+        }
+ 
+        auto const & symbol = signal_event.symbol();
+        auto direction = signal_event.direction(); // signal_type in python
+ 
+        auto mkt_quantity = 100;
+        auto cur_quantity = current_positions_[symbol];
+        auto order_type = OrderEventType::MARKET;
+ 
+        trace_with_message(std::format("symbol = {}, cur_quantity = {}, direction = {}", symbol, cur_quantity, to_string(direction)));
+ 
+        switch(signal_event.direction()) {
+            case EventDirectionType::BUY: // LONG 
+            case EventDirectionType::SELL: // or SHORT
+                if(cur_quantity == 0) {
+                    return OrderEvent(symbol, order_type, mkt_quantity, direction);
+                }
+                break;
+ 
+            case EventDirectionType::EXIT:
+                if(cur_quantity > 0) {
+                    return OrderEvent(symbol, order_type, abs(cur_quantity), direction);
+                }
+                break;
+        }
+ 
+        trace_with_message("Returning TuxedoError::ERR_BAD_INPUT");
+        return unexpected(TuxedoError::ERR_BAD_INPUT);
+    }
+
+    expected<OrderEvent, TuxedoError> Portfolio::naive_order(const SignalEvent && signal_event) {
+        return naive_order(signal_event);
+    }
+
+    expected<OrderEvent, TuxedoError> Portfolio::update_signal(const Event        & signal_event) {
+        // switch(signal_event.event_type()) {
+        //     case EventType::SIGNAL:
+
+        // }
+        return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+    }
+
+    expected<OrderEvent, TuxedoError> Portfolio::update_signal(const SignalEvent && signal_event) {
+        const Event & event = signal_event;
+        return update_signal(event);
+    }
 };

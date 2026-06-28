@@ -13,10 +13,10 @@ namespace trading::engine {
     
     // Converted to enum class to prevent scope leaking
     enum class EventType {
-        MARKET,
-        SIGNAL,
-        ORDER,
-        FILL
+        MARKET, // MarketEvent
+        SIGNAL, // SignalEvent
+        ORDER,  // OrderEvent
+        FILL    // FillEvent
     };
     ostream & operator<< (ostream &os, const EventType &event_type);
 
@@ -64,12 +64,14 @@ namespace trading::engine {
     };
     ostream & operator<< (ostream &os, const MarketEventType &market_event_type);
 
-    // Converted to enum class (and removed the 'Emum' typo)
-    enum class SignalEventType {
-        LONG,
-        SHORT
+    enum class EventDirectionType {
+        BUY = 1,
+        EXIT = 0,
+        SELL = -1
     };
-    ostream & operator<< (ostream &os, const SignalEventType &signal_type);
+    
+    std::string_view to_string(EventDirectionType direction);
+    ostream & operator<< (ostream &os, const EventDirectionType &fill_direction);
 
     /* Handles the event of sending a Signal from a Strategy object.
         This is received by a Portfolio object and acted upon.
@@ -79,12 +81,16 @@ namespace trading::engine {
             int32_t strategy_id_; // The unique identifier for the strategy that generated the signal.
             string symbol_; // The ticker symbol, e.g. 'GOOG'
             sys_seconds datetime_; // The timestamp at which the signal was generated.
-            SignalEventType signal_type_; // LONG or SHORT
+            EventDirectionType direction_; // LONG or SHORT
             double strength_; // An adjustment factor "suggestion" used to scale quantity at the portfolio level. Used for pairs strategies.    
         public:
             inline SignalEvent(
-                int32_t strategy_id, string symbol, sys_seconds datetime, SignalEventType signal_type, double strength
-            ): Event(EventType::SIGNAL), strategy_id_(strategy_id), symbol_(symbol), datetime_(datetime), signal_type_(signal_type), strength_(strength) {}  
+                int32_t strategy_id, string symbol, sys_seconds datetime, EventDirectionType direction, double strength
+            ): Event(EventType::SIGNAL), strategy_id_(strategy_id), symbol_(symbol), datetime_(datetime), direction_(direction), strength_(strength) {}  
+
+            inline SignalEvent(
+                string symbol, sys_seconds datetime, EventDirectionType direction, double strength
+            ): Event(EventType::SIGNAL), strategy_id_(0), symbol_(symbol), datetime_(datetime), direction_(direction), strength_(strength) {}  
 
             inline SignalEvent(const SignalEvent&) = default;
             inline SignalEvent(SignalEvent&&) = default;
@@ -94,7 +100,7 @@ namespace trading::engine {
             inline int32_t strategy_id() const { return strategy_id_; }  
             inline const string& symbol() const { return symbol_; }
             inline sys_seconds datetime() const { return datetime_; }
-            inline SignalEventType signal_type() const { return signal_type_; }
+            inline EventDirectionType direction() const { return direction_; }
             inline double strength() const { return strength_; }
 
     };
@@ -105,6 +111,8 @@ namespace trading::engine {
         MARKET,   
         LIMIT
     };
+    
+    std::string_view to_string(OrderEventType order_event_type);
     ostream & operator<< (ostream &os, const OrderEventType &order_type);
 
     /* Handles the event of sending an Order to an execution system.
@@ -116,11 +124,11 @@ namespace trading::engine {
             string symbol_;
             OrderEventType order_type_;
             uint32_t quantity_;
-            int32_t direction_;
+            EventDirectionType direction_;
 
         public:
             OrderEvent(
-                string symbol, OrderEventType order_type, uint32_t quantity, int32_t direction
+                string symbol, OrderEventType order_type, uint32_t quantity, EventDirectionType direction
             ): Event(EventType::ORDER), symbol_(symbol), order_type_(order_type), quantity_(quantity), direction_(direction) {}
 
             inline OrderEvent(const OrderEvent&) = default;
@@ -131,7 +139,7 @@ namespace trading::engine {
             inline const string& symbol() const { return symbol_; }
             inline OrderEventType order_type() const { return order_type_; }
             inline uint32_t quantity() const { return quantity_; }
-            inline int32_t direction() const { return direction_; }
+            inline EventDirectionType direction() const { return direction_; }
     };
     ostream & operator<< (ostream &os, const OrderEvent &signal_event);
 
@@ -140,11 +148,6 @@ namespace trading::engine {
     };
     ostream & operator<< (ostream &os, const FillEventType &fill_type);
 
-    enum class FillEventDirection {
-        BUY = 1,
-        SELL = -1
-    };
-    ostream & operator<< (ostream &os, const FillEventDirection &fill_direction);
     
     /* 
         Encapsulates the notion of a Filled Order, as returned from a brokerage.
@@ -159,19 +162,19 @@ namespace trading::engine {
             uint32_t quantity_;
             uint32_t commission_;
             double fill_cost_;
-            FillEventDirection fill_direction_;
+            EventDirectionType direction_;
 
         protected:
             virtual double calculate_commission();
         public: 
             inline FillEvent(
-                sys_seconds timeindex, string symbol, string exchange, uint32_t quantity, double commission, double fill_cost, FillEventDirection fill_direction
-            ): Event(EventType::FILL), timeindex_(timeindex), symbol_(symbol), exchange_(exchange), quantity_(quantity), commission_(commission), fill_cost_(fill_cost), fill_direction_(fill_direction) {
+                sys_seconds timeindex, string symbol, string exchange, uint32_t quantity, double commission, double fill_cost, EventDirectionType fill_direction
+            ): Event(EventType::FILL), timeindex_(timeindex), symbol_(symbol), exchange_(exchange), quantity_(quantity), commission_(commission), fill_cost_(fill_cost), direction_(fill_direction) {
             }
 
             inline FillEvent(
-                sys_seconds timeindex, string symbol, string exchange, uint32_t quantity, double fill_cost, FillEventDirection fill_direction
-            ): Event(EventType::FILL), timeindex_(timeindex), symbol_(symbol), exchange_(exchange), quantity_(quantity), commission_(0.0), fill_cost_(fill_cost), fill_direction_(fill_direction) {
+                sys_seconds timeindex, string symbol, string exchange, uint32_t quantity, double fill_cost, EventDirectionType fill_direction
+            ): Event(EventType::FILL), timeindex_(timeindex), symbol_(symbol), exchange_(exchange), quantity_(quantity), commission_(0.0), fill_cost_(fill_cost), direction_(fill_direction) {
                 commission_ = calculate_commission();
             }
 
@@ -186,7 +189,7 @@ namespace trading::engine {
             inline uint32_t quantity() const { return quantity_; }
             inline double commission() const { return commission_; }
             inline double fill_cost() const { return fill_cost_; }
-            inline FillEventDirection fill_direction() const { return fill_direction_; }
+            inline EventDirectionType direction() const { return direction_; }
     };
     ostream & operator<< (ostream &os, const FillEvent &fill_event);
     
