@@ -654,4 +654,80 @@ void test_naive_order(const char * current_program_path) {
     std::cout << "[PASSED] test_naive_order" << std::endl;
 }
 
+ 
+void test_update_signal_test(const char * current_program_path) {
+    std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
+    std::string csv_dir = exe_path.string();   
+    std::string symbol1 = "TEST_PORT_A";
+ 
+    std::string file_name_1 = csv_dir + '/' + symbol1 + ".csv";
+ 
+    std::ofstream file1(file_name_1);
+    file1 << "Date,Open,High,Low,Close,Adj Close,Volume\n";
+    file1 << "2023-01-02 00:00:00,10.0,11.0,9.0,10.5,10.5,1000\n";
+    file1 << "2023-01-03 00:00:00,10.5,12.0,10.0,11.0,11.0,1100\n";
+    file1 << "2023-01-04 00:00:00,11.0,13.0,11.0,12.0,12.0,1200\n";
+    file1.close();
+ 
+    auto make_ts = [](int y, int m, int d) {
+        return std::chrono::time_point_cast<std::chrono::seconds>(
+            std::chrono::sys_days{std::chrono::year{y} / m / d}
+        );
+    };
+ 
+    Queue<unique_ptr<Event>> events;
+    vector<string> symbols = {symbol1};
+    auto handler_exp = HistoricCSVdataHandler::Create(std::move(events), csv_dir, symbols);
+    assert(handler_exp.has_value());
+ 
+    // Portfolio requires unique_ptr to DataHandler
+    auto handler_ptr = std::make_unique<HistoricCSVdataHandler>(std::move(handler_exp.value()));
+    auto* handler_ref = handler_ptr.get();
+ 
+    Queue<unique_ptr<Event>> port_events;
+    double init_cap = 100000.0;
+ 
+    auto port_exp = Portfolio::Create(std::move(handler_ptr), std::move(port_events), make_ts(2023, 1, 1), init_cap);
+    assert(port_exp.has_value());
+    auto portfolio = std::move(port_exp.value());
+ 
+    // Update timeindex to make bars available, mirroring test_naive_order's setup
+    handler_ref->update_bars();
+    portfolio.update_timeindex(MarketEvent());
+ 
+    // Snapshot state before exercising update_signal, so we can confirm the
+    // (currently stubbed) implementation has no side effects on the Portfolio.
+    auto positions_before = portfolio.current_positions();
+    auto holdings_before = portfolio.current_holdings();
+ 
+    // --- 1. Call update_signal(const SignalEvent &&) via a temporary rvalue ---
+    // A temporary SignalEvent is an exact-type rvalue, so overload resolution
+    // selects `update_signal(const SignalEvent &&)` over the base-class
+    // `update_signal(const Event &)` overload (identity match beats the
+    // derived-to-base conversion needed for the latter). That rvalue overload
+    // upcasts to `const Event &` and delegates to the base overload, whose
+    // SIGNAL-handling switch is currently commented out in the implementation,
+    // so today it always surfaces as ERR_NOT_IMPLEMENTED rather than producing
+    // an OrderEvent. This test documents/locks in that current behavior.
+    auto signal_res = portfolio.update_signal(SignalEvent(symbol1, make_ts(2023, 1, 2), EventDirectionType::BUY, 0));
+    assert(!signal_res.has_value());
+    assert(signal_res.error() == TuxedoError::ERR_NOT_IMPLEMENTED);
+ 
+    // --- 2. Same overload, reached via std::move on a named lvalue ---
+    // (the more common real-world call pattern than a bare temporary)
+    SignalEvent sig_exit(symbol1, make_ts(2023, 1, 3), EventDirectionType::EXIT, 0);
+    auto signal_res2 = portfolio.update_signal(std::move(sig_exit));
+    assert(!signal_res2.has_value());
+    assert(signal_res2.error() == TuxedoError::ERR_NOT_IMPLEMENTED);
+ 
+    // --- 3. Confirm the stubbed implementation didn't mutate Portfolio state ---
+    assert(portfolio.current_positions() == positions_before);
+    assert(portfolio.current_holdings().cash == holdings_before.cash);
+    assert(portfolio.current_holdings().commission == holdings_before.commission);
+    assert(portfolio.current_holdings().total == holdings_before.total);
+ 
+    // Cleanup
+    std::remove(file_name_1.c_str());
+    std::cout << "[PASSED] test_update_signal_test" << std::endl;
+}
 #endif

@@ -90,6 +90,7 @@ int main(int argc, char* argv[]) {
     test_update_positions_from_fill(argv[0]);
     test_update_fill(argv[0]);
     test_naive_order(argv[0]);
+    test_update_signal_test(argv[0]);
     return 0;
 }
 #endif
