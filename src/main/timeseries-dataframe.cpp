@@ -113,8 +113,7 @@ namespace timeseries::dataframe {
         return DataFrame(rows, expected_cols - 1, std::move(data), std::move(column_name_to_column_index_), std::move(timestamp_to_row_index_), std::move(timestamps_), std::move(timestamps_vector_));
     }
 
-
-    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer) const {
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer, double_accumulator accumulator) const {
         // 2. source_columns and target_columns must have the same size
         if (source_columns.size() != target_columns.size()) {
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
@@ -149,12 +148,16 @@ namespace timeseries::dataframe {
         // 3. source_column[i] copied to target_column[i] for every row
         std::vector<double> new_data;
         new_data.reserve(new_rows * new_cols);
+        double accumulated = 0;
+        double current = 0;
 
         for (size_t r = 0; r < new_rows; ++r) {
             for (size_t c = 0; c < new_cols; ++c) {
-                // Extract from the flat 1D array using the cached source indices
+                // Extract from the flat 1D array using the cached source indices                        
                 size_t original_index = r * this->cols() + source_indices[c];
-                new_data.push_back(transformer(this->data_[original_index]));
+                current = transformer(this->data_[original_index]);
+                accumulated = accumulator(accumulated, current);
+                new_data.push_back(accumulated); 
             }
         }
 
@@ -173,6 +176,10 @@ namespace timeseries::dataframe {
             std::move(new_timestamps),
             std::move(new_timestamps_vector)
         );       
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer) const {
+        return copy(source_columns, target_columns, transformer, [](double a, double v) {return v;});
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns) const {
