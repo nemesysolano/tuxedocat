@@ -367,7 +367,86 @@ void test_dataframe_create_from_column_name() {
     assert(success);
 }
 
-void copy_column_test() {
+void test_dataframe_copy_transform() {
+    // 1. Prepare sample data
+    std::string csv_data = 
+        "Date,A,B\n"
+        "2023-01-01 00:00:00,10.0,20.0\n"
+        "2023-01-02 00:00:00,30.0,40.0\n";
+    
+    std::istringstream stream(csv_data);
+    auto df_res = DataFrame::Create(stream, ',');
+    assert(df_res.has_value());
+    const auto& original_df = df_res.value();
+
+    // Define two different transformers
+    auto double_transformer = [](double val) -> double { return val * 2.0; };
+    auto offset_transformer = [](double val) -> double { return val + 5.0; };
+
+    std::vector<std::string> source_cols = {"A", "B"};
+    std::vector<std::string> target_cols = {"A_transformed", "B_transformed"};
+
+    // ----------------------------------------------------
+    // Test 1: Using the double_transformer
+    // ----------------------------------------------------
+    auto copy_res1 = original_df.copy(source_cols, target_cols, double_transformer);
+    bool test1_success = copy_res1.has_value();
+    assert(test1_success);
+    
+    if (test1_success) {
+        const auto& df_transformed1 = copy_res1.value();
+        
+        // Assert structure matches
+        assert(df_transformed1.rows() == 2);
+        assert(df_transformed1.cols() == 2);
+
+        // Verify transformed values (10*2=20, 20*2=40, etc.)
+        auto val_a1 = df_transformed1[0, 0]; // A_transformed at row 0
+        auto val_b1 = df_transformed1[0, 1]; // B_transformed at row 0
+        auto val_a2 = df_transformed1[1, 0]; // A_transformed at row 1
+        auto val_b2 = df_transformed1[1, 1]; // B_transformed at row 1
+
+        assert(val_a1.has_value() && std::abs(val_a1.value() - 20.0) < 1e-9);
+        assert(val_b1.has_value() && std::abs(val_b1.value() - 40.0) < 1e-9);
+        assert(val_a2.has_value() && std::abs(val_a2.value() - 60.0) < 1e-9);
+        assert(val_b2.has_value() && std::abs(val_b2.value() - 80.0) < 1e-9);
+    }
+
+    // ----------------------------------------------------
+    // Test 2: Using the offset_transformer
+    // ----------------------------------------------------
+    auto copy_res2 = original_df.copy(source_cols, target_cols, offset_transformer);
+    bool test2_success = copy_res2.has_value();
+    assert(test2_success);
+    
+    if (test2_success) {
+        const auto& df_transformed2 = copy_res2.value();
+        
+        // Verify transformed values (10+5=15, 20+5=25, etc.)
+        auto val_a1 = df_transformed2[0, 0];
+        auto val_b1 = df_transformed2[0, 1];
+        auto val_a2 = df_transformed2[1, 0];
+        auto val_b2 = df_transformed2[1, 1];
+
+        assert(val_a1.has_value() && std::abs(val_a1.value() - 15.0) < 1e-9);
+        assert(val_b1.has_value() && std::abs(val_b1.value() - 25.0) < 1e-9);
+        assert(val_a2.has_value() && std::abs(val_a2.value() - 35.0) < 1e-9);
+        assert(val_b2.has_value() && std::abs(val_b2.value() - 45.0) < 1e-9);
+    }
+
+    // ----------------------------------------------------
+    // Test 3: Error Bounds check (Negative test case)
+    // ----------------------------------------------------
+    std::vector<std::string> invalid_source_cols = {"A", "NonExistentColumn"};
+    auto copy_err_res = original_df.copy(invalid_source_cols, target_cols, double_transformer);
+    
+    // It should fail because "NonExistentColumn" does not exist in original_df
+    assert(!copy_err_res.has_value());
+
+    print_status("test_dataframe_copy_transform", test1_success && test2_success && !copy_err_res.has_value());
+}
+
+void test_dataframe_copy() {
     // 1. Setup a test dataframe with multiple columns
     std::string csv = "Date,A,B,C\n2023-01-01 10:00:00,1.0,2.0,3.0\n2023-01-01 11:00:00,4.0,5.0,6.0";
     std::istringstream iss(csv);
@@ -425,7 +504,7 @@ void copy_column_test() {
     auto res_dup = df.copy(std::vector<std::string>{"A", "B"}, std::vector<std::string>{"Dup", "Dup"});
     success = success && !res_dup.has_value();
 
-    print_status("copy_column_test", success);
+    print_status("test_dataframe_copy", success);
     assert(success);
 }
 

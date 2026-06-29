@@ -151,12 +151,15 @@ namespace trading::engine::portfolio {
 
             static expected<Portfolio, TuxedoError> Create(unique_ptr<DataHandler> bars, Queue<unique_ptr<Event>> events, sys_seconds start_date, double initial_capital);
     };
-
+    
     vector<Position> create_all_positions(const vector<string> & symbol_list_, sys_seconds start_date);
     vector<Holding> create_all_holdings(const vector<string> & symbol_list_, sys_seconds start_date, double initial_capital);
     Holding create_current_holdings(const vector<string> & symbol_list, double initial_capital);
     expected<double, TuxedoError> create_sharpe_ratio(const slice::Span2D & returns, size_t column_index, size_t periods) ;
-    
+
+    expected<string, TuxedoError> create_equity_curve_csv(const vector<Holding>  & all_holdings);
+    expected<DataFrame, TuxedoError> create_equity_curve_dataframe(const vector<Holding>  & all_holdings);
+    expected<DataFrame, TuxedoError> create_equity_curve_dataframe(const vector<Holding> && all_holdings);    
 };
 
 #endif

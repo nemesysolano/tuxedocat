@@ -10,5 +10,6 @@ void test_update_positions_from_fill(const char * current_program_path);
 void test_update_fill(const char * current_program_path);
 void test_naive_order(const char * current_program_path); // Portfolio::naive_order
 void test_update_signal_test(const char * current_program_path); //Portfolio::update_signal
+void test_create_equity_curve_csv();
 #endif
 #endif

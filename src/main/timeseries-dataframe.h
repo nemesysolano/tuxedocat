@@ -21,6 +21,8 @@
 #include <vector>
 
 namespace timeseries::dataframe {
+    typedef double (double_transformer)(double);
+    
     class DataFrame: public slice::Span2D {
         private:
             std::vector<double> data_;
@@ -82,6 +84,8 @@ namespace timeseries::dataframe {
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input, char field_delimiter);
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input);
             static std::expected<DataFrame, TuxedoError> Create(const std::string & file_path);
+
+            std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer) const;
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns) const;
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> && target_columns) const;
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> && source_columns, const std::vector<std::string> & target_columns) const;
@@ -97,6 +101,11 @@ namespace timeseries::dataframe {
 
             std::expected<DataFrame, TuxedoError> shift(int count, double filler);
             std::expected<DataFrame, TuxedoError> shift(int count);
+
+            std::expected<DataFrame, TuxedoError> accumulate(std::string & source_column, std::string & target_column, double_transformer transformer);
+            std::expected<DataFrame, TuxedoError> accumulate(std::string && source_column, std::string & target_column, double_transformer transformer);
+            std::expected<DataFrame, TuxedoError> accumulate(std::string & source_column, std::string && target_column, double_transformer transformer);
+            std::expected<DataFrame, TuxedoError> accumulate(std::string && source_column, std::string && target_column, double_transformer transformer);
 
             std::expected<DataFrame, TuxedoError> pct_change(size_t count);            
             inline std::expected<DataFrame, TuxedoError> pct_change() { return pct_change(1);}

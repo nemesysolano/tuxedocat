@@ -730,4 +730,111 @@ void test_update_signal_test(const char * current_program_path) {
     std::remove(file_name_1.c_str());
     std::cout << "[PASSED] test_update_signal_test" << std::endl;
 }
+
+
+void test_create_equity_curve_csv() {
+    auto make_ts = [](int y, int m, int d) {
+        return std::chrono::time_point_cast<std::chrono::seconds>(
+            std::chrono::sys_days{std::chrono::year{y} / m / d}
+        );
+    };
+ 
+    // Splits CSV text on the project's canonical row separator (slice::NEW_LINE)
+    // rather than a hardcoded "\n", so this test stays correct if that
+    // definition ever changes.
+    auto split_lines = [](const string & text) {
+        vector<string> lines;
+        size_t pos = 0;
+        while (true) {
+            size_t next = text.find(slice::NEW_LINE, pos);
+            if (next == string::npos) {
+                if (pos < text.size()) {
+                    lines.push_back(text.substr(pos));
+                }
+                break;
+            }
+            lines.push_back(text.substr(pos, next - pos));
+            pos = next + slice::NEW_LINE.size();
+        }
+        return lines;
+    };
+ 
+    // --- 1. WRONG PATH: Empty holdings vector ---
+    // Nothing to report on, so the function should fail gracefully rather
+    // than emit a header-only (or completely empty) CSV.
+    vector<Holding> empty_holdings;
+    auto empty_result = create_equity_curve_csv(empty_holdings);
+    assert(!empty_result.has_value());
+    assert(empty_result.error() == TuxedoError::ERR_NO_OBSERVATIONS);
+ 
+    // --- 2. HAPPY PATH: Two holdings, two tracked symbols ---
+    // map<string, double> orders keys lexicographically ("AAPL" < "MSFT"),
+    // so both the header and each row are expected in that column order.
+    Holding h1 {
+        .balances = {{"AAPL", 10.0}, {"MSFT", 5.0}},
+        .datetime = make_ts(2023, 1, 2),
+        .cash = 99000.0,
+        .commission = 10.0,
+        .total = 99015.0
+    };
+    Holding h2 {
+        .balances = {{"AAPL", 12.0}, {"MSFT", 5.0}},
+        .datetime = make_ts(2023, 1, 3),
+        .cash = 98000.0,
+        .commission = 15.0,
+        .total = 99012.0
+    };
+    vector<Holding> holdings = {h1, h2};
+ 
+    auto csv_result = create_equity_curve_csv(holdings);
+    assert(csv_result.has_value());
+ 
+    auto lines = split_lines(csv_result.value());
+    assert(lines.size() == 3); // header + 2 data rows
+    assert(lines[0] == "datetime,AAPL,MSFT,cash,commission,total");
+    assert(lines[1] == "2023-01-02 00:00:00,10,5,99000,10,99015");
+    assert(lines[2] == "2023-01-03 00:00:00,12,5,98000,15,99012");
+ 
+    // --- 3. EDGE CASE: Holding with no tracked symbols (cash-only account) ---
+    // balances can legitimately be empty; the CSV should degrade gracefully
+    // to just datetime/cash/commission/total, with no dangling commas.
+    Holding cash_only {
+        .balances = {},
+        .datetime = make_ts(2023, 1, 4),
+        .cash = 50000.0,
+        .commission = 0.0,
+        .total = 50000.0
+    };
+    vector<Holding> cash_only_holdings = {cash_only};
+    auto cash_only_result = create_equity_curve_csv(cash_only_holdings);
+    assert(cash_only_result.has_value());
+ 
+    auto cash_only_lines = split_lines(cash_only_result.value());
+    assert(cash_only_lines.size() == 2);
+    assert(cash_only_lines[0] == "datetime,cash,commission,total");
+    assert(cash_only_lines[1] == "2023-01-04 00:00:00,50000,0,50000");
+ 
+    // --- 4. KNOWN LIMITATION: default stream precision (6 significant digits) ---
+    // create_equity_curve_csv never sets an explicit precision, so fractional
+    // cents beyond 6 significant digits are silently rounded in the output.
+    // This test documents today's behavior rather than asserting it's correct;
+    // if exact round-tripping of cents matters, consider applying
+    // std::setprecision(std::numeric_limits<double>::max_digits10) (or similar)
+    // to the stream before writing values.
+    Holding fractional {
+        .balances = {},
+        .datetime = make_ts(2023, 1, 5),
+        .cash = 1234.567891,
+        .commission = 0.0,
+        .total = 1234.567891
+    };
+    vector<Holding> fractional_holdings = {fractional};
+    auto fractional_result = create_equity_curve_csv(fractional_holdings);
+    assert(fractional_result.has_value());
+    // 1234.567891 rounded to 6 significant digits -> "1234.57"
+    assert(fractional_result.value().find("1234.57") != string::npos);
+    assert(fractional_result.value().find("1234.567891") == string::npos);
+ 
+    std::cout << "[PASSED] test_create_equity_curve_csv" << std::endl;
+}
 #endif

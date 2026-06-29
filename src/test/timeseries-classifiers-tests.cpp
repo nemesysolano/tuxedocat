@@ -37,7 +37,7 @@ void regression_test_impl(
 void regression_test(const char * current_program_path) {
     /* Creates momentum (X) and direction dataframes (Y) */
     std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
-    std::string file_path = (exe_path / "SPMO.csv").string();    
+    std::string file_path = (exe_path / ".." / "toolchain" / "test-data" / "SPMO.csv").string();    
     auto input_stream = ifstream(file_path);    
     assert(input_stream.is_open());
 

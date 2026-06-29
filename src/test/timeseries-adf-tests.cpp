@@ -352,7 +352,7 @@ void column_span_test() {
 
 void augmented_dickey_fuller_cointegration_test(const char * current_program_path) {
     std::cout << "Running augmented_dickey_fuller_cointegration_test... " << std::endl;
-    std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
+    std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path() / ".." / "toolchain" / "test-data";
     std::string file_1_path = (exe_path / "bdx.csv").string();
     std::string file_2_path = (exe_path / "nvo.csv").string();
     

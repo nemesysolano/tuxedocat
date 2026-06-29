@@ -18,6 +18,9 @@
 // std::ostream & operator << (std::ostream & out, const std::span<const double> & v);
 
 namespace slice {  
+    extern const std::string NEW_LINE;
+    extern const std::string TIMESTAMP_FORMATTER;
+    
     class Span2D {
         protected:
             size_t rows_;

@@ -5,13 +5,19 @@
 #include <format>
 #include "timeseries-log.h"
 #include <format>
+#include <ranges>
+#include <iostream>
+#include <format>
+#include "timeseries-dataframe.h"
+#include <sstream>
 
 using namespace std;
 using namespace trading::engine;
+using namespace slice;
+using namespace timeseries::dataframe;
 
 namespace trading::engine::portfolio {
-    DrawDowns::DrawDowns(const vector<double> values, double max_drawdown_pct, size_t max_drawdown_duration) :
-        values_(values), max_drawdown_pct_(max_drawdown_pct), max_drawdown_duration_(max_drawdown_duration) {}
+    DrawDowns::DrawDowns(const vector<double> values, double max_drawdown_pct, size_t max_drawdown_duration) : values_(values), max_drawdown_pct_(max_drawdown_pct), max_drawdown_duration_(max_drawdown_duration) {}
     DrawDowns::DrawDowns(const DrawDowns & source) : values_(source.values_), max_drawdown_pct_(source.max_drawdown_pct_), max_drawdown_duration_(source.max_drawdown_duration_) {}
     DrawDowns::DrawDowns(DrawDowns && source) noexcept : values_(std::move(source.values_)), max_drawdown_pct_(source.max_drawdown_pct_), max_drawdown_duration_(source.max_drawdown_duration_) {}
     DrawDowns & DrawDowns::operator=(const DrawDowns & source) {
@@ -337,5 +343,60 @@ namespace trading::engine::portfolio {
     expected<OrderEvent, TuxedoError> Portfolio::update_signal(const SignalEvent && signal_event) {
         const Event & event = signal_event;
         return update_signal(event);
+    }
+
+    expected<string, TuxedoError> create_equity_curve_csv(const vector<Holding>  & all_holdings) {
+        if(all_holdings.empty()) {
+            return unexpected(TuxedoError::ERR_NO_OBSERVATIONS);
+        }
+
+        stringstream output;
+        
+        // Header
+        output << "datetime" << ',';
+        const Holding & first_holding = all_holdings.front();
+        for(const string & key : std::views::keys(first_holding.balances)) {
+            output << key << ',';
+        }
+        output << "cash" << ',' << "commission" << ',' << "total" << slice::NEW_LINE;
+
+        for(size_t row_index = 0; row_index < all_holdings.size(); row_index ++) { 
+            const Holding & holding = all_holdings.at(row_index);
+            const auto & balances = holding.balances;
+            
+            // Date
+            output << std::format("{:%Y-%m-%d %H:%M:%S}", holding.datetime) << ',';
+            // balances 
+            for(const string & key : std::views::keys(balances)) {
+                output << balances.at(key) << ',';
+            }            
+             // cash, commission and total
+             output << holding.cash << ',' << holding.commission << ',' << holding.total << slice::NEW_LINE;
+        }
+
+        return std::move(output).str();
+    }
+
+    expected<DataFrame, TuxedoError> create_equity_curve_dataframe(const vector<Holding>  & all_holdings) {        
+        auto equity_curve_csv_result = create_equity_curve_csv(all_holdings);
+        if(!equity_curve_csv_result.has_value()) {
+            return unexpected(equity_curve_csv_result.error());
+        }
+        
+        const string & equity_curve_csv = equity_curve_csv_result.value();
+        istringstream input(equity_curve_csv); 
+        
+        auto dataframe_result = DataFrame::Create(input, ',');
+        if(!dataframe_result.has_value()) {
+            return unexpected(dataframe_result.error());
+        }
+        
+        DataFrame dataframe = std::move(dataframe_result.value());
+
+        return std::move(dataframe);
+    }
+
+    expected<DataFrame, TuxedoError> create_equity_curve_dataframe(const vector<Holding> && all_holdings) {
+        return create_equity_curve_dataframe(all_holdings);
     }
 };

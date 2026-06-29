@@ -113,7 +113,8 @@ namespace timeseries::dataframe {
         return DataFrame(rows, expected_cols - 1, std::move(data), std::move(column_name_to_column_index_), std::move(timestamp_to_row_index_), std::move(timestamps_), std::move(timestamps_vector_));
     }
 
-    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns) const {
+
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer) const {
         // 2. source_columns and target_columns must have the same size
         if (source_columns.size() != target_columns.size()) {
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
@@ -153,7 +154,7 @@ namespace timeseries::dataframe {
             for (size_t c = 0; c < new_cols; ++c) {
                 // Extract from the flat 1D array using the cached source indices
                 size_t original_index = r * this->cols() + source_indices[c];
-                new_data.push_back(this->data_[original_index]);
+                new_data.push_back(transformer(this->data_[original_index]));
             }
         }
 
@@ -171,7 +172,11 @@ namespace timeseries::dataframe {
             std::move(new_row_map), 
             std::move(new_timestamps),
             std::move(new_timestamps_vector)
-        );
+        );       
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns) const {
+        return this->copy(source_columns, target_columns, [](double v){return v;}) ;
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> && target_columns) const {

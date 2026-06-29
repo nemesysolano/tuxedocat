@@ -19,7 +19,14 @@ std::ostream & operator << (std::ostream & out, const std::span<const double> & 
 }
 
 namespace slice {
-MutableSlice2D operator - (const Span2D & self, const Span2D & other){
+#if defined(_WIN32) || defined(_WIN64)
+    const std::string NEW_LINE("\r\n");
+#else
+    const std::string NEW_LINE("\n");
+#endif    
+    extern const std::string TIMESTAMP_FORMATTER("%Y-%m-%d %H:%M:%S");
+
+    MutableSlice2D operator - (const Span2D & self, const Span2D & other){
         auto min_cols = std::min(self.cols(), other.cols());
         auto min_rows = std::min(self.rows(), other.rows());
         MutableSlice2D result(min_rows, min_cols);
@@ -204,7 +211,7 @@ MutableSlice2D operator - (const Span2D & self, const Span2D & other){
 
     }
 
-std::expected<std::reference_wrapper<MutableSlice2D>, TuxedoError> MutableSlice2D::operator += (const Span2D & other) {
+    std::expected<std::reference_wrapper<MutableSlice2D>, TuxedoError> MutableSlice2D::operator += (const Span2D & other) {
         // 1. Strict Dimension Validation
         if (this->rows() != other.rows() || this->cols() != other.cols()) {
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);

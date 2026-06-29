@@ -58,13 +58,15 @@ int main(int argc, char* argv[]) {
     test_dataframe_access_by_string_timestamp_invalid_format() ;
     test_dataframe_access_string_combinations_valid();
     test_dataframe_access_string_invalid_column();
+    test_dataframe_copy_transform();
+    test_dataframe_copy();
     common_timestamps_test();
     ols_flat_tests();
     test_dataframe_create_from_column_index();
     test_dataframe_create_from_column_name();
     test_dataframe_reindex();
     augmented_dickey_fuller_cointegration_test(argv[0]);
-    copy_column_test();
+    test_dataframe_copy();
     shift_test();
     pct_change_test();
     append_column_test();    
@@ -91,6 +93,7 @@ int main(int argc, char* argv[]) {
     test_update_fill(argv[0]);
     test_naive_order(argv[0]);
     test_update_signal_test(argv[0]);
+    test_create_equity_curve_csv();
     return 0;
 }
 #endif
