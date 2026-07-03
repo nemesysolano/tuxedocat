@@ -1131,7 +1131,84 @@ void test_cumsum() {
 }
 
 void test_cumprod() {
-    
+    // 1. Setup mock data matching the scale of test_cumsum
+    std::string csv_data =
+        "Date,A,B\n"
+        "2023-01-01 00:00:00,10.0,20.0\n"
+        "2023-01-02 00:00:00,5.0,25.0\n"
+        "2023-01-03 00:00:00,15.0,15.0\n"
+        "2023-01-04 00:00:00,12.0,30.0\n";
+ 
+    std::istringstream stream(csv_data);
+    auto df_res = DataFrame::Create(stream, ',');
+    assert(df_res.has_value());
+    DataFrame & df = df_res.value();
+ 
+    // 2. Test Path A: Single-Column Cumulative Product
+    // Accumulation logic for column A:
+    // Row 0: 10.0
+    // Row 1: 10.0 * 5.0 = 50.0
+    // Row 2: 50.0 * 15.0 = 750.0
+    // Row 3: 750.0 * 12.0 = 9000.0
+    vector<std::string> single_source = {"A"};
+    vector<std::string> single_target = {"A_cumprod"};
+    auto cumprod_res = df.cumprod(single_source, single_target);
+    assert(cumprod_res.has_value());
+    DataFrame & cumprod_df = cumprod_res.value();
+ 
+    auto col_idx_opt = cumprod_df.column_index("A_cumprod");
+    assert(col_idx_opt.has_value());
+    size_t col_idx = col_idx_opt.value();
+ 
+    assert(std::abs(cumprod_df[0, col_idx].value() - 10.0) < 1e-6);
+    assert(std::abs(cumprod_df[1, col_idx].value() - 50.0) < 1e-6);
+    assert(std::abs(cumprod_df[2, col_idx].value() - 750.0) < 1e-6);
+    assert(std::abs(cumprod_df[3, col_idx].value() - 9000.0) < 1e-6);
+ 
+    // 3. Test Path B: Multi-Column Cumulative Product
+    // Accumulation logic for column B:
+    // Row 0: 20.0
+    // Row 1: 20.0 * 25.0 = 500.0
+    // Row 2: 500.0 * 15.0 = 7500.0
+    // Row 3: 7500.0 * 30.0 = 225000.0
+    std::vector<std::string> sources = {"A", "B"};
+    std::vector<std::string> targets = {"A_cumprod_multi", "B_cumprod_multi"};
+    auto cumprod_multi_res = df.cumprod(sources, targets);
+    assert(cumprod_multi_res.has_value());
+    auto& cumprod_multi_df = cumprod_multi_res.value();
+ 
+    auto col_a_multi_opt = cumprod_multi_df.column_index("A_cumprod_multi");
+    auto col_b_multi_opt = cumprod_multi_df.column_index("B_cumprod_multi");
+    assert(col_a_multi_opt.has_value());
+    assert(col_b_multi_opt.has_value());
+ 
+    size_t col_a_idx = col_a_multi_opt.value();
+    size_t col_b_idx = col_b_multi_opt.value();
+ 
+    // Verify column A multi-cumprod
+    assert(std::abs(cumprod_multi_df[0, col_a_idx].value() - 10.0) < 1e-6);
+    assert(std::abs(cumprod_multi_df[1, col_a_idx].value() - 50.0) < 1e-6);
+    assert(std::abs(cumprod_multi_df[2, col_a_idx].value() - 750.0) < 1e-6);
+    assert(std::abs(cumprod_multi_df[3, col_a_idx].value() - 9000.0) < 1e-6);
+ 
+    // Verify column B multi-cumprod
+    assert(std::abs(cumprod_multi_df[0, col_b_idx].value() - 20.0) < 1e-6);
+    assert(std::abs(cumprod_multi_df[1, col_b_idx].value() - 500.0) < 1e-6);
+    assert(std::abs(cumprod_multi_df[2, col_b_idx].value() - 7500.0) < 1e-6);
+    assert(std::abs(cumprod_multi_df[3, col_b_idx].value() - 225000.0) < 1e-6);
+ 
+    // 4. Test Path C: Mismatched target parameter lengths (Failure path)
+    std::vector<std::string> bad_targets2 = {"A_cumprod_multi", "B_cumprod_multi", "C_cumprod_multi"};
+    auto bad_res = df.cumprod(sources, bad_targets2);
+    assert(!bad_res.has_value());
+ 
+    // 5. Test Path D: Non-existent source column name (Failure path)
+    std::vector<std::string> bad_sources = {"NON_EXISTENT_COLUMN"};
+    std::vector<std::string> bad_targets = {"target"};
+    auto bad_col_res = df.cumprod(bad_sources, bad_targets);
+    assert(!bad_col_res.has_value());
+ 
+    print_status("test_cumprod", true);
 }
 
 #endif
