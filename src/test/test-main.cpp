@@ -62,6 +62,8 @@ int main(int argc, char* argv[]) {
     test_dataframe_copy_transform();
     test_cummax();
     test_cummin();
+    test_cumsum();
+    test_cumprod();
     test_dataframe_copy();
     common_timestamps_test();
     ols_flat_tests();

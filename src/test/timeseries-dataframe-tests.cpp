@@ -1046,4 +1046,92 @@ void test_cummin() {
  
     print_status("test_cummin", test1_success && test2_success && !cummin_err_res.has_value());
 }
+
+void test_cumsum() {
+    // 1. Setup mock data matching the scale of test_cummax/test_cummin
+    std::string csv_data =
+        "Date,A,B\n"
+        "2023-01-01 00:00:00,10.0,20.0\n"
+        "2023-01-02 00:00:00,5.0,25.0\n"
+        "2023-01-03 00:00:00,15.0,15.0\n"
+        "2023-01-04 00:00:00,12.0,30.0\n";
+
+    std::istringstream stream(csv_data);
+    auto df_res = DataFrame::Create(stream, ',');
+    assert(df_res.has_value());
+    DataFrame & df = df_res.value();
+
+    // 2. Test Path A: Single-Column Cumulative Sum
+    // Accumulation logic for column A:
+    // Row 0: 10.0
+    // Row 1: 10.0 + 5.0 = 15.0
+    // Row 2: 15.0 + 15.0 = 30.0
+    // Row 3: 30.0 + 12.0 = 42.0
+    vector<std::string> single_source = {"A"};
+    vector<std::string> single_target = {"A_cumsum"};
+    auto cumsum_res = df.cumsum(single_source, single_target);
+    assert(cumsum_res.has_value());
+    DataFrame & cumsum_df = cumsum_res.value();
+
+    cout << df << endl;
+    cout << cumsum_df << endl;
+    auto col_idx_opt = cumsum_df.column_index("A_cumsum");
+    assert(col_idx_opt.has_value());
+    size_t col_idx = col_idx_opt.value();
+
+    assert(std::abs(cumsum_df[0, col_idx].value() - 10.0) < 1e-6);
+    assert(std::abs(cumsum_df[1, col_idx].value() - 15.0) < 1e-6);
+    assert(std::abs(cumsum_df[2, col_idx].value() - 30.0) < 1e-6);
+    assert(std::abs(cumsum_df[3, col_idx].value() - 42.0) < 1e-6);
+
+    // 3. Test Path B: Multi-Column Cumulative Sum
+    // Accumulation logic for column B:
+    // Row 0: 20.0
+    // Row 1: 20.0 + 25.0 = 45.0
+    // Row 2: 45.0 + 15.0 = 60.0
+    // Row 3: 60.0 + 30.0 = 90.0
+    std::vector<std::string> sources = {"A", "B"};
+    std::vector<std::string> targets = {"A_cumsum_multi", "B_cumsum_multi"};
+    auto cumsum_multi_res = df.cumsum(sources, targets);
+    assert(cumsum_multi_res.has_value());
+    auto& cumsum_multi_df = cumsum_multi_res.value();
+
+    auto col_a_multi_opt = cumsum_multi_df.column_index("A_cumsum_multi");
+    auto col_b_multi_opt = cumsum_multi_df.column_index("B_cumsum_multi");
+    assert(col_a_multi_opt.has_value());
+    assert(col_b_multi_opt.has_value());
+
+    size_t col_a_idx = col_a_multi_opt.value();
+    size_t col_b_idx = col_b_multi_opt.value();
+
+    // Verify column A multi-cumsum
+    assert(std::abs(cumsum_multi_df[0, col_a_idx].value() - 10.0) < 1e-6);
+    assert(std::abs(cumsum_multi_df[1, col_a_idx].value() - 15.0) < 1e-6);
+    assert(std::abs(cumsum_multi_df[2, col_a_idx].value() - 30.0) < 1e-6);
+    assert(std::abs(cumsum_multi_df[3, col_a_idx].value() - 42.0) < 1e-6);
+
+    // Verify column B multi-cumsum
+    assert(std::abs(cumsum_multi_df[0, col_b_idx].value() - 20.0) < 1e-6);
+    assert(std::abs(cumsum_multi_df[1, col_b_idx].value() - 45.0) < 1e-6);
+    assert(std::abs(cumsum_multi_df[2, col_b_idx].value() - 60.0) < 1e-6);
+    assert(std::abs(cumsum_multi_df[3, col_b_idx].value() - 90.0) < 1e-6);
+
+    // 4. Test Path C: Mismatched target parameter lengths (Failure path)
+    std::vector<std::string> bad_targets2 = {"A_cumsum_multi", "B_cumsum_multi", "C_cumsum_multi"};
+    auto bad_res = df.cumsum(sources, bad_targets2);
+    assert(!bad_res.has_value());
+
+    // 5. Test Path D: Non-existent source column name (Failure path)
+    std::vector<std::string> bad_sources = {"NON_EXISTENT_COLUMN"};
+    std::vector<std::string> bad_targets = {"target"};
+    auto bad_col_res = df.cumsum(bad_sources, bad_targets);
+    assert(!bad_col_res.has_value());
+
+    print_status("test_cumsum", true);
+}
+
+void test_cumprod() {
+    
+}
+
 #endif

@@ -261,11 +261,19 @@ namespace timeseries::dataframe {
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::cummax(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column, double_transformer transformer) const {
-        return this->copy(source_column, target_column, transformer, [](std::span<double> row, size_t column_index, double x) { 
-            if(!std::isnan(x) && (std::isnan(row[column_index]) || x > row[column_index])) {
+        vector<double> accumulated(source_column.size(), std::numeric_limits<double>::min());
+
+        return this->copy(
+            source_column,
+            target_column,
+            transformer,
+            [](std::span<double> row, size_t column_index, double x) { 
+                if(!std::isnan(x) && (std::isnan(row[column_index]) || x > row[column_index])) {
                 row[column_index] = x;
-            }          
-        });
+                }          
+            },
+            accumulated
+        );
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::cummax(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column) const {
@@ -293,7 +301,19 @@ namespace timeseries::dataframe {
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::cumsum(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column, double_transformer transformer) const {
-        return this->copy(source_column, target_column, transformer, identity_accumulator); 
+        vector<double> accumulated(source_column.size(), 0.0);
+
+        return this->copy(
+            source_column,
+            target_column,
+            transformer,
+            [](std::span<double> row, size_t column_index, double x) { 
+                if(!(std::isnan(x) || std::isnan(row[column_index]))) {
+                    row[column_index] += x;
+                }          
+            }, 
+            accumulated
+        ); 
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::cumsum(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column) const {
@@ -301,7 +321,19 @@ namespace timeseries::dataframe {
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::cumprod(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column, double_transformer transformer) const {        
-        return this->copy(source_column, target_column, transformer, identity_accumulator);         
+        vector<double> accumulated(source_column.size(), 1.0);
+
+        return this->copy(
+            source_column,
+            target_column,
+            transformer,
+            [](std::span<double> row, size_t column_index, double x) { 
+                if(!(std::isnan(x) || std::isnan(row[column_index]))) {
+                    row[column_index] *= x;
+                }          
+            }, 
+            accumulated
+        );          
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::cumprod(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column) const {

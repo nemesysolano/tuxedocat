@@ -31,5 +31,7 @@ void test_dataframe_reindex();
 void test_copy_without_neither_transformer_nor_accumulator();
 void test_cummax(); //cumsum, cumprod, cummin, cummax
 void test_cummin();
+void test_cumsum();
+void test_cumprod();
 #endif
 #endif
