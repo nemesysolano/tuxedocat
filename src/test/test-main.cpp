@@ -60,7 +60,8 @@ int main(int argc, char* argv[]) {
     test_dataframe_access_string_invalid_column();
     test_copy_without_neither_transformer_nor_accumulator();
     test_dataframe_copy_transform();
-    test_accumulators();
+    test_cummax();
+    test_cummin();
     test_dataframe_copy();
     common_timestamps_test();
     ols_flat_tests();

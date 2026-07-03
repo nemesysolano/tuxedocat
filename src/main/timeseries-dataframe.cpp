@@ -116,7 +116,7 @@ namespace timeseries::dataframe {
         return DataFrame(rows, expected_cols - 1, std::move(data), std::move(column_name_to_column_index_), std::move(timestamp_to_row_index_), std::move(timestamps_), std::move(timestamps_vector_));
     }
 
-    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer, double_accumulator accumulator) const {
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer, double_accumulator accumulator, vector<double> & accumulated) const {
         // 2. source_columns and target_columns must have the same size
         if (source_columns.size() != target_columns.size()) {
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
@@ -152,7 +152,6 @@ namespace timeseries::dataframe {
         std::vector<double> new_data;
         new_data.reserve(new_rows * new_cols);        
         double current = 0;
-        vector<double> accumulated(new_cols);
 
         for (size_t r = 0; r < new_rows; ++r) {
             for (size_t c = 0; c < new_cols; ++c) {
@@ -179,7 +178,12 @@ namespace timeseries::dataframe {
             std::move(new_row_map), 
             std::move(new_timestamps),
             std::move(new_timestamps_vector)
-        );       
+        );         
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer, double_accumulator accumulator) const {
+        vector<double> accumulated(source_columns.size());    
+        return copy(source_columns, target_columns, transformer, accumulator, accumulated);
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer) const {
@@ -269,7 +273,19 @@ namespace timeseries::dataframe {
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::cummin(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column, double_transformer transformer) const {
-        return this->copy(source_column, target_column, transformer, identity_accumulator);        
+        vector<double> accumulated(source_column.size(), std::numeric_limits<double>::max());
+
+        return this->copy(
+            source_column,
+            target_column,
+            transformer,
+            [](std::span<double> row, size_t column_index, double x) { 
+                if(!std::isnan(x) && (std::isnan(row[column_index]) || x < row[column_index])) {
+                    row[column_index] = x;
+                }          
+            }, 
+            accumulated
+        );
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::cummin(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column) const {

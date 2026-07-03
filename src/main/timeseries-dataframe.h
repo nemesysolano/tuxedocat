@@ -89,6 +89,7 @@ namespace timeseries::dataframe {
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input);
             static std::expected<DataFrame, TuxedoError> Create(const std::string & file_path);
 
+            std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer, double_accumulator accumulator, std::vector<double> & accumulated) const;
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer, double_accumulator accumulator) const;
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer) const;
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns) const;

@@ -854,7 +854,7 @@ void test_copy_without_neither_transformer_nor_accumulator() {
     print_status("test_copy_without_neither_transformer_nor_accumulator", true);
 }
 
-void test_accumulators() {
+void test_cummax() {
     // 1. Setup mock data
     std::string csv_data =
         "Date,A,B\n"
@@ -941,7 +941,109 @@ void test_accumulators() {
     auto cummax_err_res = df.cummax(source_cols, bad_target_cols);
     assert(!cummax_err_res.has_value());
  
-    print_status("test_accumulators", test1_success && test2_success && !cummax_err_res.has_value());
+    print_status("test_cummax", test1_success && test2_success && !cummax_err_res.has_value());
 }
 
+void test_cummin() {
+    // 1. Setup mock data. Row 2 goes back up after row 1's dip, so a real
+    // running minimum needs 3 rows to prove it doesn't just track the latest value.
+    std::string csv_data =
+        "Date,A,B\n"
+        "2023-01-01 00:00:00,10.0,50.0\n"
+        "2023-01-02 00:00:00,30.0,20.0\n"
+        "2023-01-03 00:00:00,5.0,60.0\n";
+ 
+    std::istringstream stream(csv_data);
+    auto df_res = DataFrame::Create(stream, ',');
+    assert(df_res.has_value());
+    DataFrame & df = df_res.value();
+ 
+    std::vector<std::string> source_cols = {"A", "B"};
+    std::vector<std::string> target_cols = {"A_min", "B_min"};
+ 
+    // ----------------------------------------------------
+    // Test 1: cummin(source, target, transformer) — 3-arg overload
+    // cummin tracks a running minimum of the *transformed* values.
+    // ----------------------------------------------------
+    auto offset_transformer = [](double val) -> double { return val + 5.0; };
+ 
+    auto cummin_res1 = df.cummin(source_cols, target_cols, offset_transformer);
+    bool test1_success = cummin_res1.has_value();
+    assert(test1_success);
+ 
+    cout << df << endl;
+    if (test1_success) {
+        DataFrame & df_cummin1 = cummin_res1.value();
+ 
+        cout << df_cummin1 << endl;
+        assert(df_cummin1.rows() == 3);
+        assert(df_cummin1.cols() == 2);
+ 
+        auto col_a_idx = df_cummin1.column_index("A_min");
+        auto col_b_idx = df_cummin1.column_index("B_min");
+        assert(col_a_idx.has_value());
+        assert(col_b_idx.has_value());
+ 
+        // Transformed: A -> [15, 35, 10], B -> [55, 25, 65]
+        // Running min:  A_min -> [15, 15, 10], B_min -> [55, 25, 25]
+        auto val_a1 = df_cummin1[0, col_a_idx.value()];
+        auto val_b1 = df_cummin1[0, col_b_idx.value()];
+        auto val_a2 = df_cummin1[1, col_a_idx.value()];
+        auto val_b2 = df_cummin1[1, col_b_idx.value()];
+        auto val_a3 = df_cummin1[2, col_a_idx.value()];
+        auto val_b3 = df_cummin1[2, col_b_idx.value()];
+ 
+        assert(val_a1.has_value() && std::abs(val_a1.value() - 15.0) < 1e-9);
+        assert(val_b1.has_value() && std::abs(val_b1.value() - 55.0) < 1e-9);
+        assert(val_a2.has_value() && std::abs(val_a2.value() - 15.0) < 1e-9);
+        assert(val_b2.has_value() && std::abs(val_b2.value() - 25.0) < 1e-9);
+        assert(val_a3.has_value() && std::abs(val_a3.value() - 10.0) < 1e-9);
+        assert(val_b3.has_value() && std::abs(val_b3.value() - 25.0) < 1e-9);
+    }
+ 
+    // ----------------------------------------------------
+    // Test 2: cummin(source, target) — 2-arg overload (identity_transformer)
+    // Running min of the raw values.
+    // ----------------------------------------------------
+    auto cummin_res2 = df.cummin(source_cols, target_cols);
+    bool test2_success = cummin_res2.has_value();
+    assert(test2_success);
+ 
+    if (test2_success) {
+        const auto& df_cummin2 = cummin_res2.value();
+ 
+        assert(df_cummin2.rows() == 3);
+        assert(df_cummin2.cols() == 2);
+ 
+        auto col_a_idx = df_cummin2.column_index("A_min");
+        auto col_b_idx = df_cummin2.column_index("B_min");
+        assert(col_a_idx.has_value());
+        assert(col_b_idx.has_value());
+ 
+        // Raw: A -> [10, 30, 5], B -> [50, 20, 60]
+        // Running min: A_min -> [10, 10, 5], B_min -> [50, 20, 20]
+        auto val_a1 = df_cummin2[0, col_a_idx.value()];
+        auto val_b1 = df_cummin2[0, col_b_idx.value()];
+        auto val_a2 = df_cummin2[1, col_a_idx.value()];
+        auto val_b2 = df_cummin2[1, col_b_idx.value()];
+        auto val_a3 = df_cummin2[2, col_a_idx.value()];
+        auto val_b3 = df_cummin2[2, col_b_idx.value()];
+ 
+        assert(val_a1.has_value() && std::abs(val_a1.value() - 10.0) < 1e-9);
+        assert(val_b1.has_value() && std::abs(val_b1.value() - 50.0) < 1e-9);
+        assert(val_a2.has_value() && std::abs(val_a2.value() - 10.0) < 1e-9);
+        assert(val_b2.has_value() && std::abs(val_b2.value() - 20.0) < 1e-9);
+        assert(val_a3.has_value() && std::abs(val_a3.value() - 5.0) < 1e-9);
+        assert(val_b3.has_value() && std::abs(val_b3.value() - 20.0) < 1e-9);
+    }
+ 
+    // ----------------------------------------------------
+    // Test 3: Error bounds check — mismatched source/target sizes
+    // ----------------------------------------------------
+    std::vector<std::string> bad_target_cols = {"A_min_only"};
+    auto cummin_err_res = df.cummin(source_cols, bad_target_cols);
+    assert(!cummin_err_res.has_value());
+ 
+    print_status("test_cummin", test1_success && test2_success && !cummin_err_res.has_value());
+}
 #endif
