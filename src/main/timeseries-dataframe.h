@@ -19,11 +19,14 @@
 #include <functional>
 #include <list>
 #include <vector>
+#include <span>
 
 namespace timeseries::dataframe {
-    typedef double (* double_transformer)(double);
-    typedef double (* double_accumulator)(double, double); //(double accumulated, double current) -> Combines accumulated and current and resulting value si passed as accumulated in the next iteration
-
+    typedef std::function<double(double)> double_transformer;
+    typedef std::function<void(std::span<double> row, size_t column_index, double x)> double_accumulator; 
+    double identity_transformer(double x);
+    void identity_accumulator(std::span<double> row, size_t column_index, double x);
+    
     class DataFrame: public slice::Span2D {
         private:
             std::vector<double> data_;
@@ -104,10 +107,17 @@ namespace timeseries::dataframe {
             std::expected<DataFrame, TuxedoError> shift(int count, double filler);
             std::expected<DataFrame, TuxedoError> shift(int count);
 
-            std::expected<DataFrame, TuxedoError> accumulate(std::string & source_column, std::string & target_column, double_transformer transformer, double_accumulator accumulator);
-            std::expected<DataFrame, TuxedoError> accumulate(std::string && source_column, std::string & target_column, double_transformer transformer, double_accumulator accumulator);
-            std::expected<DataFrame, TuxedoError> accumulate(std::string & source_column, std::string && target_column, double_transformer transformer, double_accumulator accumulator);
-            std::expected<DataFrame, TuxedoError> accumulate(std::string && source_column, std::string && target_column, double_transformer transformer, double_accumulator accumulator);
+            std::expected<DataFrame, TuxedoError> cummax(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column, double_transformer transformer) const;
+            std::expected<DataFrame, TuxedoError> cummax(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column) const;
+            
+            std::expected<DataFrame, TuxedoError> cummin(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column, double_transformer transformer) const;
+            std::expected<DataFrame, TuxedoError> cummin(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column) const;
+
+            std::expected<DataFrame, TuxedoError> cumsum(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column, double_transformer transformer) const;
+            std::expected<DataFrame, TuxedoError> cumsum(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column) const;
+            
+            std::expected<DataFrame, TuxedoError> cumprod(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column) const;
+            std::expected<DataFrame, TuxedoError> cumprod(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column, double_transformer transformer) const;
 
             std::expected<DataFrame, TuxedoError> pct_change(size_t count);            
             inline std::expected<DataFrame, TuxedoError> pct_change() { return pct_change(1);}

@@ -10,11 +10,12 @@
 #include <ctime>   // For timegm
 #include "timeseries-adf.h"
 #include <cmath> // Required for std::isnan and std::abs
-
+#include <cassert>
 
 using namespace timeseries::dataframe;
 using namespace slice;
 using namespace timeseries::adf;
+using namespace std;
 
 // Helper to keep test output consistent
 void print_status(const std::string& test_name, bool success) {
@@ -807,4 +808,140 @@ void test_dataframe_check_timestamps_vector_keeps_elements_order() {
 
     std::cout << "[PASSED] test_dataframe_check_timestamps_vector_keeps_elements_order" << std::endl;
 }
+void test_copy_without_neither_transformer_nor_accumulator() {
+    // 1. Setup mock data
+    std::string csv_data =
+        "Date,A,B,C\n"
+        "2023-01-01 00:00:00,10.0,20.0,30.0\n"
+        "2023-01-02 00:00:00,11.0,21.0,31.0\n";
+
+    std::istringstream stream(csv_data);
+    auto df_res = DataFrame::Create(stream, ',');
+    assert(df_res.has_value());
+    auto& df = df_res.value();
+
+    // 2. Define copy parameters
+    std::vector<std::string> sources = {"A", "C"};
+    std::vector<std::string> targets = {"A_Copy", "C_Copy"};
+
+    // 3. Execute the copy
+    auto copied_res = df.copy(sources, targets);
+    
+    // 4. Validate Success Path
+    assert(copied_res.has_value());
+    auto& copied_df = copied_res.value();
+
+    // Verify the new columns exist
+    auto col_a_copy_idx = copied_df.column_index("A_Copy");
+    auto col_c_copy_idx = copied_df.column_index("C_Copy");
+    assert(col_a_copy_idx.has_value());
+    assert(col_c_copy_idx.has_value());
+
+    // Verify Row 0 copied accurately
+    assert((copied_df[0, col_a_copy_idx.value()].value() == 10.0));
+    assert((copied_df[0, col_c_copy_idx.value()].value() == 30.0));
+
+    // Verify Row 1 copied accurately
+    assert((copied_df[1, col_a_copy_idx.value()].value() == 11.0));
+    assert((copied_df[1, col_c_copy_idx.value()].value() == 31.0));
+
+    // 5. Validate Failure Path (Guard Rails)
+    // Vectors of differing sizes should return an unexpected error
+    std::vector<std::string> bad_targets = {"A_Copy_Only"};
+    auto bad_res = df.copy(sources, bad_targets);
+    assert(!bad_res.has_value());
+
+    print_status("test_copy_without_neither_transformer_nor_accumulator", true);
+}
+
+void test_accumulators() {
+    // 1. Setup mock data
+    std::string csv_data =
+        "Date,A,B\n"
+        "2023-01-01 00:00:00,10.0,50.0\n"
+        "2023-01-02 00:00:00,30.0,20.0\n";
+ 
+    std::istringstream stream(csv_data);
+    auto df_res = DataFrame::Create(stream, ',');
+    assert(df_res.has_value());
+    auto& df = df_res.value();
+ 
+    std::vector<std::string> source_cols = {"A", "B"};
+    std::vector<std::string> target_cols = {"A_max", "B_max"};
+ 
+    // ----------------------------------------------------
+    // Test 1: cummax(source, target, transformer) — 3-arg overload
+    // ----------------------------------------------------
+    auto offset_transformer = [](double val) -> double { return val + 5.0; };
+ 
+    auto cummax_res1 = df.cummax(source_cols, target_cols, offset_transformer);
+    bool test1_success = cummax_res1.has_value();
+    assert(test1_success);
+ 
+    if (test1_success) {
+        timeseries::dataframe::DataFrame & df_cummax1 = cummax_res1.value();
+ 
+        assert(df_cummax1.rows() == 2);
+        assert(df_cummax1.cols() == 2);
+ 
+        auto col_a_idx = df_cummax1.column_index("A_max");
+        auto col_b_idx = df_cummax1.column_index("B_max");
+        assert(col_a_idx.has_value());
+        assert(col_b_idx.has_value());
+        
+        cout << df << endl;
+        cout << df_cummax1 << endl;
+        
+        // Row 0: 10+5=15, 50+5=55. Row 1: 30+5=35, 20+5=25.
+        auto val_a1 = df_cummax1[0, col_a_idx.value()];
+        auto val_b1 = df_cummax1[0, col_b_idx.value()];
+        auto val_a2 = df_cummax1[1, col_a_idx.value()];
+        auto val_b2 = df_cummax1[1, col_b_idx.value()];
+ 
+        assert(val_a1.has_value() && std::abs(val_a1.value() - 15.0) < 1e-9);
+        assert(val_b1.has_value() && std::abs(val_b1.value() - 55.0) < 1e-9);
+        assert(val_a2.has_value() && std::abs(val_a2.value() - 35.0) < 1e-9);
+        assert(val_b2.has_value() && std::abs(val_b2.value() - 55.0) < 1e-9);
+    }
+ 
+    // ----------------------------------------------------
+    // Test 2: cummax(source, target) — 2-arg overload (identity_transformer)
+    // ----------------------------------------------------
+    auto cummax_res2 = df.cummax(source_cols, target_cols);
+    bool test2_success = cummax_res2.has_value();
+    assert(test2_success);
+ 
+    if (test2_success) {
+        const auto& df_cummax2 = cummax_res2.value();
+ 
+        assert(df_cummax2.rows() == 2);
+        assert(df_cummax2.cols() == 2);
+ 
+        auto col_a_idx = df_cummax2.column_index("A_max");
+        auto col_b_idx = df_cummax2.column_index("B_max");
+        assert(col_a_idx.has_value());
+        assert(col_b_idx.has_value());
+ 
+        // Values should pass through unchanged (identity_transformer)
+        auto val_a1 = df_cummax2[0, col_a_idx.value()];
+        auto val_b1 = df_cummax2[0, col_b_idx.value()];
+        auto val_a2 = df_cummax2[1, col_a_idx.value()];
+        auto val_b2 = df_cummax2[1, col_b_idx.value()];
+ 
+        assert(val_a1.has_value() && std::abs(val_a1.value() - 10.0) < 1e-9);
+        assert(val_b1.has_value() && std::abs(val_b1.value() - 50.0) < 1e-9);
+        assert(val_a2.has_value() && std::abs(val_a2.value() - 30.0) < 1e-9);
+        assert(val_b2.has_value() && std::abs(val_b2.value() - 50.0) < 1e-9);
+    }
+ 
+    // ----------------------------------------------------
+    // Test 3: Error bounds check — mismatched source/target sizes
+    // ----------------------------------------------------
+    std::vector<std::string> bad_target_cols = {"A_max_only"};
+    auto cummax_err_res = df.cummax(source_cols, bad_target_cols);
+    assert(!cummax_err_res.has_value());
+ 
+    print_status("test_accumulators", test1_success && test2_success && !cummax_err_res.has_value());
+}
+
 #endif

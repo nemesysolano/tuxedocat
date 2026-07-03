@@ -58,7 +58,9 @@ int main(int argc, char* argv[]) {
     test_dataframe_access_by_string_timestamp_invalid_format() ;
     test_dataframe_access_string_combinations_valid();
     test_dataframe_access_string_invalid_column();
+    test_copy_without_neither_transformer_nor_accumulator();
     test_dataframe_copy_transform();
+    test_accumulators();
     test_dataframe_copy();
     common_timestamps_test();
     ols_flat_tests();

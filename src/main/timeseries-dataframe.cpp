@@ -11,8 +11,11 @@
 using namespace std;
 
 namespace timeseries::dataframe {
-    
-     std::expected<DataFrame, TuxedoError> DataFrame::Create(std::istream &input, char field_delimiter) {
+    double identity_transformer(double x) {return x;}
+    void identity_accumulator(std::span<double> row, size_t column_index, double x) { row[column_index] = x;}
+
+
+    std::expected<DataFrame, TuxedoError> DataFrame::Create(std::istream &input, char field_delimiter) {
         std::vector<double> data;
         std::map<std::string, size_t> column_name_to_column_index_;
         std::map<std::chrono::sys_seconds, size_t> timestamp_to_row_index_;
@@ -147,18 +150,19 @@ namespace timeseries::dataframe {
 
         // 3. source_column[i] copied to target_column[i] for every row
         std::vector<double> new_data;
-        new_data.reserve(new_rows * new_cols);
-        double accumulated = 0;
+        new_data.reserve(new_rows * new_cols);        
         double current = 0;
+        vector<double> accumulated(new_cols);
 
         for (size_t r = 0; r < new_rows; ++r) {
             for (size_t c = 0; c < new_cols; ++c) {
                 // Extract from the flat 1D array using the cached source indices                        
                 size_t original_index = r * this->cols() + source_indices[c];
                 current = transformer(this->data_[original_index]);
-                accumulated = accumulator(accumulated, current);
-                new_data.push_back(accumulated); 
+                accumulator(std::span<double>(accumulated), c, current);
             }
+
+            new_data.append_range(accumulated); 
         }
 
         // The timestamp mappings remain structurally identical, just clone them
@@ -179,11 +183,11 @@ namespace timeseries::dataframe {
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer) const {
-        return copy(source_columns, target_columns, transformer, [](double a, double v) {return v;});
+        return copy(source_columns, target_columns, transformer, identity_accumulator);
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns) const {
-        return this->copy(source_columns, target_columns, [](double v){return v;}) ;
+        return this->copy(source_columns, target_columns, identity_transformer) ;
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::copy(const std::vector<std::string> & source_columns, const std::vector<std::string> && target_columns) const {
@@ -250,6 +254,42 @@ namespace timeseries::dataframe {
 
     std::expected<DataFrame, TuxedoError> DataFrame::shift(int count) {
         return shift(count, NAN);
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::cummax(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column, double_transformer transformer) const {
+        return this->copy(source_column, target_column, transformer, [](std::span<double> row, size_t column_index, double x) { 
+            if(!std::isnan(x) && (std::isnan(row[column_index]) || x > row[column_index])) {
+                row[column_index] = x;
+            }          
+        });
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::cummax(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column) const {
+        return this->cummax(source_column, target_column, identity_transformer);
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::cummin(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column, double_transformer transformer) const {
+        return this->copy(source_column, target_column, transformer, identity_accumulator);        
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::cummin(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column) const {
+        return this->cummin(source_column, target_column, identity_transformer);
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::cumsum(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column, double_transformer transformer) const {
+        return this->copy(source_column, target_column, transformer, identity_accumulator); 
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::cumsum(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column) const {
+        return this->cumsum(source_column, target_column, identity_transformer);
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::cumprod(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column, double_transformer transformer) const {        
+        return this->copy(source_column, target_column, transformer, identity_accumulator);         
+    }
+
+    std::expected<DataFrame, TuxedoError> DataFrame::cumprod(const std::vector<std::string> & source_column, const std::vector<std::string> & target_column) const {
+        return this->cumprod(source_column, target_column, identity_transformer);
     }
 
     std::expected<DataFrame, TuxedoError> DataFrame::pct_change(size_t count) {
@@ -970,5 +1010,3 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
         return out;
     }
 }
-
- 

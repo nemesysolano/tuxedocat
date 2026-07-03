@@ -28,5 +28,8 @@ void shift_test();
 void pct_change_test();
 void append_column_test();
 void test_dataframe_reindex();
+void test_copy_without_neither_transformer_nor_accumulator();
+void test_accumulators(); //cumsum, cumprod, cummin, cummax
+
 #endif
 #endif
