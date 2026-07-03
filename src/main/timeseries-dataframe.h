@@ -162,10 +162,12 @@ namespace timeseries::dataframe {
             inline std::expected<slice::Slice2D, TuxedoError> slice_to(size_t end_row) const {/* Range [0, end_row) */return slice(0, end_row);}
 
             void reindex(std::span<std::chrono::sys_seconds> target_timestamps);
+            friend std::ostream & operator << (std::ostream & out, const DataFrame & df);
             friend std::ostream & operator << (std::ostream & out, DataFrame & df);
             virtual ~DataFrame();
     };
 
+    std::ostream & operator << (std::ostream & out, const DataFrame & df);
     std::ostream & operator << (std::ostream & out, DataFrame & df);
 
     std::set<std::chrono::sys_seconds> common_timestamps(std::list<std::reference_wrapper<const DataFrame>> data_frame);

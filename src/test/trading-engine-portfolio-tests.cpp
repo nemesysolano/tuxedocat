@@ -837,4 +837,89 @@ void test_create_equity_curve_csv() {
  
     std::cout << "[PASSED] test_create_equity_curve_csv" << std::endl;
 }
+
+void test_create_equity_curve_dataframe() {
+    trace_with_message("Running test_create_equity_curve_dataframe");
+
+    // 1. Helper to generate mathematically perfect UTC timestamps
+    auto make_ts = [](int y, int m, int d, int h = 0) {
+        return std::chrono::time_point_cast<std::chrono::seconds>(
+            std::chrono::sys_days{std::chrono::year{y} / m / d}
+        ) + std::chrono::hours{h};
+    };
+
+    // 2. Setup mock holdings timeline
+    std::vector<Holding> holdings;
+
+    Holding h1;
+    h1.datetime = make_ts(2023, 1, 1, 10);
+    h1.balances["AAPL"] = 100.0;
+    h1.balances["MSFT"] = 50.0;
+    h1.cash = 10000.0;
+    h1.commission = 5.0;
+    h1.total = 25000.0;
+    holdings.push_back(h1);
+
+    Holding h2;
+    h2.datetime = make_ts(2023, 1, 2, 10);
+    h2.balances["AAPL"] = 150.0;
+    h2.balances["MSFT"] = 50.0;
+    h2.cash = 5000.0;
+    h2.commission = 10.0;
+    h2.total = 26000.0;
+    holdings.push_back(h2);
+
+    // Add a 3rd holding so that after dropping the NaN row (h1), we still have 2 rows
+    Holding h3;
+    h3.datetime = make_ts(2023, 1, 3, 10);
+    h3.balances["AAPL"] = 160.0;
+    h3.balances["MSFT"] = 60.0;
+    h3.cash = 4000.0;
+    h3.commission = 15.0;
+    h3.total = 27000.0;
+    holdings.push_back(h3);
+
+    // 3. Invoke the target function
+    auto df_result = create_equity_curve_dataframe(holdings);
+
+    // 4. Validate successful creation
+    assert(df_result.has_value());
+    auto& df = df_result.value();
+
+    // 5. Validate matrix dimensions (2 rows after dropna, and at least 5 cols + returns/equity_curve)
+    assert(df.rows() == 2);
+    assert(df.cols() >= 5);
+
+    // 6. Fetch dynamic column mappings
+    auto col_aapl_opt = df.column_index("AAPL");
+    auto col_msft_opt = df.column_index("MSFT");
+    auto col_cash_opt = df.column_index("cash");
+    auto col_comm_opt = df.column_index("commission");
+    auto col_total_opt = df.column_index("total");
+
+    assert(col_aapl_opt.has_value());
+    assert(col_msft_opt.has_value());
+    assert(col_cash_opt.has_value());
+    assert(col_comm_opt.has_value());
+    assert(col_total_opt.has_value());
+
+    size_t col_aapl = col_aapl_opt.value();
+    size_t col_cash = col_cash_opt.value();
+    size_t col_comm = col_comm_opt.value();
+    size_t col_total = col_total_opt.value();
+
+    // 7. Validate Row 0 (Corresponds to h2 because h1 was dropped)
+    assert(std::abs(df[0, col_aapl].value() - 150.0) < 1e-6);
+    assert(std::abs(df[0, col_cash].value() - 5000.0) < 1e-6);
+    assert(std::abs(df[0, col_comm].value() - 10.0) < 1e-6);
+    assert(std::abs(df[0, col_total].value() - 26000.0) < 1e-6);
+
+    // 8. Validate Row 1 (Corresponds to h3)
+    assert(std::abs(df[1, col_aapl].value() - 160.0) < 1e-6);
+    assert(std::abs(df[1, col_cash].value() - 4000.0) < 1e-6);
+    assert(std::abs(df[1, col_comm].value() - 15.0) < 1e-6);
+    assert(std::abs(df[1, col_total].value() - 27000.0) < 1e-6);
+
+    std::cout << "[PASSED] test_create_equity_curve_dataframe" << std::endl;
+}
 #endif

@@ -65,6 +65,7 @@ int main(int argc, char* argv[]) {
     test_cumsum();
     test_cumprod();
     test_dataframe_copy();
+    test_create_equity_curve_dataframe();
     common_timestamps_test();
     ols_flat_tests();
     test_dataframe_create_from_column_index();

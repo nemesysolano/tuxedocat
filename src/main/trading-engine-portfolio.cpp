@@ -378,22 +378,54 @@ namespace trading::engine::portfolio {
     }
 
     expected<DataFrame, TuxedoError> create_equity_curve_dataframe(const vector<Holding>  & all_holdings) {        
-        auto equity_curve_csv_result = create_equity_curve_csv(all_holdings);
-        if(!equity_curve_csv_result.has_value()) {
-            return unexpected(equity_curve_csv_result.error());
+        auto csv_result = create_equity_curve_csv(all_holdings);
+        vector<string> RETURNS = {"returns"};
+        vector<string> TOTAL = {"total"};
+        vector<string> EQUITY_CURVE = {"equity_curve"};
+ 
+        if(!csv_result.has_value()) {
+            return unexpected(csv_result.error());
+        }        
+        const string & csv = csv_result.value();
+ 
+        istringstream input(csv); 
+        
+        auto curve_result = DataFrame::Create(input, ',');
+        if(!curve_result.has_value()) {
+            return unexpected(curve_result.error());
+        }        
+        DataFrame curve = std::move(curve_result.value());
+        
+        auto returns_result = curve.copy(TOTAL, RETURNS);
+        if(!returns_result.has_value()) {
+            return unexpected(returns_result.error());
         }
-        
-        const string & equity_curve_csv = equity_curve_csv_result.value();
-        istringstream input(equity_curve_csv); 
-        
-        auto dataframe_result = DataFrame::Create(input, ',');
-        if(!dataframe_result.has_value()) {
-            return unexpected(dataframe_result.error());
+        DataFrame returns = std::move(returns_result.value());
+ 
+        auto pct_change_result = returns.pct_change();
+        if(!pct_change_result.has_value()) {
+            return unexpected(pct_change_result.error());
         }
-        
-        DataFrame dataframe = std::move(dataframe_result.value());
-
-        return std::move(dataframe);
+        DataFrame pct_change = std::move(pct_change_result.value());
+ 
+        auto equity_curve_result = pct_change.cumprod(RETURNS, EQUITY_CURVE, [](double x) { return 1.0 + x; });
+        if(!equity_curve_result.has_value()) {
+            return unexpected(equity_curve_result.error());
+        }
+        DataFrame equity_curve = std::move(equity_curve_result.value());
+ 
+        curve.append_column(pct_change, RETURNS[0], RETURNS[0]);
+        curve.append_column(equity_curve, EQUITY_CURVE[0], EQUITY_CURVE[0]);
+ 
+        // The first row has no prior period, so pct_change() leaves `returns` (and
+        // therefore `equity_curve`) as NaN there — matching pandas' pct_change().
+        // The Python reference drops that row via curve.dropna(); do the same here
+        // so the output lines up (in both row count and values).
+        auto dropna_result = curve.dropna();
+        if(!dropna_result.has_value()) {
+            return unexpected(dropna_result.error());
+        }
+        return std::move(dropna_result.value());
     }
 
     expected<DataFrame, TuxedoError> create_equity_curve_dataframe(const vector<Holding> && all_holdings) {

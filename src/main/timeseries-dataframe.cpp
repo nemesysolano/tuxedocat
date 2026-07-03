@@ -1009,7 +1009,7 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
     }
 
 
-    std::ostream & operator<< (std::ostream & out, DataFrame & df) {
+    std::ostream & operator<< (std::ostream & out, const DataFrame & df) {
         // 1. Reconstruct the ordered column names based on their physical index
         std::vector<std::string> ordered_cols(df.cols());
         for (const auto& [name, idx] : df.column_name_to_column_index_) {
@@ -1056,5 +1056,9 @@ TuxedoError DataFrame::append_column(DataFrame & source, const std::string & sou
             out << "\n";
         }
         return out;
+    }
+
+    std::ostream & operator<< (std::ostream & out, DataFrame & df) {
+        return out << static_cast<const DataFrame&>(df);
     }
 }
