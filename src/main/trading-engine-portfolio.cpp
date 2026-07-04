@@ -15,6 +15,7 @@ using namespace std;
 using namespace trading::engine;
 using namespace slice;
 using namespace timeseries::dataframe;
+using namespace trading::engine::portfolio;
 
 namespace trading::engine::portfolio {
     DrawDowns::DrawDowns(const vector<double> values, double max_drawdown_pct, size_t max_drawdown_duration) : values_(values), max_drawdown_pct_(max_drawdown_pct), max_drawdown_duration_(max_drawdown_duration) {}
@@ -333,16 +334,23 @@ namespace trading::engine::portfolio {
     }
 
     expected<OrderEvent, TuxedoError> Portfolio::update_signal(const Event        & signal_event) {
-        // switch(signal_event.event_type()) {
-        //     case EventType::SIGNAL:
-
-        // }
+        switch(signal_event.event_type()) {
+            case EventType::SIGNAL:
+                return naive_order(static_cast<const SignalEvent &>(signal_event));
+            default:
+                trace_with_message("Returning TuxedoError::ERR_NOT_IMPLEMENTED");
+                break;
+        }
         return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
     }
 
     expected<OrderEvent, TuxedoError> Portfolio::update_signal(const SignalEvent && signal_event) {
         const Event & event = signal_event;
         return update_signal(event);
+    }
+
+    expected<DataFrame, TuxedoError> Portfolio::create_equity_curve_dataframe() const {
+        return ::create_equity_curve_dataframe(this->all_holdings_);
     }
 
     expected<string, TuxedoError> create_equity_curve_csv(const vector<Holding>  & all_holdings) {
@@ -432,3 +440,7 @@ namespace trading::engine::portfolio {
         return create_equity_curve_dataframe(all_holdings);
     }
 };
+
+// static expected<SummaryStats, TuxedoError> SummaryStats::Create(const Portfolio & portfolio){
+
+// }

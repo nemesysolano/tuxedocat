@@ -149,6 +149,8 @@ namespace trading::engine::portfolio {
             expected<OrderEvent, TuxedoError> update_signal(const Event        & signal_event);
             expected<OrderEvent, TuxedoError> update_signal(const SignalEvent && signal_event);
 
+            expected<DataFrame, TuxedoError> create_equity_curve_dataframe() const;
+            
             static expected<Portfolio, TuxedoError> Create(unique_ptr<DataHandler> bars, Queue<unique_ptr<Event>> events, sys_seconds start_date, double initial_capital);
     };
     
@@ -159,7 +161,16 @@ namespace trading::engine::portfolio {
 
     expected<string, TuxedoError> create_equity_curve_csv(const vector<Holding>  & all_holdings);
     expected<DataFrame, TuxedoError> create_equity_curve_dataframe(const vector<Holding>  & all_holdings);
-    expected<DataFrame, TuxedoError> create_equity_curve_dataframe(const vector<Holding> && all_holdings);    
+    expected<DataFrame, TuxedoError> create_equity_curve_dataframe(const vector<Holding> && all_holdings);  
+      
+    struct SummaryStats {
+        double total_return;
+        double sharpe_ratio;
+        double max_drawdown;
+        double drawdown_duration;
+        static expected<SummaryStats, TuxedoError> Create(const Portfolio & portfolio);
+    };    
 };
+
 
 #endif
