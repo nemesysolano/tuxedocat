@@ -12,5 +12,6 @@ void test_naive_order(const char * current_program_path); // Portfolio::naive_or
 void test_update_signal_test(const char * current_program_path); //Portfolio::update_signal
 void test_create_equity_curve_csv();
 void test_create_equity_curve_dataframe();
+void test_create_summary_stats();
 #endif
 #endif

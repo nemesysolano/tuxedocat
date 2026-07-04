@@ -904,4 +904,75 @@ void test_create_equity_curve_dataframe() {
 
     std::cout << "[PASSED] test_create_equity_curve_dataframe" << std::endl;
 }
+
+void test_create_summary_stats() {
+    trace_with_message("Running test_create_summary_stats");
+ 
+    // 1. Helper to generate mathematically perfect UTC timestamps
+    auto make_ts = [](int y, int m, int d, int h = 0) {
+        return std::chrono::time_point_cast<std::chrono::seconds>(
+            std::chrono::sys_days{std::chrono::year{y} / m / d}
+        ) + std::chrono::hours{h};
+    };
+ 
+    // 2. Setup mock holdings timeline. `total` goes up, down, down, up so that
+    // there's a real drawdown to detect (not just a monotonic curve), and the
+    // first row gets dropped (NaN return) leaving 4 rows for the stats.
+    // total:  100 -> 110 -> 105 ->  95 -> 120
+    // Two simulated companies' share counts ride along in `balances` (they
+    // don't feed into the stats math, which is driven entirely by `total`,
+    // but they exercise the multi-symbol code path in create_equity_curve_csv).
+    std::vector<Holding> holdings;
+    std::vector<double> totals          = {100.0, 110.0, 105.0, 95.0, 120.0};
+    std::vector<double> aapl_balances   = { 10.0,  10.0,  12.0, 12.0,  15.0};
+    std::vector<double> msft_balances   = {  5.0,   6.0,   6.0,  7.0,   8.0};
+    int day = 1;
+    for (size_t i = 0; i < totals.size(); ++i) {
+        Holding h;
+        h.datetime = make_ts(2023, 1, day++, 10);
+        h.balances["AAPL"] = aapl_balances[i];
+        h.balances["MSFT"] = msft_balances[i];
+        h.cash = 1000.0;
+        h.commission = 1.0;
+        h.total = totals[i];
+        holdings.push_back(h);
+    }
+ 
+    // 3. Build the equity curve dataframe (the real input to create_summary_stats)
+    auto equity_curve_result = create_equity_curve_dataframe(holdings);
+    assert(equity_curve_result.has_value());
+    auto & equity_curve_df = equity_curve_result.value();
+ 
+    // 4. Invoke the target function
+    auto stats_result = create_summary_stats(equity_curve_df);
+    assert(stats_result.has_value());
+    auto & stats = stats_result.value();
+ 
+    // 5. Validate total_return: equal to the last row's equity_curve value (1.20)
+    assert(std::abs(stats.total_return - 1.20) < 1e-6);
+ 
+    // 6. Validate sharpe_ratio: mean/std of the 4 `returns` values, annualized by sqrt(252)
+    // returns: [0.10, -0.045455, -0.095238, 0.263158] -> sharpe ~= 6.3218
+    assert(std::abs(stats.sharpe_ratio - 6.3218066253) < 1e-4);
+ 
+    // 7. Validate max_drawdown: equity_curve [1.10, 1.05, 0.95, 1.20]
+    // hwm:      1.10 -> 1.10 -> 1.10 -> 1.20
+    // drawdown: 0    -> 0.05 -> 0.15 -> 0
+    // Expected max drawdown: 0.15 -> 15.0 (as a percentage)
+    assert(std::abs(stats.max_drawdown - 15.0) < 1e-4);
+ 
+    // 8. Validate drawdown_duration: the max drawdown occurs at a single bar (row index 2)
+    assert(stats.drawdown_duration == 1);
+    std::cout << stats << endl;
+    
+    // 9. Failure path: a dataframe missing `returns`/`equity_curve` columns should fail
+    std::string bad_csv = "Date,A\n2023-01-01 00:00:00,10.0\n2023-01-02 00:00:00,20.0\n";
+    std::istringstream bad_stream(bad_csv);
+    auto bad_df_result = DataFrame::Create(bad_stream, ',');
+    assert(bad_df_result.has_value());
+    auto bad_stats_result = create_summary_stats(bad_df_result.value());
+    assert(!bad_stats_result.has_value());
+     
+    std::cout << "[PASSED] test_create_summary_stats" << std::endl;
+}
 #endif

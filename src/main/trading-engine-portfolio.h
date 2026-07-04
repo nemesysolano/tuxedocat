@@ -31,6 +31,10 @@ namespace trading::engine::portfolio {
             DrawDowns & operator=(DrawDowns && source) noexcept;
             ~DrawDowns() = default;
 
+            double max_drawdown_pct() const {return max_drawdown_pct_;}
+            size_t max_drawdown_duration() const {return max_drawdown_duration_;}
+
+            static expected<DrawDowns, TuxedoError> Create(const slice::Span2D &pnl, size_t column_index);
             static expected<DrawDowns, TuxedoError> Create(const slice::Span2D &pnl);
             
     };
@@ -167,9 +171,13 @@ namespace trading::engine::portfolio {
         double total_return;
         double sharpe_ratio;
         double max_drawdown;
-        double drawdown_duration;
+        size_t drawdown_duration;
         static expected<SummaryStats, TuxedoError> Create(const Portfolio & portfolio);
-    };    
+    };  
+
+    std::ostream & operator << (std::ostream & out, const SummaryStats & summary_stats);
+    
+    expected<SummaryStats, TuxedoError> create_summary_stats(const DataFrame & equity_curve_dataframe);
 };
 
 

@@ -65,7 +65,6 @@ int main(int argc, char* argv[]) {
     test_cumsum();
     test_cumprod();
     test_dataframe_copy();
-    test_create_equity_curve_dataframe();
     common_timestamps_test();
     ols_flat_tests();
     test_dataframe_create_from_column_index();
@@ -100,6 +99,8 @@ int main(int argc, char* argv[]) {
     test_naive_order(argv[0]);
     test_update_signal_test(argv[0]);
     test_create_equity_curve_csv();
+    test_create_equity_curve_dataframe();
+    test_create_summary_stats();
     return 0;
 }
 #endif

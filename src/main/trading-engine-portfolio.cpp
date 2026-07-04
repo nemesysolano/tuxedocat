@@ -18,6 +18,10 @@ using namespace timeseries::dataframe;
 using namespace trading::engine::portfolio;
 
 namespace trading::engine::portfolio {
+    const string RETURNS_LABEL ("returns");
+    const string TOTAL_LABEL ("total");
+    const string EQUITY_CURVE_LABEL("equity_curve");
+
     DrawDowns::DrawDowns(const vector<double> values, double max_drawdown_pct, size_t max_drawdown_duration) : values_(values), max_drawdown_pct_(max_drawdown_pct), max_drawdown_duration_(max_drawdown_duration) {}
     DrawDowns::DrawDowns(const DrawDowns & source) : values_(source.values_), max_drawdown_pct_(source.max_drawdown_pct_), max_drawdown_duration_(source.max_drawdown_duration_) {}
     DrawDowns::DrawDowns(DrawDowns && source) noexcept : values_(std::move(source.values_)), max_drawdown_pct_(source.max_drawdown_pct_), max_drawdown_duration_(source.max_drawdown_duration_) {}
@@ -38,8 +42,8 @@ namespace trading::engine::portfolio {
         return *this;
     }
 
-    expected<DrawDowns, TuxedoError> DrawDowns::Create(const slice::Span2D &pnl) {
-        if(pnl.empty()) {
+   expected<DrawDowns, TuxedoError> DrawDowns::Create(const slice::Span2D &pnl, size_t column_index) {
+        if(pnl.empty() || column_index > pnl.cols() - 1) {
             return std::unexpected(TuxedoError::ERR_EMPTY_VECTOR);
         }
         
@@ -49,17 +53,21 @@ namespace trading::engine::portfolio {
         // Drawdown and duration series.
         vector<double> drawdown(pnl.rows(), 0.0);
         vector<uint16_t> duration(pnl.rows(), 0);
-
+ 
         // Pre-populate
-        hwm[0] = pnl[0, 0].value();
-
+        auto hwm0_result = pnl[0, column_index];
+        if(!hwm0_result.has_value()) {
+            return std::unexpected(hwm0_result.error());
+        }
+        hwm[0] = hwm0_result.value();
+ 
         // Cache for max drawdown and max duration
         double max_draw_down = 0.0;
         size_t max_drawdown_duration = 0;
-
+ 
         // Fill the series via a loop
         for(size_t i = 1; i < pnl.rows(); i++) {
-            const auto &pnl_value_result = pnl[i, 0];
+            const auto &pnl_value_result = pnl[i, column_index];
             if(!pnl_value_result.has_value()) {
                 return std::unexpected(pnl_value_result.error());
             }
@@ -67,16 +75,20 @@ namespace trading::engine::portfolio {
             hwm[i] = std::max(hwm[i-1], pnl_value);
             drawdown[i] = hwm[i] - pnl_value;
             duration[i] = drawdown[i] > drawdown[i-1] ? 1 : drawdown[i-1] + 1;
-
+ 
             // Track max drawdown
             if(drawdown[i] > max_draw_down) {
                 max_draw_down = drawdown[i];
                 max_drawdown_duration = duration[i];
             }
         }
-
+ 
         // Create DrawDowns object
         return DrawDowns(std::move(drawdown), max_draw_down, max_drawdown_duration);
+    }
+
+    expected<DrawDowns, TuxedoError> DrawDowns::Create(const slice::Span2D &pnl) {
+        return DrawDowns::Create(pnl, 0);
     }
 
     expected<double, TuxedoError> create_sharpe_ratio(const slice::Span2D & returns, size_t column_index, size_t periods) {
@@ -387,9 +399,9 @@ namespace trading::engine::portfolio {
 
     expected<DataFrame, TuxedoError> create_equity_curve_dataframe(const vector<Holding>  & all_holdings) {        
         auto csv_result = create_equity_curve_csv(all_holdings);
-        vector<string> RETURNS = {"returns"};
-        vector<string> TOTAL = {"total"};
-        vector<string> EQUITY_CURVE = {"equity_curve"};
+        vector<string> RETURNS = {RETURNS_LABEL};
+        vector<string> TOTAL = {TOTAL_LABEL};
+        vector<string> EQUITY_CURVE = {EQUITY_CURVE_LABEL};
  
         if(!csv_result.has_value()) {
             return unexpected(csv_result.error());
@@ -439,8 +451,69 @@ namespace trading::engine::portfolio {
     expected<DataFrame, TuxedoError> create_equity_curve_dataframe(const vector<Holding> && all_holdings) {
         return create_equity_curve_dataframe(all_holdings);
     }
+
+    expected<SummaryStats, TuxedoError> SummaryStats::Create(const Portfolio & portfolio){
+        
+        auto equity_curve_dataframe_result = portfolio.create_equity_curve_dataframe();
+        if(!equity_curve_dataframe_result.has_value()) {
+            return unexpected(equity_curve_dataframe_result.error());
+        }
+        auto & equity_curve_dataframe = equity_curve_dataframe_result.value();    
+
+        return create_summary_stats(equity_curve_dataframe);
+    }    
+
+    expected<SummaryStats, TuxedoError> create_summary_stats(const DataFrame & equity_curve_dataframe) {
+        auto equity_column_index_result = equity_curve_dataframe.column_index(EQUITY_CURVE_LABEL);
+        if(!equity_column_index_result.has_value()) {
+            return unexpected(equity_column_index_result.error());
+        }
+        auto equity_column_index = equity_column_index_result.value();    
+
+        auto returns_column_index_result = equity_curve_dataframe.column_index(RETURNS_LABEL);
+        if(!returns_column_index_result.has_value()) {
+            return unexpected(returns_column_index_result.error());
+        }
+        auto returns_column_index = returns_column_index_result.value();
+
+        auto const last_row = equity_curve_dataframe.rows() - 1;    
+        auto total_return_result = equity_curve_dataframe[last_row, equity_column_index];
+        if(!total_return_result.has_value()) {
+            return unexpected(total_return_result.error());
+        }
+        auto total_return = total_return_result.value(); // total_return
+        
+        auto sharpe_ratio_result = create_sharpe_ratio(equity_curve_dataframe, returns_column_index, 252);
+        if(!sharpe_ratio_result.has_value()) {
+            return unexpected(sharpe_ratio_result.error());
+        }
+        auto sharpe_ratio = sharpe_ratio_result.value(); // sharpe_ratio
+
+        
+        auto drawdowns_result = DrawDowns::Create(equity_curve_dataframe, equity_column_index); // const slice::Span2D &pnl// 
+        if(!drawdowns_result.has_value()) {
+            return unexpected(drawdowns_result.error());
+        }
+        auto const & drawdowns = drawdowns_result.value();
+        auto max_dd = drawdowns.max_drawdown_pct() * 100; // max_dd
+        auto dd_duration = drawdowns.max_drawdown_duration(); // dd_duration
+
+        return SummaryStats {
+            .total_return = total_return,
+            .sharpe_ratio = sharpe_ratio,
+            .max_drawdown = max_dd,
+            .drawdown_duration = dd_duration
+        };    
+    }
+
+    std::ostream & operator << (std::ostream & out, const SummaryStats & summary_stats) {
+        out << "SummaryStats{" 
+            << "total_return=" << summary_stats.total_return
+            << ", sharpe_ratio=" << summary_stats.sharpe_ratio
+            << ", max_drawdown=" << summary_stats.max_drawdown
+            << ", drawdown_duration=" << summary_stats.drawdown_duration
+            << "}";
+        return out;
+    }
 };
 
-// static expected<SummaryStats, TuxedoError> SummaryStats::Create(const Portfolio & portfolio){
-
-// }
