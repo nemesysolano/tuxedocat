@@ -7,6 +7,8 @@
 #include <chrono>
 #include <iostream>
 #include "slice.h"
+#include <chrono>
+using namespace std::chrono;
 
 namespace timeseries {
     enum class RegressionType {
@@ -16,6 +18,6 @@ namespace timeseries {
         NO_CONSTANT 
     };    
 
-
+    inline sys_seconds sys_seconds_now() { return floor<seconds>(system_clock::now()); };
 }
 #endif

@@ -18,8 +18,8 @@ namespace trading::engine::datahandler {
         open_price_index, high_price_index, low_price_index, close_price_index, volume_index
     */
     HistoricCSVdataHandler::HistoricCSVdataHandler(
-        Queue<unique_ptr<Event>> events, vector<string> & symbol_list, map<string, DataFrame> symbol_data, bool continue_backtest, map<string, vector<Bar>> latest_symbol_data, size_t iterator_size, size_t open_price_index, size_t high_price_index, size_t low_price_index, size_t close_price_index, size_t volume_index): 
-        events_(std::move(events)),
+        Queue<unique_ptr<Event>> & events, vector<string> & symbol_list, map<string, DataFrame> symbol_data, bool continue_backtest, map<string, vector<Bar>> latest_symbol_data, size_t iterator_size, size_t open_price_index, size_t high_price_index, size_t low_price_index, size_t close_price_index, size_t volume_index): 
+        events_(events),
         symbol_list_(std::move(symbol_list)),
         symbol_data_(std::move(symbol_data)),
         continue_backtest_(continue_backtest),
@@ -36,7 +36,7 @@ namespace trading::engine::datahandler {
     }    
 
     HistoricCSVdataHandler::HistoricCSVdataHandler(HistoricCSVdataHandler&& other) noexcept
-        : events_(std::move(other.events_)),
+        : events_(other.events_),
           symbol_list_(std::move(other.symbol_list_)),
           symbol_data_(std::move(other.symbol_data_)),
           continue_backtest_(other.continue_backtest_),
@@ -68,7 +68,7 @@ namespace trading::engine::datahandler {
         return *this;
     }
 
-    expected<HistoricCSVdataHandler, TuxedoError> HistoricCSVdataHandler::Create(Queue<unique_ptr<Event>> events, const string & csv_dir , vector<string> & symbol_list) {
+    expected<unique_ptr<HistoricCSVdataHandler>, TuxedoError> HistoricCSVdataHandler::Create(Queue<unique_ptr<Event>> & events, const string & csv_dir , vector<string> & symbol_list) {
         /* 
         Store all timestamps from loaded CSV files
         */
@@ -143,8 +143,8 @@ namespace trading::engine::datahandler {
             latest_symbol_data.insert({symbol, vector<Bar>()});         
         }        
         
-        return HistoricCSVdataHandler(
-            std::move(events), symbol_list, std::move(symbol_data), true, std::move(latest_symbol_data), timestamps.size(),
+        return std::make_unique<HistoricCSVdataHandler>(
+            events, symbol_list, std::move(symbol_data), true, std::move(latest_symbol_data), timestamps.size(),
             open_price_index, high_price_index, low_price_index, close_price_index, volume_index
         );
     }

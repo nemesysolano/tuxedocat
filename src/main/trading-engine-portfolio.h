@@ -64,7 +64,7 @@ namespace trading::engine::portfolio {
     class Portfolio {
         private:
             unique_ptr<DataHandler> bars_;
-            Queue<unique_ptr<Event>> events_;
+            Queue<unique_ptr<Event>> & events_;
             const vector<string> & symbol_list_; // bars_.symbol_list();
             sys_seconds start_date_;
             double initial_capital_;
@@ -72,10 +72,11 @@ namespace trading::engine::portfolio {
             map<string, int32_t> current_positions_;
             vector<Holding> all_holdings_;
             Holding current_holdings_;
+
         public:
             inline Portfolio(
                 unique_ptr<DataHandler> bars,
-                Queue<unique_ptr<Event>> events,
+                Queue<unique_ptr<Event>> & events,
                 sys_seconds start_date,
                 double initial_capital,
                 vector<Position> all_positions,
@@ -83,7 +84,7 @@ namespace trading::engine::portfolio {
                 vector<Holding> all_holdings,
                 Holding current_holdings
             ): bars_(std::move(bars)),
-                events_(std::move(events)),
+                events_(events),
                 symbol_list_(bars_->symbol_list()),
                 start_date_(start_date),
                 initial_capital_(initial_capital),
@@ -95,7 +96,7 @@ namespace trading::engine::portfolio {
 
             inline Portfolio(Portfolio && source) noexcept: 
                 bars_(std::move(source.bars_)), 
-                events_(std::move(source.events_)), 
+                events_(source.events_), 
                 symbol_list_(source.symbol_list_), 
                 start_date_(source.start_date_), 
                 initial_capital_(source.initial_capital_),
@@ -109,7 +110,11 @@ namespace trading::engine::portfolio {
             inline Portfolio & operator=(Portfolio && source) noexcept {
                 if(this != &source) {
                     bars_ = std::move(source.bars_);
-                    events_ = std::move(source.events_);
+                    // events_ is a reference to an externally-owned queue (shared with
+                    // Backtest/ExecutionHandler); it's bound once at construction and
+                    // can't be reseated here. Assigning through it would try to
+                    // copy-assign the referent Queue, which fails to compile since
+                    // Queue<unique_ptr<Event>> holds a move-only element type.
                     start_date_ = source.start_date_;
                     initial_capital_ = source.initial_capital_;
                     all_positions_ = std::move(source.all_positions_);
@@ -155,7 +160,7 @@ namespace trading::engine::portfolio {
 
             expected<DataFrame, TuxedoError> create_equity_curve_dataframe() const;
             
-            static expected<Portfolio, TuxedoError> Create(unique_ptr<DataHandler> bars, Queue<unique_ptr<Event>> events, sys_seconds start_date, double initial_capital);
+            static expected<std::unique_ptr<Portfolio>, TuxedoError> Create(unique_ptr<DataHandler> bars, Queue<unique_ptr<Event>> & events, sys_seconds start_date, double initial_capital);
     };
     
     vector<Position> create_all_positions(const vector<string> & symbol_list_, sys_seconds start_date);

@@ -79,7 +79,7 @@ void test_portfolio_create(const char * current_program_path) {
 
     // --- 1. WRONG PATH: Nullptr for DataHandler ---
     // The Portfolio should gracefully intercept a null dependency without segfaulting
-    auto err_res = Portfolio::Create(nullptr, std::move(empty_events), start_dt, init_cap);
+    auto err_res = Portfolio::Create(nullptr, empty_events, start_dt, init_cap);
     assert(!err_res.has_value());
     assert(err_res.error() == TuxedoError::ERR_INVALID_DATA_FORMAT);
 
@@ -112,42 +112,42 @@ void test_portfolio_create(const char * current_program_path) {
     std::vector<std::string> symbols = {symbol1, symbol2};
     
     // Instantiate the DataHandler (Passed from disk)
-    auto handler_res = HistoricCSVdataHandler::Create(std::move(empty_events), csv_dir, symbols);
+    auto handler_res = HistoricCSVdataHandler::Create(empty_events, csv_dir, symbols);
     assert(handler_res.has_value());
     
     // Transfer ownership to a unique_ptr required by the Portfolio
-    auto handler_ptr = std::make_unique<HistoricCSVdataHandler>(std::move(handler_res.value()));
+    auto handler_ptr = std::move(handler_res.value());
     
     // Create the Portfolio Engine
-    auto port_res = Portfolio::Create(std::move(handler_ptr), std::move(empty_events), start_dt, init_cap);
+    auto port_res = Portfolio::Create(std::move(handler_ptr), empty_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
     
     // --- 3. VALIDATE INTERNAL STATE (Using strictly const accessors) ---
-    assert(portfolio.start_date() == start_dt);
-    assert(portfolio.initial_capital() == init_cap);
+    assert(portfolio->start_date() == start_dt);
+    assert(portfolio->initial_capital() == init_cap);
     
-    const auto& syms = portfolio.symbol_list();
+    const auto& syms = portfolio->symbol_list();
     assert(syms.size() == 2);
     assert(syms[0] == symbol1 || syms[1] == symbol1);
 
     // Validate 0th state of `all_positions`
     // Even though the handler has 6 combined dates of history, Portfolio initializes at exactly start_dt
-    const auto& all_pos = portfolio.all_positions();
+    const auto& all_pos = portfolio->all_positions();
     assert(all_pos.size() == 1);
     assert(all_pos[0].datetime == start_dt);
     assert(all_pos[0].balances.at(symbol1) == 0.0);
     assert(all_pos[0].balances.at(symbol2) == 0.0);
 
     // Validate 0th state of `current_positions`
-    const auto& cur_pos = portfolio.current_positions();
+    const auto& cur_pos = portfolio->current_positions();
     assert(cur_pos.size() == 2);
     assert(cur_pos.at(symbol1) == 0.0);
     assert(cur_pos.at(symbol2) == 0.0);
 
     // Validate 0th state of `all_holdings`
-    const auto& all_hold = portfolio.all_holdings();
+    const auto& all_hold = portfolio->all_holdings();
     assert(all_hold.size() == 1);
     assert(all_hold[0].datetime == start_dt);
     assert(all_hold[0].cash == init_cap);
@@ -156,14 +156,14 @@ void test_portfolio_create(const char * current_program_path) {
     assert(all_hold[0].balances.at(symbol1) == 0.0);
     
     // Validate 0th state of `current_holdings`
-    const auto& cur_hold = portfolio.current_holdings();
+    const auto& cur_hold = portfolio->current_holdings();
     assert(cur_hold.cash == init_cap);
     assert(cur_hold.total == init_cap);
     assert(cur_hold.balances.at(symbol2) == 0.0);
     
     // Verify dereferenced components didn't slice or break
-    assert(portfolio.bars().symbol_list().size() == 2);
-    assert(portfolio.events().empty()); 
+    assert(portfolio->bars().symbol_list().size() == 2);
+    assert(portfolio->events().empty()); 
 
     // 4. Cleanup temporary test files
     std::remove(file_name_1.c_str());
@@ -210,14 +210,14 @@ void test_portfolio_update_timeindex(const char * current_program_path) {
     std::vector<std::string> symbols = {symbol1, symbol2};
 
     // Instantiate the DataHandler (Passed from disk)
-    auto handler_res = HistoricCSVdataHandler::Create(std::move(empty_events), csv_dir, symbols);
+    auto handler_res = HistoricCSVdataHandler::Create(empty_events, csv_dir, symbols);
     assert(handler_res.has_value());
     
     // Transfer ownership to a unique_ptr required by the Portfolio
-    auto handler_ptr = std::make_unique<HistoricCSVdataHandler>(std::move(handler_res.value()));
+    auto handler_ptr = std::move(handler_res.value());
     
     // Create the Portfolio Engine
-    auto port_res = Portfolio::Create(std::move(handler_ptr), std::move(empty_events), start_dt, init_cap);
+    auto port_res = Portfolio::Create(std::move(handler_ptr), empty_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
@@ -225,32 +225,32 @@ void test_portfolio_update_timeindex(const char * current_program_path) {
 
     // --- 1. WRONG PATH: Update timeindex before DataHandler provides any bars ---
     // The underlying data handler has not yet been advanced, so querying latest_bar_datetime will fail safely.
-    TuxedoError err = portfolio.update_timeindex(market_event);
+    TuxedoError err = portfolio->update_timeindex(market_event);
     assert(err != TuxedoError::NO_ERROR);
 
     // Validate state remains perfectly unchanged (Length remains 1: The initial state)
-    assert(portfolio.all_positions().size() == 1);
-    assert(portfolio.all_holdings().size() == 1);
+    assert(portfolio->all_positions().size() == 1);
+    assert(portfolio->all_holdings().size() == 1);
 
 
     // --- 2. HAPPY PATH ---
     // Extract a mutable reference to the internal handler to advance the market timeline
-    auto& handler_ref = const_cast<DataHandler&>(portfolio.bars());
+    auto& handler_ref = const_cast<DataHandler&>(portfolio->bars());
     
     // 2.1 Advance timeline to Jan 2
     TuxedoError update_err1 = handler_ref.update_bars();
     assert(update_err1 == TuxedoError::NO_ERROR);
 
-    TuxedoError port_err1 = portfolio.update_timeindex(market_event);
+    TuxedoError port_err1 = portfolio->update_timeindex(market_event);
     assert(port_err1 == TuxedoError::NO_ERROR);
 
     // Validate internal state has successfully appended the new date
-    const auto& all_pos1 = portfolio.all_positions();
+    const auto& all_pos1 = portfolio->all_positions();
     assert(all_pos1.size() == 2);
     assert(all_pos1.back().datetime == make_ts(2023, 1, 2));
     assert(all_pos1.back().balances.at(symbol1) == 0.0); // 0 positions as no orders occurred
 
-    const auto& all_hold1 = portfolio.all_holdings();
+    const auto& all_hold1 = portfolio->all_holdings();
     assert(all_hold1.size() == 2);
     assert(all_hold1.back().datetime == make_ts(2023, 1, 2));
     assert(all_hold1.back().cash == init_cap);
@@ -260,15 +260,15 @@ void test_portfolio_update_timeindex(const char * current_program_path) {
     TuxedoError update_err2 = handler_ref.update_bars();
     assert(update_err2 == TuxedoError::NO_ERROR);
 
-    TuxedoError port_err2 = portfolio.update_timeindex(market_event);
+    TuxedoError port_err2 = portfolio->update_timeindex(market_event);
     assert(port_err2 == TuxedoError::NO_ERROR);
 
     // Validate internal state has successfully appended the next date
-    const auto& all_pos2 = portfolio.all_positions();
+    const auto& all_pos2 = portfolio->all_positions();
     assert(all_pos2.size() == 3);
     assert(all_pos2.back().datetime == make_ts(2023, 1, 3));
     
-    const auto& all_hold2 = portfolio.all_holdings();
+    const auto& all_hold2 = portfolio->all_holdings();
     assert(all_hold2.size() == 3);
     assert(all_hold2.back().datetime == make_ts(2023, 1, 3));
 
@@ -316,15 +316,15 @@ void test_update_holdings_from_fill(const char * current_program_path) {
     std::vector<std::string> symbols = {symbol1, symbol2};
 
     // Instantiate the DataHandler (Passed from disk)
-    auto handler_res = HistoricCSVdataHandler::Create(std::move(empty_events), csv_dir, symbols);
+    auto handler_res = HistoricCSVdataHandler::Create(empty_events, csv_dir, symbols);
     assert(handler_res.has_value());
     
     // Transfer ownership to a unique_ptr required by the Portfolio
-    auto handler_ptr = std::make_unique<HistoricCSVdataHandler>(std::move(handler_res.value()));
+    auto handler_ptr = std::move(handler_res.value());
     
     // Create the Portfolio Engine
     Queue<unique_ptr<Event>> port_events;
-    auto port_res = Portfolio::Create(std::move(handler_ptr), std::move(port_events), start_dt, init_cap);
+    auto port_res = Portfolio::Create(std::move(handler_ptr), port_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
@@ -332,27 +332,27 @@ void test_update_holdings_from_fill(const char * current_program_path) {
     // --- 1. WRONG PATH: Update holding with an invalid Symbol ---
     // If a trade executes for a ticker we don't track, the engine must safely reject it.
     FillEvent invalid_fill(make_ts(2023, 1, 2), "INVALID_SYM", "ARCA", 100, 10.5, 1.0, EventDirectionType::BUY);
-    TuxedoError err1 = portfolio.update_holdings_from_fill(invalid_fill);
+    TuxedoError err1 = portfolio->update_holdings_from_fill(invalid_fill);
     assert(err1 != TuxedoError::NO_ERROR);
 
     // --- 2. HAPPY PATH ---
     // 2.1 Advance timeline to Jan 2 so Portfolio has an active timestamp
-    portfolio.update_bars();
+    portfolio->update_bars();
     MarketEvent market_event;
-    portfolio.update_timeindex(market_event);
+    portfolio->update_timeindex(market_event);
 
     // 2.2 Submit a Valid BUY Fill (Opening a Position)
     FillEvent valid_buy(make_ts(2023, 1, 2), symbol1, "ARCA", 100, 5.0, 0, EventDirectionType::BUY);
-    TuxedoError err2 = portfolio.update_holdings_from_fill(valid_buy);
+    TuxedoError err2 = portfolio->update_holdings_from_fill(valid_buy);
     assert(err2 == TuxedoError::NO_ERROR);
 
     // 2.3 Validate internal state correctly reflects the new Long position
-    const auto& cur_pos = portfolio.current_positions();
+    const auto& cur_pos = portfolio->current_positions();
     trace_with_message(std::format("cur_pos.at({}) = {}", symbol1, cur_pos.at(symbol1)));
     assert(cur_pos.at(symbol1) == 0);
     assert(cur_pos.at(symbol2) == 0);
 
-    const auto& cur_hold = portfolio.current_holdings();
+    const auto& cur_hold = portfolio->current_holdings();
     // Cash deduction: 100 shares @ $10.50 = $1,050.00. Plus $5.00 commission.
     assert(cur_hold.cash == (init_cap - 1050.0 - 5.0));
     assert(cur_hold.commission == 5.0);
@@ -360,16 +360,16 @@ void test_update_holdings_from_fill(const char * current_program_path) {
     assert(std::abs(cur_hold.total - (init_cap -1050 - 5.0)) < 1e-6);
 
     // 2.4 Submit a Valid SELL Fill (Partial Exit)    
-    portfolio.update_bars();
+    portfolio->update_bars();
     FillEvent valid_sell(make_ts(2023, 1, 3), symbol1, "ARCA", 50, 6.0, 0, EventDirectionType::SELL);
-    TuxedoError err3 = portfolio.update_holdings_from_fill(valid_sell);
+    TuxedoError err3 = portfolio->update_holdings_from_fill(valid_sell);
     assert(err3 == TuxedoError::NO_ERROR);
 
     // 2.5 Validate internal state correctly tracks the partial exit
-    const auto& cur_pos2 = portfolio.current_positions();
+    const auto& cur_pos2 = portfolio->current_positions();
     assert(cur_pos2.at(symbol1) == 0); // 100 - 50 = 50 remain
 
-    const auto& cur_hold2 = portfolio.current_holdings();
+    const auto& cur_hold2 = portfolio->current_holdings();
     // Cash addition: Sold 50 shares @ $11.00 = +$550.00. Minus $6.00 commission.
     trace_with_message(std::format("cash = {}, expected  = {}", cur_hold2.cash, init_cap - 1050.0 - 5.0 + 550.0 - 6.0));
     assert(cur_hold2.cash == (init_cap - 1050.0 - 5.0 + 550.0 - 6.0));
@@ -419,48 +419,48 @@ void test_update_positions_from_fill(const char * current_program_path) {
     std::vector<std::string> symbols = {symbol1, symbol2};
 
     // Instantiate the DataHandler (Passed from disk)
-    auto handler_res = HistoricCSVdataHandler::Create(std::move(empty_events), csv_dir, symbols);
+    auto handler_res = HistoricCSVdataHandler::Create(empty_events, csv_dir, symbols);
     assert(handler_res.has_value());
     
     // Transfer ownership to a unique_ptr required by the Portfolio
-    auto handler_ptr = std::make_unique<HistoricCSVdataHandler>(std::move(handler_res.value()));
+    auto handler_ptr = std::move(handler_res.value());
     
     // Create the Portfolio Engine
     Queue<unique_ptr<Event>> port_events;
-    auto port_res = Portfolio::Create(std::move(handler_ptr), std::move(port_events), start_dt, init_cap);
+    auto port_res = Portfolio::Create(std::move(handler_ptr), port_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
 
     // --- 1. WRONG PATH: Update position with an invalid Symbol ---
     FillEvent invalid_fill(make_ts(2023, 1, 2), "INVALID_SYM", "ARCA", 100, 10.5, 1.0, EventDirectionType::BUY);
-    TuxedoError err1 = portfolio.update_positions_from_fill(invalid_fill);
+    TuxedoError err1 = portfolio->update_positions_from_fill(invalid_fill);
     assert(err1 != TuxedoError::NO_ERROR);
 
     // --- 2. HAPPY PATH ---
     // 2.1 Advance timeline to Jan 2 so Portfolio has an active timestamp
-    auto& handler_ref = const_cast<DataHandler&>(portfolio.bars());
+    auto& handler_ref = const_cast<DataHandler&>(portfolio->bars());
     handler_ref.update_bars();
     MarketEvent market_event;
-    portfolio.update_timeindex(market_event);
+    portfolio->update_timeindex(market_event);
 
     // 2.2 Submit a Valid BUY Fill (Opening a Position)
     FillEvent valid_buy(make_ts(2023, 1, 2), symbol1, "ARCA", 100, 10.5, 5.0, EventDirectionType::BUY);
-    TuxedoError err2 = portfolio.update_positions_from_fill(valid_buy);
+    TuxedoError err2 = portfolio->update_positions_from_fill(valid_buy);
     assert(err2 == TuxedoError::NO_ERROR);
 
     // 2.3 Validate internal state correctly reflects the new Long position
-    const auto& cur_pos = portfolio.current_positions();
+    const auto& cur_pos = portfolio->current_positions();
     assert(cur_pos.at(symbol1) == 100);
     assert(cur_pos.at(symbol2) == 0);
 
     // 2.4 Submit a Valid SELL Fill (Partial Exit)
     FillEvent valid_sell(make_ts(2023, 1, 3), symbol1, "ARCA", 50, 11.0, 5.0, EventDirectionType::SELL);
-    TuxedoError err3 = portfolio.update_positions_from_fill(valid_sell);
+    TuxedoError err3 = portfolio->update_positions_from_fill(valid_sell);
     assert(err3 == TuxedoError::NO_ERROR);
 
     // 2.5 Validate internal state correctly tracks the partial exit
-    const auto& cur_pos2 = portfolio.current_positions();
+    const auto& cur_pos2 = portfolio->current_positions();
     assert(cur_pos2.at(symbol1) == 50); // 100 - 50 = 50 remain
 
     // 3. Cleanup temporary test files
@@ -507,41 +507,41 @@ void test_update_fill(const char * current_program_path) {
     std::vector<std::string> symbols = {symbol1, symbol2};
 
     // Instantiate the DataHandler (Passed from disk)
-    auto handler_res = HistoricCSVdataHandler::Create(std::move(empty_events), csv_dir, symbols);
+    auto handler_res = HistoricCSVdataHandler::Create(empty_events, csv_dir, symbols);
     assert(handler_res.has_value());
     
     // Transfer ownership to a unique_ptr required by the Portfolio
-    auto handler_ptr = std::make_unique<HistoricCSVdataHandler>(std::move(handler_res.value()));
+    auto handler_ptr = std::move(handler_res.value());
     
     // Create the Portfolio Engine
     Queue<unique_ptr<Event>> port_events;
-    auto port_res = Portfolio::Create(std::move(handler_ptr), std::move(port_events), start_dt, init_cap);
+    auto port_res = Portfolio::Create(std::move(handler_ptr), port_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
 
     // --- 1. Advance timeline to Jan 2 ---
-    auto& handler_ref = const_cast<DataHandler&>(portfolio.bars());
+    auto& handler_ref = const_cast<DataHandler&>(portfolio->bars());
     handler_ref.update_bars();
     MarketEvent market_event;
-    portfolio.update_timeindex(market_event);
+    portfolio->update_timeindex(market_event);
 
     // --- 2. WRONG PATH: Invalid Symbol ---
     // Should return early and reject the operation
     FillEvent invalid_fill(make_ts(2023, 1, 2), "INVALID_SYM", "ARCA", 100, 10.5, 1.0, EventDirectionType::BUY);
-    TuxedoError err1 = portfolio.update_fill(invalid_fill);
+    TuxedoError err1 = portfolio->update_fill(invalid_fill);
     assert(err1 != TuxedoError::NO_ERROR);
 
     // --- 3. HAPPY PATH: BUY (Full coordinated state change) ---
     FillEvent valid_buy(make_ts(2023, 1, 2), symbol1, "ARCA", 100, 10.5, 5.0, EventDirectionType::BUY);
-    TuxedoError err2 = portfolio.update_fill(valid_buy);
+    TuxedoError err2 = portfolio->update_fill(valid_buy);
     assert(err2 == TuxedoError::NO_ERROR);
 
     // Validate BOTH positions and holdings were correctly synchronized
-    const auto& cur_pos = portfolio.current_positions();
+    const auto& cur_pos = portfolio->current_positions();
     assert(cur_pos.at(symbol1) == 100);
     
-    const auto& cur_hold = portfolio.current_holdings();
+    const auto& cur_hold = portfolio->current_holdings();
     assert(cur_hold.cash == (init_cap - 1050.0 - 10.0)); // Deduction for shares + comm
     assert(cur_hold.commission == 10.0);
     // The Portfolio engine dynamically deducts (cost + commission) from the total
@@ -549,18 +549,18 @@ void test_update_fill(const char * current_program_path) {
 
     // --- 4. Advance timeline to Jan 3 to simulate actual trading loop progression ---
     handler_ref.update_bars();
-    portfolio.update_timeindex(market_event);
+    portfolio->update_timeindex(market_event);
 
     // --- 5. HAPPY PATH: SELL (Full coordinated state change) ---
     FillEvent valid_sell(make_ts(2023, 1, 3), symbol1, "ARCA", 50, 11.0, 5.0, EventDirectionType::SELL);
-    TuxedoError err3 = portfolio.update_fill(valid_sell);
+    TuxedoError err3 = portfolio->update_fill(valid_sell);
     assert(err3 == TuxedoError::NO_ERROR);
 
     // Validate BOTH positions and holdings were correctly synchronized after partial exit
-    const auto& cur_pos2 = portfolio.current_positions();
+    const auto& cur_pos2 = portfolio->current_positions();
     assert(cur_pos2.at(symbol1) == 50); // 100 - 50 = 50 remaining shares
 
-    const auto& cur_hold2 = portfolio.current_holdings();
+    const auto& cur_hold2 = portfolio->current_holdings();
     assert(cur_hold2.cash == (init_cap - 1050.0 - 5.0 + 550.0 - 16.0)); // Repayment for shares sold - comm
     assert(cur_hold2.commission == 21.0);
 
@@ -593,27 +593,27 @@ void test_naive_order(const char * current_program_path) {
 
     Queue<unique_ptr<Event>> events;
     vector<string> symbols = {symbol1};
-    auto handler_exp = HistoricCSVdataHandler::Create(std::move(events), csv_dir, symbols);
+    auto handler_exp = HistoricCSVdataHandler::Create(events, csv_dir, symbols);
     assert(handler_exp.has_value());
     
     // Portfolio requires unique_ptr to DataHandler
-    auto handler_ptr = std::make_unique<HistoricCSVdataHandler>(std::move(handler_exp.value()));
+    auto handler_ptr = std::move(handler_exp.value());
     auto* handler_ref = handler_ptr.get();
 
     Queue<unique_ptr<Event>> port_events;
     double init_cap = 100000.0;
     
-    auto port_exp = Portfolio::Create(std::move(handler_ptr), std::move(port_events), make_ts(2023, 1, 1), init_cap);
+    auto port_exp = Portfolio::Create(std::move(handler_ptr), port_events, make_ts(2023, 1, 1), init_cap);
     assert(port_exp.has_value());
     auto portfolio = std::move(port_exp.value());
 
     // Update timeindex to make bars available
     handler_ref->update_bars();
-    portfolio.update_timeindex(MarketEvent());
+    portfolio->update_timeindex(MarketEvent());
 
     // --- 1. Test BUY with 0 position ---
     SignalEvent sig_buy(symbol1, make_ts(2023, 1, 2), EventDirectionType::BUY, 0);
-    auto order_res = portfolio.naive_order(sig_buy);
+    auto order_res = portfolio->naive_order(sig_buy);
     assert(order_res.has_value());
     assert(order_res.value().symbol() == symbol1);
     assert(order_res.value().direction() == EventDirectionType::BUY);
@@ -622,18 +622,18 @@ void test_naive_order(const char * current_program_path) {
 
     // --- 2. Test BUY with existing position ---
     FillEvent valid_buy(make_ts(2023, 1, 2), symbol1, "ARCA", 100, 10.5, EventDirectionType::BUY);
-    portfolio.update_fill(valid_buy);
-    assert(portfolio.current_positions().at(symbol1) == 100);
+    portfolio->update_fill(valid_buy);
+    assert(portfolio->current_positions().at(symbol1) == 100);
 
     SignalEvent sig_buy2(symbol1, make_ts(2023, 1, 3), EventDirectionType::BUY, 0);
-    auto order_res2 = portfolio.naive_order(sig_buy2);
+    auto order_res2 = portfolio->naive_order(sig_buy2);
     // Position exists, naive_order should return unexpected ERR_BAD_INPUT based on the newly added logic
     assert(!order_res2.has_value());
     assert(order_res2.error() == TuxedoError::ERR_BAD_INPUT);
 
     // --- 3. Test EXIT with existing position ---
     SignalEvent sig_exit(symbol1, make_ts(2023, 1, 3), EventDirectionType::EXIT, 0);
-    auto order_res3 = portfolio.naive_order(sig_exit);
+    auto order_res3 = portfolio->naive_order(sig_exit);
     assert(order_res3.has_value());
     assert(order_res3.value().symbol() == symbol1);
     assert(order_res3.value().direction() == EventDirectionType::EXIT);
@@ -641,11 +641,11 @@ void test_naive_order(const char * current_program_path) {
 
     // --- 4. Test EXIT with 0 position ---
     FillEvent valid_sell(make_ts(2023, 1, 3), symbol1, "ARCA", 100, 11.0, EventDirectionType::SELL);
-    portfolio.update_fill(valid_sell);
-    assert(portfolio.current_positions().at(symbol1) == 0); // Position is now 0
+    portfolio->update_fill(valid_sell);
+    assert(portfolio->current_positions().at(symbol1) == 0); // Position is now 0
 
     SignalEvent sig_exit2(symbol1, make_ts(2023, 1, 4), EventDirectionType::EXIT, 0);
-    auto order_res4 = portfolio.naive_order(sig_exit2);
+    auto order_res4 = portfolio->naive_order(sig_exit2);
     // Position is 0, nothing to exit. Should return unexpected ERR_BAD_INPUT
     assert(!order_res4.has_value());
     assert(order_res4.error() == TuxedoError::ERR_BAD_INPUT);
@@ -686,20 +686,20 @@ void test_update_signal_test(const char * current_program_path) {
     Queue<unique_ptr<Event>> handler_events;
     std::vector<std::string> symbols = {symbol1, symbol2};
 
-    auto handler_res = HistoricCSVdataHandler::Create(std::move(handler_events), csv_dir, symbols);
+    auto handler_res = HistoricCSVdataHandler::Create(handler_events, csv_dir, symbols);
     assert(handler_res.has_value());
-    auto handler = std::make_unique<HistoricCSVdataHandler>(std::move(handler_res.value()));
+    auto handler = std::move(handler_res.value());
     handler->update_bars(); // load first bar
 
     Queue<unique_ptr<Event>> port_events;
-    auto port_res = Portfolio::Create(std::move(handler), std::move(port_events), make_ts(2023, 1, 1), 100000.0);
+    auto port_res = Portfolio::Create(std::move(handler), port_events, make_ts(2023, 1, 1), 100000.0);
     assert(port_res.has_value());
     auto portfolio = std::move(port_res.value());
 
     SignalEvent sig_event(symbol1, make_ts(2023, 1, 1), EventDirectionType::BUY, 1.0);
     
     // Validating the fixed naive_order implementation!
-    auto signal_res = portfolio.update_signal(sig_event);
+    auto signal_res = portfolio->update_signal(sig_event);
     assert(signal_res.has_value()); 
     
     const OrderEvent& order = signal_res.value();

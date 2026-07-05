@@ -36,6 +36,7 @@ namespace trading::engine {
             inline Event& operator=(Event&&) = default;
 
             inline EventType event_type() const { return event_type_; }
+            virtual ~Event() = default;
     };
     
     enum class MarketEventType {
@@ -60,6 +61,8 @@ namespace trading::engine {
             inline MarketEvent& operator=(MarketEvent&&) = default;
 
             inline MarketEventType market_event_type() const { return market_event_type_; }
+
+            virtual ~MarketEvent() = default;
             
     };
     ostream & operator<< (ostream &os, const MarketEventType &market_event_type);
@@ -103,6 +106,8 @@ namespace trading::engine {
             inline EventDirectionType direction() const { return direction_; }
             inline double strength() const { return strength_; }
 
+            virtual ~SignalEvent() = default;
+
     };
     ostream & operator<< (ostream &os, const SignalEvent &signal_event);
     
@@ -140,6 +145,8 @@ namespace trading::engine {
             inline OrderEventType order_type() const { return order_type_; }
             inline uint32_t quantity() const { return quantity_; }
             inline EventDirectionType direction() const { return direction_; }
+
+            virtual ~OrderEvent() = default;
     };
     ostream & operator<< (ostream &os, const OrderEvent &signal_event);
 
@@ -190,6 +197,8 @@ namespace trading::engine {
             inline double commission() const { return commission_; }
             inline double fill_cost() const { return fill_cost_; }
             inline EventDirectionType direction() const { return direction_; }
+
+            virtual ~FillEvent() = default;
     };
     ostream & operator<< (ostream &os, const FillEvent &fill_event);
     

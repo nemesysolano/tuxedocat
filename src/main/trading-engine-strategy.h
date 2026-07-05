@@ -19,6 +19,7 @@ namespace trading::engine::strategy {
     class Strategy {
         public:
             virtual void calculate_signals() = 0;
+            virtual ~Strategy() = default;
     };
 
 };

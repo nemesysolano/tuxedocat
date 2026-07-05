@@ -142,7 +142,7 @@ namespace trading::engine::portfolio {
         return holding;
     }
 
-    expected<Portfolio, TuxedoError> Portfolio::Create(unique_ptr<DataHandler> bars, Queue<unique_ptr<Event>> events, sys_seconds start_date, double initial_capital) {
+    expected<std::unique_ptr<Portfolio>, TuxedoError> Portfolio::Create(unique_ptr<DataHandler> bars, Queue<unique_ptr<Event>> & events, sys_seconds start_date, double initial_capital) {
         if(!bars) {
             return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
         }
@@ -156,7 +156,7 @@ namespace trading::engine::portfolio {
         }();
         auto all_holdings = create_all_holdings(bars->symbol_list(), start_date, initial_capital);
         auto current_holdings = create_current_holdings(bars->symbol_list(), initial_capital);
-        return Portfolio(std::move(bars), std::move(events), start_date, initial_capital, std::move(all_positions), std::move(current_positions), std::move(all_holdings), std::move(current_holdings));
+        return make_unique<Portfolio>(std::move(bars), events, start_date, initial_capital, std::move(all_positions), std::move(current_positions), std::move(all_holdings), std::move(current_holdings));
     }
 
     TuxedoError Portfolio::update_timeindex(const MarketEvent  & market_event) {
