@@ -2,6 +2,7 @@
 #define __TRADING_ENGINE_STRATEGY__
 #include "trading-engine.h"
 #include "trading-engine-datahandler.h"
+using namespace std;
 
 namespace trading::engine::strategy {
     /*
@@ -17,7 +18,11 @@ namespace trading::engine::strategy {
     since it obtains the bar tuples fro a queue object.
     */
     class Strategy {
+        private:
+            unique_ptr<DataHandler> & datahandler_;
+            unique_ptr<Event> & events_;
         public:
+            inline Strategy(unique_ptr<DataHandler> & datahandler, unique_ptr<Event> & events): datahandler_(datahandler), events_(events){}
             virtual void calculate_signals() = 0;
             virtual ~Strategy() = default;
     };

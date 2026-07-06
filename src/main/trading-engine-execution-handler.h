@@ -45,8 +45,8 @@ namespace trading::engine::executionhandler {
     */
     class SimulationExecutionHandler: public ExecutionHandler {
         protected:
-            unique_ptr<DataHandler> & datahandler_;
-            Queue<unique_ptr<Event>> & events_;
+            unique_ptr<DataHandler> & datahandler_; // Must be in the same of scope of *this.
+            Queue<unique_ptr<Event>> & events_; // Must be in the same of scope of *this.
         public:
 
             /* 

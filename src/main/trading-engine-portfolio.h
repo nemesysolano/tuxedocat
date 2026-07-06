@@ -64,7 +64,7 @@ namespace trading::engine::portfolio {
     class Portfolio {
         private:
             unique_ptr<DataHandler> bars_;
-            Queue<unique_ptr<Event>> & events_;
+            Queue<unique_ptr<Event>> & events_; // Must be in the same of scope of *this.
             const vector<string> & symbol_list_; // bars_.symbol_list();
             sys_seconds start_date_;
             double initial_capital_;

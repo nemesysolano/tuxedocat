@@ -99,9 +99,9 @@ namespace trading::engine::datahandler {
     
     class HistoricCSVdataHandler: public DataHandler {
         private:
-            Queue<unique_ptr<Event>> & events_;
+            Queue<unique_ptr<Event>> & events_; // Must be in the same of scope of *this.
             string csv_dir_;
-            vector<string> symbol_list_;
+            reference_wrapper<const vector<string>> symbol_list_;
             map<string, DataFrame> symbol_data_; // This field name is misleading, but we will keep it for consistency with the python version.
             bool continue_backtest_;
             map<string, vector<Bar>> latest_symbol_data_;
@@ -115,7 +115,7 @@ namespace trading::engine::datahandler {
         public:
             HistoricCSVdataHandler(
                 Queue<unique_ptr<Event>> & events,
-                vector<string> & symbol_list,
+                reference_wrapper<const vector<string>> symbol_list,
                 map<string, DataFrame> symbol_data,
                 bool continue_backtest,
                 map<string, vector<Bar>> latest_symbol_data,
@@ -140,7 +140,7 @@ namespace trading::engine::datahandler {
             TuxedoError update_bars() override;                        
             ~HistoricCSVdataHandler() override = default;
 
-            static expected<unique_ptr<HistoricCSVdataHandler>, TuxedoError> Create(Queue<unique_ptr<Event>> & events, const string & csv_dir , vector<string> & symbol_list);
+            static expected<unique_ptr<HistoricCSVdataHandler>, TuxedoError> Create(Queue<unique_ptr<Event>> & events, const string & csv_dir , const vector<string> & symbol_list);
             const map<string, DataFrame> & symbol_data() const;
     };
 };

@@ -18,7 +18,7 @@ namespace trading::engine::datahandler {
         open_price_index, high_price_index, low_price_index, close_price_index, volume_index
     */
     HistoricCSVdataHandler::HistoricCSVdataHandler(
-        Queue<unique_ptr<Event>> & events, vector<string> & symbol_list, map<string, DataFrame> symbol_data, bool continue_backtest, map<string, vector<Bar>> latest_symbol_data, size_t iterator_size, size_t open_price_index, size_t high_price_index, size_t low_price_index, size_t close_price_index, size_t volume_index): 
+        Queue<unique_ptr<Event>> & events, reference_wrapper<const vector<string>> symbol_list, map<string, DataFrame> symbol_data, bool continue_backtest, map<string, vector<Bar>> latest_symbol_data, size_t iterator_size, size_t open_price_index, size_t high_price_index, size_t low_price_index, size_t close_price_index, size_t volume_index): 
         events_(events),
         symbol_list_(std::move(symbol_list)),
         symbol_data_(std::move(symbol_data)),
@@ -37,7 +37,7 @@ namespace trading::engine::datahandler {
 
     HistoricCSVdataHandler::HistoricCSVdataHandler(HistoricCSVdataHandler&& other) noexcept
         : events_(other.events_),
-          symbol_list_(std::move(other.symbol_list_)),
+          symbol_list_(other.symbol_list_),
           symbol_data_(std::move(other.symbol_data_)),
           continue_backtest_(other.continue_backtest_),
           latest_symbol_data_(std::move(other.latest_symbol_data_)),
@@ -68,7 +68,7 @@ namespace trading::engine::datahandler {
         return *this;
     }
 
-    expected<unique_ptr<HistoricCSVdataHandler>, TuxedoError> HistoricCSVdataHandler::Create(Queue<unique_ptr<Event>> & events, const string & csv_dir , vector<string> & symbol_list) {
+    expected<unique_ptr<HistoricCSVdataHandler>, TuxedoError> HistoricCSVdataHandler::Create(Queue<unique_ptr<Event>> & events, const string & csv_dir , const vector<string> & symbol_list) {
         /* 
         Store all timestamps from loaded CSV files
         */
@@ -241,6 +241,8 @@ namespace trading::engine::datahandler {
         if(!continue_backtest_) {
             return TuxedoError::ERR_NO_OBSERVATIONS;
         }
+
+        const vector<string> & symbol_list_ = this->symbol_list_.get();
 
         for(const string & symbol: symbol_list_) {            
             DataFrame & data_frame = symbol_data_.at(symbol);
