@@ -64,7 +64,7 @@ namespace trading::engine::portfolio {
     class Portfolio {
         private:
             unique_ptr<DataHandler> datahandler_;
-            Queue<unique_ptr<Event>> & events_; // Must be in the same of scope of *this.
+            reference_wrapper<Queue<unique_ptr<Event>>> events_; // Must be in the same of scope of *this.
             const vector<string> & symbol_list_; // datahandler_.symbol_list();
             sys_seconds start_date_;
             double initial_capital_;
@@ -76,7 +76,7 @@ namespace trading::engine::portfolio {
         public:
             inline Portfolio(
                 unique_ptr<DataHandler> datahandler,
-                Queue<unique_ptr<Event>> & events,
+                reference_wrapper<Queue<unique_ptr<Event>>> events,
                 sys_seconds start_date,
                 double initial_capital,
                 vector<Position> all_positions,
@@ -110,11 +110,7 @@ namespace trading::engine::portfolio {
             inline Portfolio & operator=(Portfolio && source) noexcept {
                 if(this != &source) {
                     datahandler_ = std::move(source.datahandler_);
-                    // events_ is a reference to an externally-owned queue (shared with
-                    // Backtest/ExecutionHandler); it's bound once at construction and
-                    // can't be reseated here. Assigning through it would try to
-                    // copy-assign the referent Queue, which fails to compile since
-                    // Queue<unique_ptr<Event>> holds a move-only element type.
+                    events_ = std::move(source.events_);
                     start_date_ = source.start_date_;
                     initial_capital_ = source.initial_capital_;
                     all_positions_ = std::move(source.all_positions_);
@@ -160,7 +156,7 @@ namespace trading::engine::portfolio {
 
             expected<DataFrame, TuxedoError> create_equity_curve_dataframe() const;
             
-            static expected<std::unique_ptr<Portfolio>, TuxedoError> Create(unique_ptr<DataHandler> bars, Queue<unique_ptr<Event>> & events, sys_seconds start_date, double initial_capital);
+            static expected<std::unique_ptr<Portfolio>, TuxedoError> Create(unique_ptr<DataHandler> bars, reference_wrapper<Queue<unique_ptr<Event>>> events, sys_seconds start_date, double initial_capital);
     };
     
     vector<Position> create_all_positions(const vector<string> & symbol_list_, sys_seconds start_date);

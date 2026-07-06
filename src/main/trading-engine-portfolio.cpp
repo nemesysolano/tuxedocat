@@ -142,7 +142,7 @@ namespace trading::engine::portfolio {
         return holding;
     }
 
-    expected<std::unique_ptr<Portfolio>, TuxedoError> Portfolio::Create(unique_ptr<DataHandler> bars, Queue<unique_ptr<Event>> & events, sys_seconds start_date, double initial_capital) {
+    expected<std::unique_ptr<Portfolio>, TuxedoError> Portfolio::Create(unique_ptr<DataHandler> bars, reference_wrapper<Queue<unique_ptr<Event>>> events, sys_seconds start_date, double initial_capital) {
         if(!bars) {
             return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
         }
