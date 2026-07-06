@@ -63,9 +63,9 @@ namespace trading::engine::portfolio {
     */
     class Portfolio {
         private:
-            unique_ptr<DataHandler> bars_;
+            unique_ptr<DataHandler> datahandler_;
             Queue<unique_ptr<Event>> & events_; // Must be in the same of scope of *this.
-            const vector<string> & symbol_list_; // bars_.symbol_list();
+            const vector<string> & symbol_list_; // datahandler_.symbol_list();
             sys_seconds start_date_;
             double initial_capital_;
             vector<Position> all_positions_;
@@ -75,7 +75,7 @@ namespace trading::engine::portfolio {
 
         public:
             inline Portfolio(
-                unique_ptr<DataHandler> bars,
+                unique_ptr<DataHandler> datahandler,
                 Queue<unique_ptr<Event>> & events,
                 sys_seconds start_date,
                 double initial_capital,
@@ -83,9 +83,9 @@ namespace trading::engine::portfolio {
                 map<string, int32_t> current_positions,
                 vector<Holding> all_holdings,
                 Holding current_holdings
-            ): bars_(std::move(bars)),
+            ): datahandler_(std::move(datahandler)),
                 events_(events),
-                symbol_list_(bars_->symbol_list()),
+                symbol_list_(datahandler_->symbol_list()),
                 start_date_(start_date),
                 initial_capital_(initial_capital),
                 all_positions_(std::move(all_positions)),
@@ -95,7 +95,7 @@ namespace trading::engine::portfolio {
             }; 
 
             inline Portfolio(Portfolio && source) noexcept: 
-                bars_(std::move(source.bars_)), 
+                datahandler_(std::move(source.datahandler_)), 
                 events_(source.events_), 
                 symbol_list_(source.symbol_list_), 
                 start_date_(source.start_date_), 
@@ -109,7 +109,7 @@ namespace trading::engine::portfolio {
 
             inline Portfolio & operator=(Portfolio && source) noexcept {
                 if(this != &source) {
-                    bars_ = std::move(source.bars_);
+                    datahandler_ = std::move(source.datahandler_);
                     // events_ is a reference to an externally-owned queue (shared with
                     // Backtest/ExecutionHandler); it's bound once at construction and
                     // can't be reseated here. Assigning through it would try to
@@ -126,12 +126,12 @@ namespace trading::engine::portfolio {
             };
             
             // Accessors
-            inline const DataHandler & bars() const { return *bars_; }
+            inline const DataHandler & bars() const { return *datahandler_; }
 #ifdef __TEST_MAIN__
-            inline TuxedoError update_bars() { return bars_->update_bars(); }
+            inline TuxedoError update_bars() { return datahandler_->update_bars(); }
 #endif            
             inline const Queue<unique_ptr<Event>> & events() const { return events_; }
-            const vector<string> & symbol_list() const { return symbol_list_; } // bars_.symbol_list();
+            const vector<string> & symbol_list() const { return symbol_list_; } // datahandler_.symbol_list();
             const sys_seconds start_date() const { return start_date_; }
             double initial_capital() const { return initial_capital_; }
             const vector<Position> & all_positions() const { return all_positions_; }

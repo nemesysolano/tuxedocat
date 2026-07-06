@@ -230,7 +230,7 @@ namespace trading::engine::portfolio {
         Takes a FillEvent object and updates the holdings matrix to reflect the 
         holdings value
         */
-        const DataHandler & bars = * bars_.get();
+        const DataHandler & bars = * datahandler_.get();
         if(bars.latest_bar_datetime(fill_event.symbol()).has_value() == false) {
             return TuxedoError::ERR_NO_OBSERVATIONS;
         } 
@@ -267,7 +267,7 @@ namespace trading::engine::portfolio {
         Takes a FillEvent object and updates the position matrix to
         reflect new position.
         */
-        const DataHandler & bars = * bars_.get();
+        const DataHandler & bars = * datahandler_.get();
         if(bars.latest_bar_datetime(fill_event.symbol()).has_value() == false) {
             return TuxedoError::ERR_NO_OBSERVATIONS;
         } 
