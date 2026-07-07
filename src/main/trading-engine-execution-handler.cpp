@@ -18,7 +18,7 @@ namespace trading::engine::executionhandler {
         ));
     }
 
-    expected<unique_ptr<SimulationExecutionHandler>, TuxedoError> SimulationExecutionHandler::Create(unique_ptr<DataHandler> & datahandler, Queue<unique_ptr<Event>> & events) {        
+    expected<unique_ptr<SimulationExecutionHandler>, TuxedoError> SimulationExecutionHandler::Create(reference_wrapper<unique_ptr<DataHandler>> & datahandler, Queue<unique_ptr<Event>> & events) {        
         return make_unique<SimulationExecutionHandler>(datahandler, events);
     }
 }

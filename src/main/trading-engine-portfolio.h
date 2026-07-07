@@ -63,7 +63,7 @@ namespace trading::engine::portfolio {
     */
     class Portfolio {
         private:
-            unique_ptr<DataHandler> datahandler_;
+            reference_wrapper<unique_ptr<DataHandler>> datahandler_;
             reference_wrapper<Queue<unique_ptr<Event>>> events_; // Must be in the same of scope of *this.
             const vector<string> & symbol_list_; // datahandler_.symbol_list();
             sys_seconds start_date_;
@@ -75,7 +75,7 @@ namespace trading::engine::portfolio {
 
         public:
             inline Portfolio(
-                unique_ptr<DataHandler> datahandler,
+                reference_wrapper<unique_ptr<DataHandler>> datahandler,
                 reference_wrapper<Queue<unique_ptr<Event>>> events,
                 sys_seconds start_date,
                 double initial_capital,
@@ -83,9 +83,9 @@ namespace trading::engine::portfolio {
                 map<string, int32_t> current_positions,
                 vector<Holding> all_holdings,
                 Holding current_holdings
-            ): datahandler_(std::move(datahandler)),
+            ): datahandler_(datahandler),
                 events_(events),
-                symbol_list_(datahandler_->symbol_list()),
+                symbol_list_(datahandler_.get()->symbol_list()),
                 start_date_(start_date),
                 initial_capital_(initial_capital),
                 all_positions_(std::move(all_positions)),
@@ -122,9 +122,9 @@ namespace trading::engine::portfolio {
             };
             
             // Accessors
-            inline const DataHandler & bars() const { return *datahandler_; }
+            inline const DataHandler & bars() const { return * datahandler_.get(); }
 #ifdef __TEST_MAIN__
-            inline TuxedoError update_bars() { return datahandler_->update_bars(); }
+            inline TuxedoError update_bars() { return (* datahandler_.get()).update_bars(); }
 #endif            
             inline const Queue<unique_ptr<Event>> & events() const { return events_; }
             const vector<string> & symbol_list() const { return symbol_list_; } // datahandler_.symbol_list();
@@ -156,7 +156,7 @@ namespace trading::engine::portfolio {
 
             expected<DataFrame, TuxedoError> create_equity_curve_dataframe() const;
             
-            static expected<std::unique_ptr<Portfolio>, TuxedoError> Create(unique_ptr<DataHandler> bars, reference_wrapper<Queue<unique_ptr<Event>>> events, sys_seconds start_date, double initial_capital);
+            static expected<std::unique_ptr<Portfolio>, TuxedoError> Create(reference_wrapper<unique_ptr<DataHandler>> bars, reference_wrapper<Queue<unique_ptr<Event>>> events, sys_seconds start_date, double initial_capital);
     };
     
     vector<Position> create_all_positions(const vector<string> & symbol_list_, sys_seconds start_date);

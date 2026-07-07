@@ -45,7 +45,7 @@ namespace trading::engine::executionhandler {
     */
     class SimulationExecutionHandler: public ExecutionHandler {
         protected:
-            unique_ptr<DataHandler> & datahandler_; // Must be in the same of scope of *this.
+            reference_wrapper<unique_ptr<DataHandler>> & datahandler_; // Must be in the same of scope of *this.
             Queue<unique_ptr<Event>> & events_; // Must be in the same of scope of *this.
         public:
 
@@ -56,7 +56,7 @@ namespace trading::engine::executionhandler {
                 /* 
                 Reference to datahablder; must always be in the same scope of `SimulationExecutionHandler`.
                 */
-                unique_ptr<DataHandler> & datahandler,
+                reference_wrapper<unique_ptr<DataHandler>> & datahandler,
                 
                 /*
                 The queue of `FillEvent` objects.
@@ -77,7 +77,7 @@ namespace trading::engine::executionhandler {
             
             virtual ~SimulationExecutionHandler() = default;
 
-            static expected<unique_ptr<SimulationExecutionHandler>, TuxedoError> Create(unique_ptr<DataHandler> & datahandler, Queue<unique_ptr<Event>> & events);
+            static expected<unique_ptr<SimulationExecutionHandler>, TuxedoError> Create(reference_wrapper<unique_ptr<DataHandler>> & datahandler, Queue<unique_ptr<Event>> & events);
     };
 }
 

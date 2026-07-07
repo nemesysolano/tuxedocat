@@ -28,9 +28,9 @@ namespace trading::engine::backtest {
         if(!datahandler_result.has_value()) {
             return unexpected(datahandler_result.error());
         }
-        auto datahandler = std::move(datahandler_result.value()); // unique_ptr<DataHandler>
+        auto datahandler = std::move(datahandler_result.value()); // reference_wrapper<unique_ptr<DataHandler>>
 
-        auto strategy_result = strategy_cls(datahandler, events_ref); //unique_ptr<DataHandler> & datahandler, Queue<unique_ptr<Event>> & events
+        auto strategy_result = strategy_cls(datahandler, events_ref); //reference_wrapper<unique_ptr<DataHandler>> & datahandler, Queue<unique_ptr<Event>> & events
         if(!strategy_result.has_value()) {
             return unexpected(strategy_result.error());
         }

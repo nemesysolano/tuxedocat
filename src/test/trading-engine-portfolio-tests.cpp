@@ -77,13 +77,8 @@ void test_portfolio_create(const char * current_program_path) {
     double init_cap = 100000.0;
     Queue<unique_ptr<Event>> empty_events; // Note: updated to shared_ptr wrapper to match the Handler requirements
 
-    // --- 1. WRONG PATH: Nullptr for DataHandler ---
-    // The Portfolio should gracefully intercept a null dependency without segfaulting
-    auto err_res = Portfolio::Create(nullptr, empty_events, start_dt, init_cap);
-    assert(!err_res.has_value());
-    assert(err_res.error() == TuxedoError::ERR_INVALID_DATA_FORMAT);
 
-    // --- 2. HAPPY PATH ---
+    // --- 1. HAPPY PATH ---
     // Setup temporary CSV files with multi-day non-overlapping dates
     std::filesystem::path exe_path = std::filesystem::canonical(current_program_path).parent_path();
     string csv_dir = exe_path.string();   
@@ -116,10 +111,11 @@ void test_portfolio_create(const char * current_program_path) {
     assert(handler_res.has_value());
     
     // Transfer ownership to a unique_ptr required by the Portfolio
-    auto handler_ptr = std::move(handler_res.value());
-    
+    std::unique_ptr<DataHandler> handler_ptr = std::move(handler_res.value());
+    auto handler_ref = std::ref(handler_ptr);
+
     // Create the Portfolio Engine
-    auto port_res = Portfolio::Create(std::move(handler_ptr), empty_events, start_dt, init_cap);
+    auto port_res = Portfolio::Create(std::move(handler_ref), empty_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
@@ -214,10 +210,11 @@ void test_portfolio_update_timeindex(const char * current_program_path) {
     assert(handler_res.has_value());
     
     // Transfer ownership to a unique_ptr required by the Portfolio
-    auto handler_ptr = std::move(handler_res.value());
-    
+    std::unique_ptr<DataHandler> handler_ptr = std::move(handler_res.value());
+    auto handler_ref = std::ref(handler_ptr);
+
     // Create the Portfolio Engine
-    auto port_res = Portfolio::Create(std::move(handler_ptr), empty_events, start_dt, init_cap);
+    auto port_res = Portfolio::Create(std::move(handler_ref), empty_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
@@ -235,10 +232,9 @@ void test_portfolio_update_timeindex(const char * current_program_path) {
 
     // --- 2. HAPPY PATH ---
     // Extract a mutable reference to the internal handler to advance the market timeline
-    auto& handler_ref = const_cast<DataHandler&>(portfolio->bars());
-    
+   
     // 2.1 Advance timeline to Jan 2
-    TuxedoError update_err1 = handler_ref.update_bars();
+    TuxedoError update_err1 = handler_ptr->update_bars();
     assert(update_err1 == TuxedoError::NO_ERROR);
 
     TuxedoError port_err1 = portfolio->update_timeindex(market_event);
@@ -257,7 +253,7 @@ void test_portfolio_update_timeindex(const char * current_program_path) {
     assert(all_hold1.back().total == init_cap);
 
     // 2.2 Advance timeline to Jan 3
-    TuxedoError update_err2 = handler_ref.update_bars();
+    TuxedoError update_err2 = handler_ptr->update_bars();
     assert(update_err2 == TuxedoError::NO_ERROR);
 
     TuxedoError port_err2 = portfolio->update_timeindex(market_event);
@@ -320,11 +316,11 @@ void test_update_holdings_from_fill(const char * current_program_path) {
     assert(handler_res.has_value());
     
     // Transfer ownership to a unique_ptr required by the Portfolio
-    auto handler_ptr = std::move(handler_res.value());
-    
+    std::unique_ptr<DataHandler> handler_ptr = std::move(handler_res.value());
+    auto handler_ref = std::ref(handler_ptr);
     // Create the Portfolio Engine
     Queue<unique_ptr<Event>> port_events;
-    auto port_res = Portfolio::Create(std::move(handler_ptr), port_events, start_dt, init_cap);
+    auto port_res = Portfolio::Create(std::move(handler_ref), port_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
@@ -423,11 +419,12 @@ void test_update_positions_from_fill(const char * current_program_path) {
     assert(handler_res.has_value());
     
     // Transfer ownership to a unique_ptr required by the Portfolio
-    auto handler_ptr = std::move(handler_res.value());
-    
+    std::unique_ptr<DataHandler> handler_ptr = std::move(handler_res.value());
+    auto handler_ref = std::ref(handler_ptr);
+
     // Create the Portfolio Engine
     Queue<unique_ptr<Event>> port_events;
-    auto port_res = Portfolio::Create(std::move(handler_ptr), port_events, start_dt, init_cap);
+    auto port_res = Portfolio::Create(std::move(handler_ref), port_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
@@ -439,8 +436,7 @@ void test_update_positions_from_fill(const char * current_program_path) {
 
     // --- 2. HAPPY PATH ---
     // 2.1 Advance timeline to Jan 2 so Portfolio has an active timestamp
-    auto& handler_ref = const_cast<DataHandler&>(portfolio->bars());
-    handler_ref.update_bars();
+    handler_ptr->update_bars();
     MarketEvent market_event;
     portfolio->update_timeindex(market_event);
 
@@ -511,18 +507,19 @@ void test_update_fill(const char * current_program_path) {
     assert(handler_res.has_value());
     
     // Transfer ownership to a unique_ptr required by the Portfolio
-    auto handler_ptr = std::move(handler_res.value());
+    std::unique_ptr<DataHandler> handler_ptr = std::move(handler_res.value());
+    auto handler_ref = std::ref(handler_ptr);
     
     // Create the Portfolio Engine
     Queue<unique_ptr<Event>> port_events;
-    auto port_res = Portfolio::Create(std::move(handler_ptr), port_events, start_dt, init_cap);
+    auto port_res = Portfolio::Create(std::move(handler_ref), port_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
 
     // --- 1. Advance timeline to Jan 2 ---
-    auto& handler_ref = const_cast<DataHandler&>(portfolio->bars());
-    handler_ref.update_bars();
+    // auto handler_ref = const_cast<DataHandler>(portfolio->bars());
+    handler_ptr.get()->update_bars();
     MarketEvent market_event;
     portfolio->update_timeindex(market_event);
 
@@ -548,7 +545,7 @@ void test_update_fill(const char * current_program_path) {
     assert(std::abs(cur_hold.total - (init_cap - 1050.0 - 10.0)) < 1e-6); 
 
     // --- 4. Advance timeline to Jan 3 to simulate actual trading loop progression ---
-    handler_ref.update_bars();
+    handler_ptr.get()->update_bars();
     portfolio->update_timeindex(market_event);
 
     // --- 5. HAPPY PATH: SELL (Full coordinated state change) ---
@@ -597,18 +594,18 @@ void test_naive_order(const char * current_program_path) {
     assert(handler_exp.has_value());
     
     // Portfolio requires unique_ptr to DataHandler
-    auto handler_ptr = std::move(handler_exp.value());
-    auto* handler_ref = handler_ptr.get();
+    std::unique_ptr<DataHandler> handler_ptr = std::move(handler_exp.value());
+    auto handler_ref = std::ref(handler_ptr);
 
     Queue<unique_ptr<Event>> port_events;
     double init_cap = 100000.0;
     
-    auto port_exp = Portfolio::Create(std::move(handler_ptr), port_events, make_ts(2023, 1, 1), init_cap);
+    auto port_exp = Portfolio::Create(std::move(handler_ref), port_events, make_ts(2023, 1, 1), init_cap);
     assert(port_exp.has_value());
     auto portfolio = std::move(port_exp.value());
 
     // Update timeindex to make bars available
-    handler_ref->update_bars();
+    handler_ptr.get()->update_bars();
     portfolio->update_timeindex(MarketEvent());
 
     // --- 1. Test BUY with 0 position ---
@@ -688,11 +685,14 @@ void test_update_signal_test(const char * current_program_path) {
 
     auto handler_res = HistoricCSVdataHandler::Create(handler_events, csv_dir, symbols);
     assert(handler_res.has_value());
-    auto handler = std::move(handler_res.value());
-    handler->update_bars(); // load first bar
+
+    std::unique_ptr<DataHandler> handler_ptr = std::move(handler_res.value());
+    reference_wrapper<unique_ptr<DataHandler>> handler_wrapper = ref(handler_ptr);
+    
+    handler_wrapper.get()->update_bars(); // load first bar
 
     Queue<unique_ptr<Event>> port_events;
-    auto port_res = Portfolio::Create(std::move(handler), port_events, make_ts(2023, 1, 1), 100000.0);
+    auto port_res = Portfolio::Create(handler_wrapper, port_events, make_ts(2023, 1, 1), 100000.0);
     assert(port_res.has_value());
     auto portfolio = std::move(port_res.value());
 
