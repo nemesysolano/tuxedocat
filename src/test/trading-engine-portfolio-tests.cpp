@@ -159,7 +159,7 @@ void test_portfolio_create(const char * current_program_path) {
     
     // Verify dereferenced components didn't slice or break
     assert(portfolio->bars().symbol_list().size() == 2);
-    assert(portfolio->events().empty()); 
+    assert(portfolio->events().get().empty()); 
 
     // 4. Cleanup temporary test files
     std::remove(file_name_1.c_str());

@@ -143,19 +143,19 @@ namespace trading::engine::portfolio {
     }
 
     expected<std::unique_ptr<Portfolio>, TuxedoError> Portfolio::Create(reference_wrapper<unique_ptr<DataHandler>> datahandler, reference_wrapper<Queue<unique_ptr<Event>>> events, sys_seconds start_date, double initial_capital) {
-        if(!datahandler) {
-            return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
-        }
-        auto all_positions = create_all_positions(datahandler->symbol_list(), start_date);
+        // if(datahandler) {
+        //     return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
+        // }
+        auto all_positions = create_all_positions(datahandler.get()->symbol_list(), start_date);
         map<string, int32_t> current_positions = [&datahandler]() {
             map<string, int32_t> positions;
-            for(const auto & symbol : datahandler->symbol_list()) {
+            for(const auto & symbol : datahandler.get()->symbol_list()) {
                 positions[symbol] = 0;
             }
             return positions;
         }();
-        auto all_holdings = create_all_holdings(datahandler->symbol_list(), start_date, initial_capital);
-        auto current_holdings = create_current_holdings(datahandler->symbol_list(), initial_capital);
+        auto all_holdings = create_all_holdings(datahandler.get()->symbol_list(), start_date, initial_capital);
+        auto current_holdings = create_current_holdings(datahandler.get()->symbol_list(), initial_capital);
         return make_unique<Portfolio>(std::move(datahandler), events, start_date, initial_capital, std::move(all_positions), std::move(current_positions), std::move(all_holdings), std::move(current_holdings));
     }
 

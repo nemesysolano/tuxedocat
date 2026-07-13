@@ -17,11 +17,12 @@ using namespace std::chrono;
 using namespace trading::engine::strategy;
 using namespace trading::engine::executionhandler;
 
-namespace trading::engine::backtest {
-    typedef std::function<expected<reference_wrapper<unique_ptr<DataHandler>>, TuxedoError>(Queue<unique_ptr<Event>> &, const string & , const vector<string> &)> datahandler_factory;
-    typedef std::function<expected<unique_ptr<Portfolio>, TuxedoError>(reference_wrapper<unique_ptr<DataHandler>>, Queue<unique_ptr<Event>> &, sys_seconds, double)> portfolio_factory; // portfolio_cls in python
-    typedef std::function<expected<unique_ptr<ExecutionHandler>, TuxedoError>(reference_wrapper<unique_ptr<DataHandler>> & datahandler, Queue<unique_ptr<Event>> & events)> executionhandler_factory;
-    typedef std::function<expected<unique_ptr<Strategy>, TuxedoError>(reference_wrapper<unique_ptr<DataHandler>> & datahandler, Queue<unique_ptr<Event>> & events)> strategy_factory; // strategy_cls in python    
+namespace trading::engine::backtest { // reference_wrapper<Queue<unique_ptr<Event>>>  events, const string & csv_dir , const vector<string> & symbol_list
+// Change this line:
+    typedef std::function<expected<unique_ptr<DataHandler>, TuxedoError>(reference_wrapper<Queue<unique_ptr<Event>>> , const string & , const vector<string> &)> datahandler_factory;
+    typedef std::function<expected<unique_ptr<Portfolio>, TuxedoError>(reference_wrapper<unique_ptr<DataHandler>>, reference_wrapper<Queue<unique_ptr<Event>>> , sys_seconds, double)> portfolio_factory; // portfolio_cls in python
+    typedef std::function<expected<unique_ptr<ExecutionHandler>, TuxedoError>(reference_wrapper<unique_ptr<DataHandler>> datahandler, reference_wrapper<Queue<unique_ptr<Event>>>  events)> executionhandler_factory;
+    typedef std::function<expected<unique_ptr<Strategy>, TuxedoError>(reference_wrapper<unique_ptr<DataHandler>> datahandler, reference_wrapper<Queue<unique_ptr<Event>>>  events)> strategy_factory; // strategy_cls in python    
 
     /* 
     Encapsulates the settings and coponents for carrying out
@@ -36,7 +37,7 @@ namespace trading::engine::backtest {
             size_t heartbeat_; 
             sys_seconds start_date_; 
             unique_ptr<Queue<unique_ptr<Event>>> events_;
-            reference_wrapper<unique_ptr<DataHandler>> data_handler_; 
+            unique_ptr<DataHandler> data_handler_; 
             unique_ptr<Portfolio> portfolio_;
             unique_ptr<ExecutionHandler> execution_handler_;
             unique_ptr<Strategy> strategy_;             
@@ -45,7 +46,8 @@ namespace trading::engine::backtest {
             size_t orders_;
             size_t fills_;
             size_t num_strats_;
-            
+        
+        public:
             inline Backtest(
                 const string csv_dir,
                 const vector<string> & symbol_list,
@@ -53,7 +55,7 @@ namespace trading::engine::backtest {
                 size_t heartbeat,
                 sys_seconds start_date,
                 unique_ptr<Queue<unique_ptr<Event>>> events,
-                reference_wrapper<unique_ptr<DataHandler>> data_handler,
+                unique_ptr<DataHandler> data_handler,
                 unique_ptr<Portfolio> portfolio,
                 unique_ptr<ExecutionHandler> execution_handler,
                 unique_ptr<Strategy> strategy          
@@ -62,7 +64,6 @@ namespace trading::engine::backtest {
                 orders_(0), fills_(0), num_strats_(1)
               {}
 
-        public:
             static expected<unique_ptr<Backtest>, TuxedoError> Create(
                 const string csv_dir,
                 const vector<string> & symbol_list,

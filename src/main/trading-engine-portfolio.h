@@ -126,7 +126,7 @@ namespace trading::engine::portfolio {
 #ifdef __TEST_MAIN__
             inline TuxedoError update_bars() { return (* datahandler_.get()).update_bars(); }
 #endif            
-            inline const Queue<unique_ptr<Event>> & events() const { return events_; }
+            inline const reference_wrapper<Queue<unique_ptr<Event>>>  events() const { return events_; }
             const vector<string> & symbol_list() const { return symbol_list_; } // datahandler_.symbol_list();
             const sys_seconds start_date() const { return start_date_; }
             double initial_capital() const { return initial_capital_; }

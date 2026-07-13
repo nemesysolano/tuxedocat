@@ -4,6 +4,7 @@
 
 using namespace std;
 using namespace std::filesystem;
+using namespace timeseries;
 
 namespace trading::engine::backtest {
     expected<unique_ptr<Backtest>, TuxedoError> Backtest::Create(
@@ -21,22 +22,45 @@ namespace trading::engine::backtest {
         if(!is_directory(csv_dir, error) || error) {
             return unexpected(TuxedoError::ERR_CANT_OPEN_FILE);
         }
-        auto events = make_unique<unique_ptr<Queue<unique_ptr<Event>>>>();
-        auto & events_ref = * events.get()->get();
-        
-        auto datahandler_result = datahandler_cls(events_ref, csv_dir, symbol_list); // Queue<unique_ptr<Event>> &, const string & , vector<string> &
+
+        auto events_ptr = make_unique<Queue<unique_ptr<Event>>>();
+        auto events_ref = ref(*events_ptr); 
+        auto datahandler_result = datahandler_cls(events_ref, csv_dir, symbol_list);
         if(!datahandler_result.has_value()) {
             return unexpected(datahandler_result.error());
         }
-        auto datahandler = std::move(datahandler_result.value()); // reference_wrapper<unique_ptr<DataHandler>>
+        auto & datahandler = datahandler_result.value(); // data_handler
+        auto datahandler_ref = ref(datahandler);
 
-        auto strategy_result = strategy_cls(datahandler, events_ref); //reference_wrapper<unique_ptr<DataHandler>> & datahandler, Queue<unique_ptr<Event>> & events
+        auto strategy_result = strategy_cls(datahandler_ref, events_ref); 
         if(!strategy_result.has_value()) {
             return unexpected(strategy_result.error());
         }
-        auto strategy = std::move(strategy_result.value());
+        auto strategy = std::move(strategy_result.value()); // strategy
 
-        return unexpected(TuxedoError::ERR_NOT_IMPLEMENTED);
+        auto portfolio_result = portfolio_cls(datahandler, events_ref, start_date, initial_capital);
+        if(!portfolio_result.has_value()) {
+            return unexpected(portfolio_result.error());
+        }
+        auto portfolio = std::move(portfolio_result.value()); // portfolio
+
+        auto execution_handler_result = executionhandler_cls(datahandler_ref, events_ref);
+        if(!execution_handler_result.has_value()) {
+            return unexpected(execution_handler_result.error());
+        }
+        auto execution_handler = std::move(execution_handler_result.value());
+        return make_unique<Backtest>(
+            csv_dir,
+            symbol_list,
+            initial_capital,
+            heartbeat,
+            start_date,
+            std::move(events_ptr),
+            std::move(datahandler),
+            std::move(portfolio),
+            std::move(execution_handler),
+            std::move(strategy          )
+        );
     }
 
     expected<unique_ptr<Backtest>, TuxedoError> Backtest::Create(
