@@ -20,9 +20,9 @@ using namespace trading::engine::executionhandler;
 namespace trading::engine::backtest { // reference_wrapper<Queue<unique_ptr<Event>>>  events, const string & csv_dir , const vector<string> & symbol_list
 // Change this line:
     typedef std::function<expected<unique_ptr<DataHandler>, TuxedoError>(reference_wrapper<Queue<unique_ptr<Event>>> , const string & , const vector<string> &)> datahandler_factory;
-    typedef std::function<expected<unique_ptr<Portfolio>, TuxedoError>(reference_wrapper<unique_ptr<DataHandler>>, reference_wrapper<Queue<unique_ptr<Event>>> , sys_seconds, double)> portfolio_factory; // portfolio_cls in python
-    typedef std::function<expected<unique_ptr<ExecutionHandler>, TuxedoError>(reference_wrapper<unique_ptr<DataHandler>> datahandler, reference_wrapper<Queue<unique_ptr<Event>>>  events)> executionhandler_factory;
-    typedef std::function<expected<unique_ptr<Strategy>, TuxedoError>(reference_wrapper<unique_ptr<DataHandler>> datahandler, reference_wrapper<Queue<unique_ptr<Event>>>  events)> strategy_factory; // strategy_cls in python    
+    typedef std::function<expected<unique_ptr<Portfolio>, TuxedoError>(reference_wrapper<DataHandler>, reference_wrapper<Queue<unique_ptr<Event>>> , sys_seconds, double)> portfolio_factory;
+    typedef std::function<expected<unique_ptr<ExecutionHandler>, TuxedoError>(reference_wrapper<DataHandler> datahandler, reference_wrapper<Queue<unique_ptr<Event>>>  events)> executionhandler_factory;
+    typedef std::function<expected<unique_ptr<Strategy>, TuxedoError>(reference_wrapper<DataHandler> datahandler, reference_wrapper<Queue<unique_ptr<Event>>>  events)> strategy_factory; // strategy_cls in python    
 
     /* 
     Encapsulates the settings and coponents for carrying out

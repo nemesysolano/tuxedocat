@@ -30,7 +30,7 @@ namespace trading::engine::backtest {
             return unexpected(datahandler_result.error());
         }
         auto & datahandler = datahandler_result.value(); // data_handler
-        auto datahandler_ref = ref(datahandler);
+        auto datahandler_ref = ref(*datahandler);
 
         auto strategy_result = strategy_cls(datahandler_ref, events_ref); 
         if(!strategy_result.has_value()) {
@@ -38,7 +38,7 @@ namespace trading::engine::backtest {
         }
         auto strategy = std::move(strategy_result.value()); // strategy
 
-        auto portfolio_result = portfolio_cls(datahandler, events_ref, start_date, initial_capital);
+        auto portfolio_result = portfolio_cls(datahandler_ref, events_ref, start_date, initial_capital);
         if(!portfolio_result.has_value()) {
             return unexpected(portfolio_result.error());
         }
@@ -59,11 +59,11 @@ namespace trading::engine::backtest {
             std::move(datahandler),
             std::move(portfolio),
             std::move(execution_handler),
-            std::move(strategy          )
+            std::move(strategy)
         );
     }
 
-    expected<unique_ptr<Backtest>, TuxedoError> Backtest::Create(
+expected<unique_ptr<Backtest>, TuxedoError> Backtest::Create(
         const string csv_dir,
         const vector<string> & symbol_list,
         double initial_capital,
@@ -77,9 +77,15 @@ namespace trading::engine::backtest {
             initial_capital,
             heartbeat,
             start_date,
-            HistoricCSVdataHandler::Create,
-            Portfolio::Create,
-            SimulationExecutionHandler::Create,
+            // Lambda to cast HistoricCSVdataHandler to DataHandler
+            [](reference_wrapper<Queue<unique_ptr<Event>>> ev, const string & dir, const vector<string> & syms) -> expected<unique_ptr<DataHandler>, TuxedoError> {
+                return HistoricCSVdataHandler::Create(ev, dir, syms);
+            },
+            Portfolio::Create, // Matches portfolio_factory perfectly
+            // Lambda to cast SimulationExecutionHandler to ExecutionHandler
+            [](reference_wrapper<DataHandler> dh, reference_wrapper<Queue<unique_ptr<Event>>> ev) -> expected<unique_ptr<ExecutionHandler>, TuxedoError> {
+                return SimulationExecutionHandler::Create(dh, ev);
+            },
             strategy_cls
         );
     }

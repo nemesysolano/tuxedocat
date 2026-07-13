@@ -112,10 +112,10 @@ void test_portfolio_create(const char * current_program_path) {
     
     // Transfer ownership to a unique_ptr required by the Portfolio
     std::unique_ptr<DataHandler> handler_ptr = std::move(handler_res.value());
-    auto handler_ref = std::ref(handler_ptr);
+    auto handler_ref = std::ref(*handler_ptr);
 
     // Create the Portfolio Engine
-    auto port_res = Portfolio::Create(std::move(handler_ref), empty_events, start_dt, init_cap);
+    auto port_res = Portfolio::Create(handler_ref, empty_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
@@ -211,10 +211,10 @@ void test_portfolio_update_timeindex(const char * current_program_path) {
     
     // Transfer ownership to a unique_ptr required by the Portfolio
     std::unique_ptr<DataHandler> handler_ptr = std::move(handler_res.value());
-    auto handler_ref = std::ref(handler_ptr);
+    auto handler_ref = std::ref(*handler_ptr);
 
     // Create the Portfolio Engine
-    auto port_res = Portfolio::Create(std::move(handler_ref), empty_events, start_dt, init_cap);
+    auto port_res = Portfolio::Create(handler_ref, empty_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
@@ -317,10 +317,10 @@ void test_update_holdings_from_fill(const char * current_program_path) {
     
     // Transfer ownership to a unique_ptr required by the Portfolio
     std::unique_ptr<DataHandler> handler_ptr = std::move(handler_res.value());
-    auto handler_ref = std::ref(handler_ptr);
+    auto handler_ref = std::ref(*handler_ptr);
     // Create the Portfolio Engine
     Queue<unique_ptr<Event>> port_events;
-    auto port_res = Portfolio::Create(std::move(handler_ref), port_events, start_dt, init_cap);
+    auto port_res = Portfolio::Create(handler_ref, port_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
@@ -420,11 +420,11 @@ void test_update_positions_from_fill(const char * current_program_path) {
     
     // Transfer ownership to a unique_ptr required by the Portfolio
     std::unique_ptr<DataHandler> handler_ptr = std::move(handler_res.value());
-    auto handler_ref = std::ref(handler_ptr);
+    auto handler_ref = std::ref(*handler_ptr);
 
     // Create the Portfolio Engine
     Queue<unique_ptr<Event>> port_events;
-    auto port_res = Portfolio::Create(std::move(handler_ref), port_events, start_dt, init_cap);
+    auto port_res = Portfolio::Create(handler_ref, port_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
@@ -508,11 +508,11 @@ void test_update_fill(const char * current_program_path) {
     
     // Transfer ownership to a unique_ptr required by the Portfolio
     std::unique_ptr<DataHandler> handler_ptr = std::move(handler_res.value());
-    auto handler_ref = std::ref(handler_ptr);
+    auto handler_ref = std::ref(*handler_ptr);
     
     // Create the Portfolio Engine
     Queue<unique_ptr<Event>> port_events;
-    auto port_res = Portfolio::Create(std::move(handler_ref), port_events, start_dt, init_cap);
+    auto port_res = Portfolio::Create(handler_ref, port_events, start_dt, init_cap);
     assert(port_res.has_value());
     
     auto& portfolio = port_res.value();
@@ -595,12 +595,12 @@ void test_naive_order(const char * current_program_path) {
     
     // Portfolio requires unique_ptr to DataHandler
     std::unique_ptr<DataHandler> handler_ptr = std::move(handler_exp.value());
-    auto handler_ref = std::ref(handler_ptr);
+    auto handler_ref = std::ref(*handler_ptr);
 
     Queue<unique_ptr<Event>> port_events;
     double init_cap = 100000.0;
     
-    auto port_exp = Portfolio::Create(std::move(handler_ref), port_events, make_ts(2023, 1, 1), init_cap);
+    auto port_exp = Portfolio::Create(handler_ref, port_events, make_ts(2023, 1, 1), init_cap);
     assert(port_exp.has_value());
     auto portfolio = std::move(port_exp.value());
 
@@ -687,9 +687,9 @@ void test_update_signal_test(const char * current_program_path) {
     assert(handler_res.has_value());
 
     std::unique_ptr<DataHandler> handler_ptr = std::move(handler_res.value());
-    reference_wrapper<unique_ptr<DataHandler>> handler_wrapper = ref(handler_ptr);
+    reference_wrapper<DataHandler> handler_wrapper = ref(*handler_ptr);
     
-    handler_wrapper.get()->update_bars(); // load first bar
+    handler_wrapper.get().update_bars(); // load first bar
 
     Queue<unique_ptr<Event>> port_events;
     auto port_res = Portfolio::Create(handler_wrapper, port_events, make_ts(2023, 1, 1), 100000.0);
