@@ -20,10 +20,11 @@ namespace trading::engine::strategy {
     class Strategy {
         private:
             reference_wrapper<datahandler::DataHandler> datahandler_;
-            unique_ptr<Event> & events_;
+            [[maybe_unused]] unique_ptr<Event> & events_;
         public:
             inline Strategy(reference_wrapper<datahandler::DataHandler> datahandler, unique_ptr<Event> & events): datahandler_(datahandler), events_(events){}
-            virtual void calculate_signals() = 0;
+            virtual void calculate_signals(MarketEvent & market_event) = 0;
+            inline void calculate_signals(MarketEvent * market_event) {calculate_signals(*market_event);}
             virtual ~Strategy() = default;
     };
 

@@ -31,6 +31,12 @@ namespace trading::engine::executionhandler {
                 const OrderEvent & order_event // Contains the `OrderEvent` object with order information.
             ) = 0;
 
+            inline void execute_order(
+                OrderEvent * order_event // Contains the `OrderEvent` object with order information.
+            ) {
+                execute_order(*order_event);
+            }
+            
             virtual ~ExecutionHandler() = default;
     };
 

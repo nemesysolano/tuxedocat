@@ -93,6 +93,7 @@ namespace trading::engine::datahandler {
             virtual expected<vector<reference_wrapper<Bar>>, TuxedoError> latest_bars(const string & symbol, size_t N) const  = 0; // get_latest_bars in python.
             virtual TuxedoError update_bars() = 0;        
             inline  expected<vector<reference_wrapper<Bar>>, TuxedoError> latest_bars(const string & symbol) const { return latest_bars(symbol, 1);}         
+            virtual bool continue_backtest() = 0;
             virtual ~DataHandler() = default;   
     };
 
@@ -138,6 +139,7 @@ namespace trading::engine::datahandler {
             expected<reference_wrapper<Bar>, TuxedoError> latest_bar(const string & symbol) const override; // get_latest_bar in python.            
             expected<vector<reference_wrapper<Bar>>, TuxedoError> latest_bars(const string & symbol, size_t N) const override; // get_latest_bars in python.
             TuxedoError update_bars() override;                        
+            inline bool continue_backtest() override {return continue_backtest_;}
             ~HistoricCSVdataHandler() override = default;
 
             static expected<unique_ptr<HistoricCSVdataHandler>, TuxedoError> Create(reference_wrapper<Queue<unique_ptr<Event>>>  events, const string & csv_dir , const vector<string> & symbol_list);

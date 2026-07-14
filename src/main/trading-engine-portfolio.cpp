@@ -345,7 +345,7 @@ namespace trading::engine::portfolio {
         return naive_order(signal_event);
     }
 
-    expected<OrderEvent, TuxedoError> Portfolio::update_signal(const Event        & signal_event) {
+    expected<OrderEvent, TuxedoError> Portfolio::update_signal(const Event & signal_event) {
         switch(signal_event.event_type()) {
             case EventType::SIGNAL:
                 return naive_order(static_cast<const SignalEvent &>(signal_event));

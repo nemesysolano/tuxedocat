@@ -1,6 +1,10 @@
 #include "trading-engine-backtest.h" 
 #include <filesystem>
 #include <system_error>
+#include <format>
+#include <print> // C++23 print feature
+#include <iostream>
+#include <memory>
 
 using namespace std;
 using namespace std::filesystem;
@@ -63,7 +67,7 @@ namespace trading::engine::backtest {
         );
     }
 
-expected<unique_ptr<Backtest>, TuxedoError> Backtest::Create(
+    expected<unique_ptr<Backtest>, TuxedoError> Backtest::Create(
         const string csv_dir,
         const vector<string> & symbol_list,
         double initial_capital,
@@ -88,5 +92,76 @@ expected<unique_ptr<Backtest>, TuxedoError> Backtest::Create(
             },
             strategy_cls
         );
+    }
+
+    void Backtest::run_backtest() {
+        size_t i = 0;
+
+        while(true) {
+            i++;
+#ifdef __DEBUG__            
+            cout << std::format("iteration {}", i);
+#endif
+
+            if(this->data_handler_->continue_backtest()) {
+                this->data_handler_->update_bars();
+            } else {
+                break;
+            }
+
+            while(true) {
+                if(events_->empty()) {
+                    break;
+                }
+
+                unique_ptr<trading::engine::Event> & event = events_->front();                
+                switch(event->event_type()) {
+                    case EventType::MARKET: // MarketEvent
+                        strategy_->calculate_signals(static_cast<MarketEvent*>(event.get()));
+                        portfolio_->update_timeindex(static_cast<MarketEvent*>(event.get()));
+                        break;
+
+                    case EventType::SIGNAL: // SignalEvent
+                        signals_ ++;
+                        portfolio_->update_signal(static_cast<SignalEvent*>(event.get()));
+                        break;
+
+                    case EventType::ORDER:  // OrderEvent
+                        orders_++;
+                        execution_handler_->execute_order(static_cast<OrderEvent*>(event.get()));
+                        break;
+
+                    case EventType::FILL:    // FillEvent
+                        fills_++;
+                        portfolio_->update_fill(static_cast<FillEvent*>(event.get()));
+                        break;
+                }
+                events_->pop();
+            }
+        }
+    }
+
+    TuxedoError Backtest::output_performance() {
+        auto equity_curve_dataframe_result = portfolio_->create_equity_curve_dataframe();
+        if(!equity_curve_dataframe_result.has_value()) {
+            return equity_curve_dataframe_result.error();
+        }
+        auto & equity_curve_dataframe = equity_curve_dataframe_result.value();
+        
+        auto summary_stats_results = create_summary_stats(equity_curve_dataframe);
+        if(!summary_stats_results.has_value()) {
+            return summary_stats_results.error();
+        }
+        auto & summary_stats = summary_stats_results.value();
+
+        cout << equity_curve_dataframe << endl;
+        cout << summary_stats << endl;
+        cout << "Signals = " << signals_ << ", Orders = " << orders_ << ", Fills = " << fills_ << endl;
+        return TuxedoError::NO_ERROR;
+    }
+
+    void Backtest::simulate_trading() {
+        run_backtest();
+        output_performance();
     }
 }

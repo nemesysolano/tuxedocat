@@ -32,9 +32,9 @@ namespace trading::engine::backtest { // reference_wrapper<Queue<unique_ptr<Even
         private:
             // Received from constructor
             const string csv_dir_; 
-            const vector<string> & symbol_list_;
-            double initial_capital_; 
-            size_t heartbeat_; 
+            [[maybe_unused]] const vector<string> & symbol_list_;
+            [[maybe_unused]] double initial_capital_; 
+            [[maybe_unused]] size_t heartbeat_; 
             sys_seconds start_date_; 
             unique_ptr<Queue<unique_ptr<Event>>> events_;
             unique_ptr<DataHandler> data_handler_; 
@@ -45,8 +45,8 @@ namespace trading::engine::backtest { // reference_wrapper<Queue<unique_ptr<Even
             // Initialized by constructor.            
             size_t orders_;
             size_t fills_;
-            size_t num_strats_;
-        
+            [[maybe_unused]] size_t num_strats_;
+            size_t signals_;
         public:
             inline Backtest(
                 const string csv_dir,
@@ -61,7 +61,7 @@ namespace trading::engine::backtest { // reference_wrapper<Queue<unique_ptr<Even
                 unique_ptr<Strategy> strategy          
             ):  csv_dir_(csv_dir), symbol_list_(symbol_list), initial_capital_(initial_capital), heartbeat_(heartbeat), start_date_(start_date), 
                 events_(std::move(events)), data_handler_(std::move(data_handler)), portfolio_(std::move(portfolio)), execution_handler_(std::move(execution_handler)), strategy_(std::move(strategy)),
-                orders_(0), fills_(0), num_strats_(1)
+                orders_(0), fills_(0), num_strats_(1), signals_(0)
               {}
 
             static expected<unique_ptr<Backtest>, TuxedoError> Create(
@@ -83,7 +83,11 @@ namespace trading::engine::backtest { // reference_wrapper<Queue<unique_ptr<Even
                 size_t heartbeat,
                 sys_seconds start_date,
                 strategy_factory strategy_cls
-            );         
+            );   
+            
+            void run_backtest();
+            TuxedoError output_performance();
+            void simulate_trading();
     };            
 }
 #endif

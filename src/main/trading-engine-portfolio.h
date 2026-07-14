@@ -138,6 +138,7 @@ namespace trading::engine::portfolio {
             // Operations
             TuxedoError update_timeindex(const MarketEvent  & market_event);
             TuxedoError update_timeindex(const MarketEvent && market_event);
+            inline TuxedoError update_timeindex(MarketEvent * market_event) {return update_timeindex(*market_event);}
 
             TuxedoError update_holdings_from_fill(const FillEvent & fill_event);
             TuxedoError update_holdings_from_fill(const FillEvent && fill_event);
@@ -147,12 +148,14 @@ namespace trading::engine::portfolio {
 
             TuxedoError update_fill(const FillEvent &  fill_event);
             TuxedoError update_fill(const FillEvent && fill_event);
+            inline TuxedoError update_fill(FillEvent * fill_event) {return update_fill(*fill_event);}
 
-            expected<OrderEvent, TuxedoError> naive_order(const SignalEvent &  signal_event); // generate_naive_order(self, signal)
+            expected<OrderEvent, TuxedoError> naive_order(const SignalEvent &  signal_event);
             expected<OrderEvent, TuxedoError> naive_order(const SignalEvent && signal_event);
 
             expected<OrderEvent, TuxedoError> update_signal(const Event        & signal_event);
             expected<OrderEvent, TuxedoError> update_signal(const SignalEvent && signal_event);
+            expected<OrderEvent, TuxedoError> update_signal(const SignalEvent  * signal_event) {Event event = * signal_event; return update_signal(event);}
 
             expected<DataFrame, TuxedoError> create_equity_curve_dataframe() const;
             
