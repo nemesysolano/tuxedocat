@@ -39,7 +39,6 @@ prebuild:
 	@find $(BIN_DIR) -type f -name '._*' -delete || true
 	@find $(OBJ_DIR) -type f -name '._*' -delete || true
 	@find $(SRC_DIR) -type f -name '._*' -delete || true
-	@remove-trackers
 
 all: prebuild $(TARGET)
 

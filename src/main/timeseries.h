@@ -19,5 +19,7 @@ namespace timeseries {
     };    
 
     inline sys_seconds sys_seconds_now() { return floor<seconds>(system_clock::now()); };
+
+    std::ostream & operator << (std::ostream out, const sys_seconds & seconds);
 }
 #endif

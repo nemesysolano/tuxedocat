@@ -58,13 +58,15 @@ namespace reports {
                 return nullptr;                
             }
             auto & regression_zscore_data = regression_zscore_data_result.value();
-        
+            trace_with_message("🍎 regression_zscore_data_result.");
+
             auto regression_data_pct_change_result = RegressionData::CreateWithPctChange(df);
             if(!regression_data_pct_change_result.has_value()){
                 trace_with_message(std::format("{} generated regression_data_pct_change_result.", full_file_path));
                 return nullptr;
             }
             auto & regression_data_pct_change = regression_data_pct_change_result.value();
+            trace_with_message("🍋 regression_data_pct_change_result.");
 
             auto regression_data_log_change_result = RegressionData::CreateWithLogChange(df);
             if(!regression_data_log_change_result.has_value()){
@@ -72,6 +74,7 @@ namespace reports {
                 return nullptr;
             }
             auto & regression_data_log_change = regression_data_log_change_result.value();
+            trace_with_message("🍌 regression_data_log_change_result.");
 
             // 2. Compute confusion matrices immediately
             auto logistic_matrix = confusion_matrix(regression_data_pct_change, [](const RegressionData & d) -> std::unique_ptr<BinaryClassifier> { return std::move(LogisticRegression::Create(d.X_train(), d.Y_train()).value()); });
@@ -83,7 +86,7 @@ namespace reports {
             // 3. Create the report using the confusion matrices (not the unique_ptr<Classifier>)
             return make_unique<QualityReport>(full_file_path, logistic_matrix, lda_matrix, qda_matrix, rsvm_matrix, random_matrix);
         } catch (const exception & e) {
-            cout << "failed to process " << full_file_path << endl;
+            cout << "failed to process " << full_file_path << ' '  << e.what() << endl;
             return nullptr;
         }
     

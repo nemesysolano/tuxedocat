@@ -2,7 +2,11 @@
 #define __TRADING_ENGINE_STRATEGY__
 #include "trading-engine.h"
 #include "trading-engine-datahandler.h"
+#include <cstddef>
+#include <map>
+
 using namespace std;
+using namespace trading::engine::datahandler;
 
 namespace trading::engine::strategy {
     /*
@@ -18,14 +22,40 @@ namespace trading::engine::strategy {
     since it obtains the bar tuples fro a queue object.
     */
     class Strategy {
-        private:
+        protected:
             reference_wrapper<datahandler::DataHandler> datahandler_;
-            [[maybe_unused]] unique_ptr<Event> & events_;
+            [[maybe_unused]] Queue<unique_ptr<Event>> & events_;
         public:
-            inline Strategy(reference_wrapper<datahandler::DataHandler> datahandler, unique_ptr<Event> & events): datahandler_(datahandler), events_(events){}
+            inline Strategy(reference_wrapper<datahandler::DataHandler> datahandler, Queue<unique_ptr<Event>> & events): datahandler_(datahandler), events_(events){}
             virtual void calculate_signals(MarketEvent & market_event) = 0;
             inline void calculate_signals(MarketEvent * market_event) {calculate_signals(*market_event);}
             virtual ~Strategy() = default;
+    };
+
+    enum class BOUGHT_STATUS {
+        LONG,
+        OUT
+    };
+
+    /*
+    Carries out a basic Moving Average Crossover strategy with short/long simple weighted moving average. Default short/long windows
+    are 100/400 respectively
+    */
+    class MovingAverageCrossStrategy: public Strategy {
+        protected:
+            size_t short_window_;
+            size_t long_window_;
+            map<string, BOUGHT_STATUS> bought_;
+
+        public:
+            MovingAverageCrossStrategy(
+                reference_wrapper<datahandler::DataHandler> datahandler, // The Datahandler object that provides bar information.
+                Queue<unique_ptr<Event>>  & events, // The event queue object.
+                size_t short_window, // The short moving average lookback.
+                size_t long_window // The long moving average lookback.
+            );
+            void calculate_signals(MarketEvent & market_event) override;
+            virtual ~MovingAverageCrossStrategy() = default;
     };
 
 };
