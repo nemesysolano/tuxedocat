@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <iterator>
 #include "timeseries-classifiers.h"
-#include "data/timeseries-dataframe.h"
+#include "data/dataframe.h"
 #include "timeseries-features.h"
 #include <iostream>
 #include <algorithm>
@@ -14,7 +14,7 @@
 #include <future>
 #include "forecast.h"
 #include "timeseries-regression-data.h"
-#include "utils/timeseries-log.h"
+#include "utils/log.h"
 #include <cassert>
 
 using namespace std;

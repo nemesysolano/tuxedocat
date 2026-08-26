@@ -11,7 +11,7 @@
 #include <memory>
 #include <expected>
 #include "utils/tuxedo-error.h"
-#include "data/timeseries-dataframe.h"
+#include "data/dataframe.h"
 #include <sstream>
 #include <set>
 #include <iomanip> // <-- Add this for std::get_time

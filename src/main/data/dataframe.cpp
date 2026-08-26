@@ -1,4 +1,4 @@
-#include "timeseries-dataframe.h"
+#include "data/dataframe.h"
 #include <fstream>
 #include <sstream>
 #include <set>
@@ -6,7 +6,7 @@
 #include <algorithm> // <-- Required for std::set_intersection
 #include <iterator>  // <-- Required for std::inserter
 #include <cmath>
-#include "utils/timeseries-log.h"
+#include "utils/log.h"
 #include "utils/tuxedo-error.h"
 using namespace std;
 

@@ -8,7 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include "timeseries.h"
-#include "utils/timeseries-log.h"
+#include "utils/log.h"
 using namespace std::filesystem;
 using namespace std;
 using namespace reports;

@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <Eigen/Dense>
 #include <random> // Required for lock-free multi-threading
-#include "utils/timeseries-log.h"
+#include "utils/log.h"
 using namespace std;
 
 namespace timeseries::classifiers {

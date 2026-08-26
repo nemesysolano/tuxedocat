@@ -1,6 +1,6 @@
 #include "timeseries-features.h"
 #include "forecast.h"
-#include "utils/timeseries-log.h"
+#include "utils/log.h"
 using namespace dataframe;
 using namespace std;
 using namespace timeseries::features;

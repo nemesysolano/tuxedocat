@@ -13,7 +13,7 @@
 #include <memory>
 #include <expected>
 #include "timeseries.h"
-#include "data/timeseries-dataframe.h"
+#include "data/dataframe.h"
 namespace forecast {
 
     class BinaryForecast {

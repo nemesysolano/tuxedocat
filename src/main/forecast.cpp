@@ -1,5 +1,5 @@
 #include "forecast.h"
-#include "utils/timeseries-log.h"
+#include "utils/log.h"
 using namespace std;
 using namespace slice;
 using namespace timeseries;
