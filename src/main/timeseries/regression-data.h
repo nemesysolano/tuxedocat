@@ -2,7 +2,7 @@
 #define __TIMESERIES_REGRESSION_DATA_H__
 #include "data/dataframe.h"
 #include <functional>
-#include "timeseries/timeseries-features.h"
+#include "timeseries/features.h"
 #include <expected>
 
 namespace timeseries::regression::data {

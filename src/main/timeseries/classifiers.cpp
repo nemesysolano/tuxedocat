@@ -1,4 +1,4 @@
-#include "timeseries/timeseries-classifiers.h"
+#include "classifiers.h"
 #include <Eigen/Dense>
 #include <cmath>
 #include <random>

@@ -1,4 +1,4 @@
-#include "timeseries-hurst.h"
+#include "hurst.h"
 #include "stats/polynomials.h"
 #include <cmath>
 #include <iostream>

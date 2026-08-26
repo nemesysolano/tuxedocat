@@ -1,4 +1,4 @@
-#include "timeseries-adf.h"
+#include "adf.h"
 #ifndef __TIMESERIES_ADF_DATA__
 namespace timeseries::adf{
     const RegressionTypeLabelMap regression_type_labels_map = {

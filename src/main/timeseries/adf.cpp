@@ -1,4 +1,4 @@
-#include "timeseries-adf.h"
+#include "adf.h"
 #include "data/slice.h"
 #include "stats/polynomials.h"
 #include "stats/distributions.h"

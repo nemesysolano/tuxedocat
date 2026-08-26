@@ -3,9 +3,9 @@
 #include <fstream>
 #include <algorithm>
 #include <iterator>
-#include "timeseries/timeseries-classifiers.h"
+#include "timeseries/classifiers.h"
 #include "data/dataframe.h"
-#include "timeseries/timeseries-features.h"
+#include "timeseries/features.h"
 #include <iostream>
 #include <algorithm>
 #include <string_view>
@@ -13,7 +13,7 @@
 #include <execution>
 #include <future>
 #include "timeseries/forecast.h"
-#include "timeseries/timeseries-regression-data.h"
+#include "timeseries/regression-data.h"
 #include "utils/log.h"
 #include <cassert>
 
