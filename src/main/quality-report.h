@@ -2,7 +2,7 @@
 #define __QUALITY_REPORT_H__
 #include <string>
 #include <vector>
-#include "timeseries-classifiers.h"
+#include "timeseries/timeseries-classifiers.h"
 #include "memory"
 using namespace std;
 using namespace timeseries::classifiers;

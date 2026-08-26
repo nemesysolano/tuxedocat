@@ -3,17 +3,17 @@
 #include <fstream>
 #include <algorithm>
 #include <iterator>
-#include "timeseries-classifiers.h"
+#include "timeseries/timeseries-classifiers.h"
 #include "data/dataframe.h"
-#include "timeseries-features.h"
+#include "timeseries/timeseries-features.h"
 #include <iostream>
 #include <algorithm>
 #include <string_view>
 #include <ranges>
 #include <execution>
 #include <future>
-#include "forecast.h"
-#include "timeseries-regression-data.h"
+#include "timeseries/forecast.h"
+#include "timeseries/timeseries-regression-data.h"
 #include "utils/log.h"
 #include <cassert>
 
@@ -23,7 +23,7 @@ using namespace timeseries::classifiers;
 using namespace dataframe;
 using namespace timeseries::features;
 using namespace timeseries::regression::data;
-using namespace forecast;
+using namespace timeseries::forecast;
 
 namespace reports {
     using BinaryClassifierProducer = std::function<std::unique_ptr<BinaryClassifier>(const RegressionData &)>;

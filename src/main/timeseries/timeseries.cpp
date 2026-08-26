@@ -1,4 +1,4 @@
-#include "timeseries.h"
+#include "timeseries/timeseries.h"
 
 #include <chrono>
 #include <ctime>

@@ -7,7 +7,7 @@
 #include <vector>
 #include <filesystem>
 #include <fstream>
-#include "timeseries.h"
+#include "timeseries/timeseries.h"
 #include "utils/log.h"
 using namespace std::filesystem;
 using namespace std;

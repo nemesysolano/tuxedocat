@@ -1,20 +1,20 @@
 #ifdef __TEST_MAIN__
 #include "timeseries-classifiers-tests.h"
-#include "timeseries-classifiers.h"
+#include "timeseries/timeseries-classifiers.h"
 #include "timeseries-dataframe.h"
 #include <filesystem>
 #include <fstream>
 #include <cassert>
 #include "forecast.h"
-#include "timeseries-features.h"
-#include "timeseries-regression-data.h"
+#include "timeseries/timeseries-features.h"
+#include "timeseries/timeseries-regression-data.h"
 #include "utils/log.h"
 
 using namespace std;
 using namespace timeseries::classifiers;
 using namespace slice;
 using namespace dataframe;
-using namespace forecast;
+using namespace timeseries::forecast;
 using namespace timeseries::features;
 using namespace timeseries::regression::data;
 

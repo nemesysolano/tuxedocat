@@ -12,9 +12,9 @@
 #include <iostream>
 #include <memory>
 #include <expected>
-#include "timeseries.h"
+#include "timeseries/timeseries.h"
 #include "data/dataframe.h"
-namespace forecast {
+namespace timeseries::forecast {
 
     class BinaryForecast {
         private:

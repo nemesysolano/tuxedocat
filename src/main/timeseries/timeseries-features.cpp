@@ -1,10 +1,10 @@
-#include "timeseries-features.h"
-#include "forecast.h"
+#include "timeseries/timeseries-features.h"
+#include "timeseries/forecast.h"
 #include "utils/log.h"
 using namespace dataframe;
 using namespace std;
 using namespace timeseries::features;
-using namespace forecast;
+using namespace timeseries::forecast;
 using namespace slice;
 
 const std::string timeseries::features::DIRECTION_COLUMN_NAME = "Direction";

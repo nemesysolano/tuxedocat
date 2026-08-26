@@ -1,6 +1,6 @@
-#include "timeseries-regression-data.h"
+#include "timeseries/timeseries-regression-data.h"
 #include <expected>
-#include "timeseries-features.h"
+#include "timeseries/timeseries-features.h"
 #include <cassert>
 
 using namespace timeseries::regression::data;

@@ -5,7 +5,7 @@ using namespace slice;
 using namespace timeseries;
 using namespace dataframe;
 
-namespace forecast
+namespace timeseries::forecast
 {
 
     std::expected<DataFrame, TuxedoError> get_nth_log_change(const DataFrame & source, const std::string  & price_column_name, size_t n) {

@@ -1,9 +1,9 @@
 #ifdef __TEST_MAIN__
 #ifndef __TIMESERIES_CLASSIFIERS_TESTS__
-#include "timeseries-classifiers.h"
+#include "timeseries/timeseries-classifiers.h"
 #include "data/dataframe.h"
 #include <functional>
-#include "timeseries-features.h"
+#include "timeseries/timeseries-features.h"
 
 void print_binary_confusion_matrix_test();
 void logistic_regression_different_time_frames_test(const char * current_program_path);
