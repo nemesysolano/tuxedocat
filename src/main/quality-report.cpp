@@ -20,7 +20,7 @@
 using namespace std;
 using namespace std::filesystem;
 using namespace timeseries::classifiers;
-using namespace timeseries::dataframe;
+using namespace dataframe;
 using namespace timeseries::features;
 using namespace timeseries::regression::data;
 using namespace forecast;

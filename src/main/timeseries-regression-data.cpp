@@ -43,7 +43,7 @@ std::expected<RegressionData, TuxedoError> RegressionData::split(const timeserie
     return RegressionData(std::move(X_train), std::move(X_test), std::move(Y_train), std::move(Y_test));
 }
 
-std::expected<RegressionData, TuxedoError> RegressionData::CreateWithLogChange(timeseries::dataframe::DataFrame & df){    
+std::expected<RegressionData, TuxedoError> RegressionData::CreateWithLogChange(dataframe::DataFrame & df){    
     auto features_result = Features::CreateWithLogChange(df);
     if(!features_result.has_value()){
         return std::unexpected(features_result.error());
@@ -52,7 +52,7 @@ std::expected<RegressionData, TuxedoError> RegressionData::CreateWithLogChange(t
 
     return RegressionData::split(momenta);    
 }
-std::expected<RegressionData, TuxedoError> RegressionData::CreateWithZScore(timeseries::dataframe::DataFrame & df){
+std::expected<RegressionData, TuxedoError> RegressionData::CreateWithZScore(dataframe::DataFrame & df){
     auto features_result = Features::CreateWithZScore(df);
     if(!features_result.has_value()) {
         return std::unexpected(features_result.error());
@@ -61,7 +61,7 @@ std::expected<RegressionData, TuxedoError> RegressionData::CreateWithZScore(time
 
     return RegressionData::split(momenta);        
 }
-std::expected<RegressionData, TuxedoError> RegressionData::CreateWithPctChange(timeseries::dataframe::DataFrame & df){
+std::expected<RegressionData, TuxedoError> RegressionData::CreateWithPctChange(dataframe::DataFrame & df){
     auto features_result = Features::CreateWithPctChange(df);
     if(!features_result.has_value()){
         return std::unexpected(features_result.error());

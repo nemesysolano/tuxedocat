@@ -10,7 +10,7 @@
 #include "utils/tuxedo-error.h"
 using namespace std;
 
-namespace timeseries::dataframe {
+namespace dataframe {
     double identity_transformer(double x) {return x;}
     void identity_accumulator(std::span<double> row, size_t column_index, double x) { row[column_index] = x;}
 

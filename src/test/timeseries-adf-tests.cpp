@@ -7,7 +7,7 @@
 #include "ols.h"
 using namespace std;
 using namespace timeseries::adf;
-using namespace timeseries::dataframe;
+using namespace dataframe;
 using namespace slice;
 
 vector<double> mac_kinnon_p_expeted_results = {

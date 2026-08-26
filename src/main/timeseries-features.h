@@ -3,7 +3,7 @@
 #include "data/timeseries-dataframe.h"
 #include <expected>
 
-using namespace timeseries::dataframe;
+using namespace dataframe;
 using namespace std;
 
 namespace timeseries::features {

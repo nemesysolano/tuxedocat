@@ -3,7 +3,7 @@
 using namespace std;
 using namespace slice;
 using namespace timeseries;
-using namespace timeseries::dataframe;
+using namespace dataframe;
 
 namespace forecast
 {
@@ -38,7 +38,7 @@ namespace forecast
         return get_nth_log_change(source, static_cast<const std::string &>(price_column_name), n);
     }
 
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_z_score(const timeseries::dataframe::DataFrame & source, const std::string  & price_column_name, size_t n){
+    std::expected<dataframe::DataFrame, TuxedoError> get_nth_z_score(const dataframe::DataFrame & source, const std::string  & price_column_name, size_t n){
         // 1. Strict Boundary Validations
         if (!source.column_index(price_column_name).has_value()) {
             return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);        
@@ -60,11 +60,11 @@ namespace forecast
 
         return price_slice_result.value().z_score(n);        
     }
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_z_score(const timeseries::dataframe::DataFrame && source, const std::string && price_column_name, size_t n) {
+    std::expected<dataframe::DataFrame, TuxedoError> get_nth_z_score(const dataframe::DataFrame && source, const std::string && price_column_name, size_t n) {
         return get_nth_z_score(source, static_cast<const std::string &>(price_column_name), n);
     }
 
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_pct_change(const timeseries::dataframe::DataFrame & source, const std::string  & price_column_name, size_t n) {
+    std::expected<dataframe::DataFrame, TuxedoError> get_nth_pct_change(const dataframe::DataFrame & source, const std::string  & price_column_name, size_t n) {
         // 1. Strict Boundary Validations
         if (!source.column_index(price_column_name).has_value()) {
             return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);        
@@ -88,7 +88,7 @@ namespace forecast
     }
 
 
-    std::expected<timeseries::dataframe::DataFrame, TuxedoError> get_nth_pct_change(const timeseries::dataframe::DataFrame && source, const std::string && price_column_name, size_t n){
+    std::expected<dataframe::DataFrame, TuxedoError> get_nth_pct_change(const dataframe::DataFrame && source, const std::string && price_column_name, size_t n){
         return get_nth_pct_change(source, static_cast<const std::string &>(price_column_name), n);    
     }
 }

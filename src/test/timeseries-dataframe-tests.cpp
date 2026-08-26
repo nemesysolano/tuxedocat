@@ -12,7 +12,7 @@
 #include <cmath> // Required for std::isnan and std::abs
 #include <cassert>
 
-using namespace timeseries::dataframe;
+using namespace dataframe;
 using namespace slice;
 using namespace timeseries::adf;
 using namespace std;
@@ -25,7 +25,7 @@ void print_status(const std::string& test_name, bool success) {
 void test_dataframe_creation_valid_input() {
     std::string csv = "Date,Price,Volume\n2023-01-01 10:00:00,100.5,1000\n2023-01-01 11:00:00,101.0,1100";
     std::istringstream iss(csv);
-    auto df_exp = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_exp = dataframe::DataFrame::Create(iss);
     bool success = df_exp.has_value() && df_exp->rows() == 2 && df_exp->cols() == 2;
     print_status("test_dataframe_creation_valid_input", success);
     assert(success);
@@ -34,7 +34,7 @@ void test_dataframe_creation_valid_input() {
 void test_dataframe_creation_invalid_timestamp() {
     std::string csv = "Date,Price\nInvalidDate,100.5";
     std::istringstream iss(csv);
-    auto df_exp = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_exp = dataframe::DataFrame::Create(iss);
     bool success = !df_exp.has_value() && df_exp.error() == TuxedoError::ERR_INVALID_DATA_FORMAT;
     print_status("test_dataframe_creation_invalid_timestamp", success);
     assert(success);
@@ -43,7 +43,7 @@ void test_dataframe_creation_invalid_timestamp() {
 void test_dataframe_creation_inconsistent_row_length() {
     std::string csv = "Date,Price\n2023-01-01 10:00:00,100.5\n2023-01-01 11:00:00";
     std::istringstream iss(csv);
-    auto df_exp = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_exp = dataframe::DataFrame::Create(iss);
     bool success = !df_exp.has_value() && df_exp.error() == TuxedoError::ERR_INCONSISTENT_ROW_LENGTH;
     print_status("test_dataframe_creation_inconsistent_row_length", success);
     assert(success);
@@ -52,7 +52,7 @@ void test_dataframe_creation_inconsistent_row_length() {
 void test_dataframe_creation_non_numeric_value() {
     std::string csv = "Date,Price\n2023-01-01 10:00:00,abc";
     std::istringstream iss(csv);
-    auto df_exp = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_exp = dataframe::DataFrame::Create(iss);
     bool success = !df_exp.has_value() && df_exp.error() == TuxedoError::ERR_INVALID_DATA_FORMAT;
     print_status("test_dataframe_creation_non_numeric_value", success);
     assert(success);
@@ -60,7 +60,7 @@ void test_dataframe_creation_non_numeric_value() {
 
 void test_dataframe_creation_empty_input() {
     std::istringstream iss("");
-    auto df_exp = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_exp = dataframe::DataFrame::Create(iss);
     bool success = !df_exp.has_value() && df_exp.error() == TuxedoError::ERR_EMPTY_VECTOR;
     print_status("test_dataframe_creation_empty_input", success);
     assert(success);
@@ -69,7 +69,7 @@ void test_dataframe_creation_empty_input() {
 void test_dataframe_access_by_index_valid() {
     std::string csv = "Date,Price\n2023-01-01 10:00:00,100.5";
     std::istringstream iss(csv);
-    auto df = timeseries::dataframe::DataFrame::Create(iss).value();
+    auto df = dataframe::DataFrame::Create(iss).value();
     auto val = df.operator[](0, 0);
     bool success = val.has_value() && val.value() == 100.5;
     print_status("test_dataframe_access_by_index_valid", success);
@@ -79,7 +79,7 @@ void test_dataframe_access_by_index_valid() {
 void test_dataframe_access_by_index_out_of_bounds() {
     std::string csv = "Date,Price\n2023-01-01 10:00:00,100.5";
     std::istringstream iss(csv);
-    auto df = timeseries::dataframe::DataFrame::Create(iss).value();
+    auto df = dataframe::DataFrame::Create(iss).value();
     bool success = !df.operator[](10, 10).has_value();
     print_status("test_dataframe_access_by_index_out_of_bounds", success);
     assert(success);
@@ -88,7 +88,7 @@ void test_dataframe_access_by_index_out_of_bounds() {
 void test_dataframe_access_by_timestamp_and_column_valid() {
     std::string csv = "Date,Price\n2023-01-01 10:00:00,100.5";
     std::istringstream iss(csv);
-    auto df = timeseries::dataframe::DataFrame::Create(iss).value();
+    auto df = dataframe::DataFrame::Create(iss).value();
     
     std::tm t = {};
     std::istringstream date_iss("2023-01-01 10:00:00");
@@ -104,7 +104,7 @@ void test_dataframe_access_by_timestamp_and_column_valid() {
 void test_dataframe_column_index_valid() {
     std::string csv = "Date,Price,Volume\n2023-01-01 10:00:00,100.5,1000";
     std::istringstream iss(csv);
-    auto df = timeseries::dataframe::DataFrame::Create(iss).value();
+    auto df = dataframe::DataFrame::Create(iss).value();
     
     auto idx = df.column_index("Volume");
     bool success = idx.has_value() && idx.value() == 1;
@@ -115,7 +115,7 @@ void test_dataframe_column_index_valid() {
 void test_dataframe_access_by_timestamp_and_column_invalid_timestamp() {
     std::string csv = "Date,Price\n2023-01-01 10:00:00,100.5";
     std::istringstream iss(csv);
-    auto df = timeseries::dataframe::DataFrame::Create(iss).value();
+    auto df = dataframe::DataFrame::Create(iss).value();
     auto ts = std::chrono::sys_seconds(std::chrono::seconds(0));
     assert(!df.operator[](ts, "Price").has_value());
     print_status("test_dataframe_access_by_timestamp_and_column_invalid_timestamp", true);
@@ -124,7 +124,7 @@ void test_dataframe_access_by_timestamp_and_column_invalid_timestamp() {
 void test_dataframe_access_by_timestamp_and_column_invalid_column() {
     std::string csv = "Date,Price\n2023-01-01 10:00:00,100.5";
     std::istringstream iss(csv);
-    auto df = timeseries::dataframe::DataFrame::Create(iss).value();
+    auto df = dataframe::DataFrame::Create(iss).value();
     std::tm t = {};
     std::istringstream date_iss("2023-01-01 10:00:00");
     date_iss >> std::get_time(&t, "%Y-%m-%d %H:%M:%S");
@@ -136,7 +136,7 @@ void test_dataframe_access_by_timestamp_and_column_invalid_column() {
 void test_dataframe_column_index_invalid() {
     std::string csv = "Date,Price\n2023-01-01 10:00:00,100.5";
     std::istringstream iss(csv);
-    auto df = timeseries::dataframe::DataFrame::Create(iss).value();
+    auto df = dataframe::DataFrame::Create(iss).value();
     auto idx = df.column_index("InvalidColumn");
     assert(!idx.has_value());
     print_status("test_dataframe_column_index_invalid", true);
@@ -148,7 +148,7 @@ void test_dataframe_access_by_string_timestamp_valid() {
     // 1. Setup CSV with a specific date
     std::string csv = "Date,Price\n2023-01-01 10:00:00,100.5";
     std::istringstream iss(csv);
-    auto df_res = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_res = dataframe::DataFrame::Create(iss);
     assert(df_res.has_value());
     auto& df = df_res.value();
     
@@ -166,7 +166,7 @@ void test_dataframe_access_by_string_timestamp_invalid_format() {
     
     std::string csv = "Date,Price\n2023-01-01 10:00:00,100.5";
     std::istringstream iss(csv);
-    auto df_res = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_res = dataframe::DataFrame::Create(iss);
     assert(df_res.has_value());
     auto& df = df_res.value();
     
@@ -182,7 +182,7 @@ void test_dataframe_access_by_string_timestamp_invalid_format() {
 void test_dataframe_access_string_combinations_valid() {
     std::string csv = "Date,Price\n2023-01-01 10:00:00,100.5";
     std::istringstream iss(csv);
-    auto df_res = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_res = dataframe::DataFrame::Create(iss);
     assert(df_res.has_value());
     auto& df = df_res.value();
     
@@ -212,7 +212,7 @@ void test_dataframe_access_string_combinations_valid() {
 void test_dataframe_access_string_invalid_column() {
     std::string csv = "Date,Price\n2023-01-01 10:00:00,100.5";
     std::istringstream iss(csv);
-    auto df_res = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_res = dataframe::DataFrame::Create(iss);
     assert(df_res.has_value());
     auto& df = df_res.value();
     
@@ -245,9 +245,9 @@ void common_timestamps_test() {
     std::string csv3 = "Date,C\n2023-01-01 10:30:00,7\n2023-01-01 11:00:00,8\n2023-01-01 12:00:00,9";
 
     std::istringstream iss1(csv1), iss2(csv2), iss3(csv3);
-    auto df1_res = timeseries::dataframe::DataFrame::Create(iss1);
-    auto df2_res = timeseries::dataframe::DataFrame::Create(iss2);
-    auto df3_res = timeseries::dataframe::DataFrame::Create(iss3);
+    auto df1_res = dataframe::DataFrame::Create(iss1);
+    auto df2_res = dataframe::DataFrame::Create(iss2);
+    auto df3_res = dataframe::DataFrame::Create(iss3);
 
     assert(df1_res.has_value() && df2_res.has_value() && df3_res.has_value());
 
@@ -256,10 +256,10 @@ void common_timestamps_test() {
     const auto& df3 = df3_res.value();
 
     // 2. Add them to a list of reference wrappers
-    std::list<std::reference_wrapper<const timeseries::dataframe::DataFrame>> dfs = {df1, df2, df3};
+    std::list<std::reference_wrapper<const dataframe::DataFrame>> dfs = {df1, df2, df3};
 
     // 3. Compute common timestamps
-    auto common = timeseries::dataframe::common_timestamps(dfs);
+    auto common = dataframe::common_timestamps(dfs);
 
     // 4. Verify the intersection is exactly 11:00:00 and 12:00:00
     bool success = common.size() == 2;
@@ -267,8 +267,8 @@ void common_timestamps_test() {
     success = success && common.find(make_ts("2023-01-01 12:00:00")) != common.end();
 
     // 5. Test Edge Case: Empty List
-    std::list<std::reference_wrapper<const timeseries::dataframe::DataFrame>> empty_dfs;
-    auto common_empty = timeseries::dataframe::common_timestamps(empty_dfs);
+    std::list<std::reference_wrapper<const dataframe::DataFrame>> empty_dfs;
+    auto common_empty = dataframe::common_timestamps(empty_dfs);
     success = success && common_empty.empty();
 
     print_status("common_timestamps_test", success);
@@ -281,7 +281,7 @@ void test_dataframe_create_from_column_index() {
     // 1. Setup mock DataFrame
     std::string csv = "Date,A,B\n2023-01-01 10:00:00,1.0,10.0\n2023-01-01 11:00:00,2.0,20.0\n2023-01-01 12:00:00,3.0,30.0";
     std::istringstream iss(csv);
-    auto df_res = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_res = dataframe::DataFrame::Create(iss);
     assert(df_res.has_value());
     auto& df = df_res.value(); // Must be non-const because CreateFromColumn is not marked const
 
@@ -328,7 +328,7 @@ void test_dataframe_create_from_column_name() {
     
     std::string csv = "Date,A,B\n2023-01-01 10:00:00,1.0,10.0\n2023-01-01 11:00:00,2.0,20.0\n2023-01-01 12:00:00,3.0,30.0";
     std::istringstream iss(csv);
-    auto df_res = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_res = dataframe::DataFrame::Create(iss);
     assert(df_res.has_value());
     auto& df = df_res.value();
 
@@ -451,7 +451,7 @@ void test_dataframe_copy() {
     // 1. Setup a test dataframe with multiple columns
     std::string csv = "Date,A,B,C\n2023-01-01 10:00:00,1.0,2.0,3.0\n2023-01-01 11:00:00,4.0,5.0,6.0";
     std::istringstream iss(csv);
-    auto df_exp = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_exp = dataframe::DataFrame::Create(iss);
     assert(df_exp.has_value());
     auto& df = df_exp.value();
 
@@ -520,7 +520,7 @@ void shift_test() {
         "2026-06-11 11:30:16,0.662864,0.955623,0.286446";
         
     std::istringstream iss(csv);
-    auto df_exp = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_exp = dataframe::DataFrame::Create(iss);
     assert(df_exp.has_value());
     auto& df = df_exp.value();
 
@@ -582,7 +582,7 @@ void pct_change_test() {
         "2026-06-11 11:30:16,0.662864,0.955623,0.286446";
         
     std::istringstream iss(csv);
-    auto df_exp = timeseries::dataframe::DataFrame::Create(iss);
+    auto df_exp = dataframe::DataFrame::Create(iss);
     assert(df_exp.has_value());
     auto& df = df_exp.value();
 
@@ -633,7 +633,7 @@ void append_column_test() {
         "2023-01-01 10:00:00,1.0,2.0\n"
         "2023-01-01 11:00:00,3.0,4.0";
     std::istringstream iss_target(csv_target);
-    auto df_target_exp = timeseries::dataframe::DataFrame::Create(iss_target);
+    auto df_target_exp = dataframe::DataFrame::Create(iss_target);
     assert(df_target_exp.has_value());
     auto& df_target = df_target_exp.value();
 
@@ -643,7 +643,7 @@ void append_column_test() {
         "2023-01-01 10:00:00,5.0,6.0\n"
         "2023-01-01 11:00:00,7.0,8.0";
     std::istringstream iss_source(csv_source);
-    auto df_source_exp = timeseries::dataframe::DataFrame::Create(iss_source);
+    auto df_source_exp = dataframe::DataFrame::Create(iss_source);
     assert(df_source_exp.has_value());
     auto& df_source = df_source_exp.value();
 
@@ -654,7 +654,7 @@ void append_column_test() {
         "2023-01-01 10:00:00,9.0\n"
         "2023-01-01 12:00:00,10.0";
     std::istringstream iss_bad(csv_bad);
-    auto df_bad_exp = timeseries::dataframe::DataFrame::Create(iss_bad);
+    auto df_bad_exp = dataframe::DataFrame::Create(iss_bad);
     assert(df_bad_exp.has_value());
     auto& df_bad_time = df_bad_exp.value();
 
@@ -879,7 +879,7 @@ void test_cummax() {
     assert(test1_success);
  
     if (test1_success) {
-        timeseries::dataframe::DataFrame & df_cummax1 = cummax_res1.value();
+        dataframe::DataFrame & df_cummax1 = cummax_res1.value();
  
         assert(df_cummax1.rows() == 2);
         assert(df_cummax1.cols() == 2);

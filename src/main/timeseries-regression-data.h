@@ -33,9 +33,9 @@ namespace timeseries::regression::data {
             const slice::MutableSlice2D & Y_train() const { return Y_train_; }
             const slice::MutableSlice2D & Y_test() const { return Y_test_; }
             
-            static std::expected<RegressionData, TuxedoError> CreateWithLogChange(timeseries::dataframe::DataFrame & df);
-            static std::expected<RegressionData, TuxedoError> CreateWithZScore(timeseries::dataframe::DataFrame & df);
-            static std::expected<RegressionData, TuxedoError> CreateWithPctChange(timeseries::dataframe::DataFrame & df);
+            static std::expected<RegressionData, TuxedoError> CreateWithLogChange(dataframe::DataFrame & df);
+            static std::expected<RegressionData, TuxedoError> CreateWithZScore(dataframe::DataFrame & df);
+            static std::expected<RegressionData, TuxedoError> CreateWithPctChange(dataframe::DataFrame & df);
     };
 } // namespace timeseries
 #endif

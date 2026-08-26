@@ -13,7 +13,7 @@
 using namespace std;
 using namespace timeseries::classifiers;
 using namespace slice;
-using namespace timeseries::dataframe;
+using namespace dataframe;
 using namespace forecast;
 using namespace timeseries::features;
 using namespace timeseries::regression::data;

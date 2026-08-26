@@ -21,7 +21,7 @@
 #include <vector>
 #include <span>
 
-namespace timeseries::dataframe {
+namespace dataframe {
     typedef std::function<double(double)> double_transformer;
     typedef std::function<void(std::span<double> row, size_t column_index, double x)> double_accumulator; 
     double identity_transformer(double x);
