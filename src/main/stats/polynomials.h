@@ -4,10 +4,10 @@
 
 #include <expected>
 #include <span>
-#include "tuxedo-error.h"
+#include "utils/tuxedo-error.h"
 #include <vector>
 #include <tuple>
-#include "slice.h"
+#include "data/slice.h"
 namespace polynomials {
     // Keep standard declarations here
     // ==========================================

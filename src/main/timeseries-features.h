@@ -1,6 +1,6 @@
 #ifndef __TIMESERIES_MOMENTA_H__
 #define __TIMESERIES_MOMENTA_H__
-#include "timeseries-dataframe.h"
+#include "data/timeseries-dataframe.h"
 #include <expected>
 
 using namespace timeseries::dataframe;

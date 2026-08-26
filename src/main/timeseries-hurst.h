@@ -1,6 +1,6 @@
 #ifndef __TIMESERIES_HURST__
 #define __TIMESERIES_HURST__
-#include "slice.h"
+#include "data/slice.h"
 
 namespace timeseries::hurst {
     std::expected<double, TuxedoError> exponent(

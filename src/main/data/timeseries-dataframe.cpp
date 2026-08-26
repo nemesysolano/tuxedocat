@@ -6,8 +6,8 @@
 #include <algorithm> // <-- Required for std::set_intersection
 #include <iterator>  // <-- Required for std::inserter
 #include <cmath>
-#include "timeseries-log.h"
-#include "tuxedo-error.h"
+#include "utils/timeseries-log.h"
+#include "utils/tuxedo-error.h"
 using namespace std;
 
 namespace timeseries::dataframe {

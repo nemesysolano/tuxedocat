@@ -7,10 +7,12 @@
 #include <vector>
 #include <filesystem>
 #include <fstream>
-
+#include "timeseries.h"
+#include "utils/timeseries-log.h"
 using namespace std::filesystem;
 using namespace std;
 using namespace reports;
+using namespace timeseries;
 
 vector<string> read_lines_from_file(const char* current_program_path) {
     auto exe_path = canonical(current_program_path).parent_path();
@@ -48,8 +50,14 @@ vector<string> read_lines_from_file(const char* current_program_path) {
 
 }
 
-int main(int argc, char* argv[]) {
+void quality(int argc, char* argv[]) {
     auto symbols = read_lines_from_file(argv[0]);
     quality(symbols);
+}
+
+
+int main(int argc, char* argv[]) {
+   
+    return 0;
 }
 #endif 

@@ -8,7 +8,7 @@
 #include "forecast.h"
 #include "timeseries-features.h"
 #include "timeseries-regression-data.h"
-#include "timeseries-log.h"
+#include "utils/timeseries-log.h"
 
 using namespace std;
 using namespace timeseries::classifiers;

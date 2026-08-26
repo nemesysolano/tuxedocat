@@ -1,7 +1,7 @@
 #ifdef __TEST_MAIN__
 #include <vector>
 #include <span>
-#include "slice.h"
+#include "data/slice.h"
 #include "timeseries-hurst-tests.h"
 #include "timeseries-hurst.h"
 #include <iostream>

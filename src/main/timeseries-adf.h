@@ -9,10 +9,10 @@
 #include <functional>
 #include <mdspan>
 #include <expected>
-#include "tuxedo-error.h"
+#include "utils/tuxedo-error.h"
 #include <functional>
 #include <memory>
-#include "slice.h"
+#include "data/slice.h"
 
 namespace timeseries::adf{
     extern const std::vector<double> tau_star_nc;

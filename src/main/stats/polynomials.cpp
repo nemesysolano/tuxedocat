@@ -1,8 +1,8 @@
-#include "polynomials.h"
+#include "stats/polynomials.h"
 #include <iostream>
 #include <cmath>
 #include <Eigen/Dense>
-#include "slice.h"
+#include "data/slice.h"
 
 using namespace std;
 

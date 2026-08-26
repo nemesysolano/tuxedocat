@@ -7,11 +7,11 @@
 #include <vector>
 #include <string>
 #include <set>
-#include "slice.h"
+#include "data/slice.h"
 #include <memory>
 #include <expected>
-#include "tuxedo-error.h"
-#include "timeseries-dataframe.h"
+#include "utils/tuxedo-error.h"
+#include "data/timeseries-dataframe.h"
 #include <sstream>
 #include <set>
 #include <iomanip> // <-- Add this for std::get_time

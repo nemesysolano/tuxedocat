@@ -1,7 +1,7 @@
 #ifdef __TEST_MAIN__
 #ifndef SLICE_TESTS_H
 #define SLICE_TESTS_H
-#include "slice.h"
+#include "data/slice.h"
 
 void slice2D_test();
 void mutable_slice2D_test();

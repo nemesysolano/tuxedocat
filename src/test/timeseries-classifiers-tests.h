@@ -1,7 +1,7 @@
 #ifdef __TEST_MAIN__
 #ifndef __TIMESERIES_CLASSIFIERS_TESTS__
 #include "timeseries-classifiers.h"
-#include "timeseries-dataframe.h"
+#include "data/timeseries-dataframe.h"
 #include <functional>
 #include "timeseries-features.h"
 

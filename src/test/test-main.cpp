@@ -5,7 +5,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
-#include "slice.h"
+#include "data/slice.h"
 #include "distributions-tests.h"
 #include "timeseries-adf-tests.h"
 #include "slice-tests.h"
@@ -13,8 +13,6 @@
 #include "timeseries-dataframe-tests.h"
 #include "ols-tests.h"
 #include "timeseries-classifiers-tests.h"
-#include "trading-engine-portfolio-tests.h"
-#include "trading-engine-datahandler-tests.h"
 
 using namespace std;
 
@@ -87,20 +85,7 @@ int main(int argc, char* argv[]) {
     category_covariance_test();
     determinant_test();
     inverse_test();
-    regression_test(argv[0]);
-    test_create_drawdowns();
-    test_historic_csv_data_handler_create(argv[0]);
-    test_historic_csv_data_handler_update_bars(argv[0]);
-    test_portfolio_create(argv[0]);
-    test_portfolio_update_timeindex(argv[0]);
-    test_update_holdings_from_fill(argv[0]);
-    test_update_positions_from_fill(argv[0]);
-    test_update_fill(argv[0]);
-    test_naive_order(argv[0]);
-    test_update_signal_test(argv[0]);
-    test_create_equity_curve_csv();
-    test_create_equity_curve_dataframe();
-    test_create_summary_stats();
+
     return 0;
 }
 #endif

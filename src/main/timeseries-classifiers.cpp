@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <Eigen/Dense>
 #include <random> // Required for lock-free multi-threading
-#include "timeseries-log.h"
+#include "utils/timeseries-log.h"
 using namespace std;
 
 namespace timeseries::classifiers {
@@ -94,6 +94,7 @@ namespace timeseries::classifiers {
         const slice::Span2D & directions
     ) {
         if(X.rows() != directions.rows() || directions.cols() != 1 || X.rows() == 0) { 
+            trace_with_message("ERR_BAD_INPUT_DIMESNSIONS");
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
         }
 
@@ -509,6 +510,7 @@ namespace timeseries::classifiers {
         const slice::Span2D & y  // (M×1) directions span                
     ) {
         if(X.rows() != y.rows() || y.cols() != 1 || X.rows() == 0) { 
+            trace_with_message("ERR_BAD_INPUT_DIMESNSIONS");
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
         }        
 
@@ -610,19 +612,10 @@ namespace timeseries::classifiers {
         const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
     ) {
         if(X.rows() != y.rows() || y.cols() != 1 || X.rows() == 0) { 
+            trace_with_message("ERR_BAD_INPUT_DIMESNSIONS");
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
         }    
         
-        /* 
-        double half_log_determinant_Σ_up_; // $\frac{1}{2} \log |Σ_k|$
-        slice::MutableSlice2D inverse_Σ_up_; // Σ_k^{-1} 
-        double log_π_k_up_; // $\log π_k$
-
-        double half_log_determinant_Σ_down_; // $\frac{1}{2} \log |Σ_k|$
-        slice::MutableSlice2D inverse_Σ_down_; // Σ_k^{-1} 
-        double log_π_k_down_; // $\log π_k$     
-        */
-
         // Calculates direction_up and direction_down
         auto dir_up_result = up_category(X, y);
         if (!dir_up_result) return std::unexpected(dir_up_result.error());
@@ -1091,6 +1084,7 @@ namespace timeseries::classifiers {
         const slice::Span2D& y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
     )  {
         if (!(X.rows() == y.rows() && y.cols() == 1)) {
+            trace_with_message("ERR_BAD_INPUT_DIMESNSIONS");
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
         }
         std::vector<size_t> current_indices;

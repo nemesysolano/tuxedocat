@@ -7,13 +7,13 @@
 #include <memory>
 #include <expected>
 #include <vector>
-#include "tuxedo-error.h"
-#include "slice.h"
+#include "utils/tuxedo-error.h"
+#include "data/slice.h"
 #include <iostream>
 #include <memory>
 #include <expected>
 #include "timeseries.h"
-#include "timeseries-dataframe.h"
+#include "data/timeseries-dataframe.h"
 namespace forecast {
 
     class BinaryForecast {

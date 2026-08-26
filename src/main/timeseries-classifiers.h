@@ -1,6 +1,6 @@
 #ifndef __TIMESERIES_CLASSIFIERS_H__
 #define __TIMESERIES_CLASSIFIERS_H__
-#include "slice.h"
+#include "data/slice.h"
 #include <expected>
 #include <iostream>
 #include <memory>

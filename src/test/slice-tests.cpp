@@ -4,7 +4,7 @@
 #include <vector>
 #include <span>
 #include <iostream>
-#include "slice.h"
+#include "data/slice.h"
 using namespace std;
 
 void slice2D_test() {

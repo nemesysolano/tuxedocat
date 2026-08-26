@@ -1,6 +1,6 @@
 #ifndef __TIMESERIES_REGRESSION_DATA_H__
 #define __TIMESERIES_REGRESSION_DATA_H__
-#include "timeseries-dataframe.h"
+#include "data/timeseries-dataframe.h"
 #include <functional>
 #include "timeseries-features.h"
 #include <expected>

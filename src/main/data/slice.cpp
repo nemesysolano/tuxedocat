@@ -1,8 +1,8 @@
-#include "slice.h"
+#include "data/slice.h"
 #include <expected>
 #include <Eigen/Dense>
 #include <iomanip>
-#include "tuxedo-error.h"
+#include "utils/tuxedo-error.h"
 using namespace std;
 
 std::ostream & operator << (std::ostream & out, const std::span<const double> & v) {

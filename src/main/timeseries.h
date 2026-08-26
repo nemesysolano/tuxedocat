@@ -6,7 +6,7 @@
 #include <map>
 #include <chrono>
 #include <iostream>
-#include "slice.h"
+#include "data/slice.h"
 #include <chrono>
 using namespace std::chrono;
 

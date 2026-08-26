@@ -1,8 +1,8 @@
 #include "timeseries-adf.h"
-#include "slice.h"
-#include "polynomials.h"
-#include "distributions.h"
-#include "tuxedo-error.h"
+#include "data/slice.h"
+#include "stats/polynomials.h"
+#include "stats/distributions.h"
+#include "utils/tuxedo-error.h"
 #include <tuple>
 #include <Eigen/Dense>
 #include <cmath>

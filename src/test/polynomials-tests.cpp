@@ -10,7 +10,7 @@
 #include <iostream>
 #include <cmath>
 #include <mdspan>
-#include "slice.h"
+#include "data/slice.h"
 
 void evaluate_test() {
     std::cout << "Running evaluate_test..." << std::endl;

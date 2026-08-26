@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <cmath>
 #include <limits>
-#include "tuxedo-error.h"
+#include "utils/tuxedo-error.h"
 
 namespace ols {
     /* y(t) = β⋅X(t) + ε(t)

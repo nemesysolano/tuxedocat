@@ -7,8 +7,8 @@
 #include <memory>
 #include <expected>
 #include <vector>
-#include "tuxedo-error.h"
-#include "slice.h"
+#include "utils/tuxedo-error.h"
+#include "data/slice.h"
 #include <iostream>
 
 namespace ols {

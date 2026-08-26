@@ -1,5 +1,5 @@
 #include "timeseries-hurst.h"
-#include "polynomials.h"
+#include "stats/polynomials.h"
 #include <cmath>
 #include <iostream>
 
