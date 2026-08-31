@@ -1,6 +1,8 @@
 #include "Broker.h"
 #include "events/FillEvent.h"
 #include <memory>
+#include "utils/log.h"
+#include <utility>
 
 using namespace std;
 using namespace events;
@@ -14,12 +16,14 @@ namespace broker {
         for(const Order & order: event_orders) {
             if(!orders_.contains(order.symbol())) {
                 orders_.emplace(order.symbol(), order);
+                trace_with_message(format("ORDER TYPE = {}",  to_underlying(order.direction())));
+
                 executions.push_back(make_unique<PositionCreatedExecution>(
-                    timeseries::sys_seconds_add_days(timeseries::sys_seconds_now(), 2), 
+                    order.timestamp(), 
                     order.symbol(), 
-                    101, 
-                    1, 
-                    1,
+                    order.entry_price(), 
+                    order.quantity(), 
+                    0,
                     order.direction()
                 ));
             }
@@ -64,6 +68,7 @@ namespace broker {
                 }
 
                 if (exit) {
+                    trace_with_message(format("ORDER DIRECTION AT EXIT = {}", to_underlying(order.direction())));
                     executions.emplace_back(make_unique<PositionClosedExecution>(
                         bar.timestamp(),
                         bar.symbol(),
@@ -71,7 +76,7 @@ namespace broker {
                         order.direction(),
                         0.0
                     ));
-                    
+                    orders_.erase(bar.symbol());
                 } else {
                     if(order.direction() == SignalDirection::LONG) {
                         profit_loss = (bar.close_price() - order.entry_price()) * order.quantity();

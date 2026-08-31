@@ -36,7 +36,8 @@ namespace broker {
             void process_event(const Event & event);
 
 #ifdef __TEST_MAIN__
-            const vector<FillEvent> & fill_events() { return fill_events_;}
+            inline const vector<FillEvent> & fill_events() { return fill_events_;}
+            inline const unordered_map<string, Order> orders() {return orders_; }
 #endif
            
     };

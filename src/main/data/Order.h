@@ -12,7 +12,7 @@ namespace data {
         private:
             sys_seconds timestamp_;
             string symbol_;
-            double quantity_;
+            int quantity_;
             double entry_price_;
             SignalDirection direction_;
             double take_profit_;
@@ -22,11 +22,12 @@ namespace data {
             Order(
                 const sys_seconds& timestamp,
                 const string& symbol,
-                double quantity,
+                int quantity,
                 double entry_price,
                 SignalDirection direction,
                 double take_profit,
-                double stop_loss)
+                double stop_loss
+            )
                 : timestamp_(timestamp),
                   symbol_(symbol),
                   quantity_(quantity),
@@ -38,7 +39,7 @@ namespace data {
             const sys_seconds& timestamp() const { return timestamp_; }
             const string& symbol() const { return symbol_; }
             double quantity() const { return quantity_; }
-            double entry_price() const { return entry_price_; }
+            int entry_price() const { return entry_price_; }
             SignalDirection direction() const { return direction_; }
             double take_profit() const { return take_profit_; }
             double stop_loss() const { return stop_loss_; }

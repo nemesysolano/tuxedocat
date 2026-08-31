@@ -1,6 +1,6 @@
 CC := clang++
 # Added -Isrc/main to the include paths so test files can find main headers
-CFLAGS := -Wall -Wextra -Iinclude -Isrc/main -I/opt/homebrew/include/eigen3 -DEIGEN_USE_BLAS -std=c++23 -MMD -MP
+CFLAGS := -Wall -Wextra -Iinclude -Isrc/main -I/opt/homebrew/include/eigen3  -DEIGEN_USE_BLAS -std=c++23 -MMD -MP
 SRC_DIR := src
 OBJ_DIR := obj
 BIN_DIR := bin

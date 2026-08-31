@@ -14,6 +14,8 @@
 #include "ols-tests.h"
 #include "timeseries-classifiers-tests.h"
 #include "portfolio/PortfolioTest.h"
+#include "broker/BrokerTest.h"
+
 using namespace std;
 
 int main(int argc, char* argv[]) {
@@ -86,6 +88,7 @@ int main(int argc, char* argv[]) {
     determinant_test();
     inverse_test();
     portfolio::portfolio_event_handling_test();
+    broker::test_broker_winning_orders();
     return 0;
 }
 #endif
