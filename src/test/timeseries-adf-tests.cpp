@@ -3,8 +3,8 @@
 #include <fstream>
 #include <iostream>
 #include <filesystem>
-#include "timeseries-dataframe.h"
-#include "ols.h"
+#include "data/dataframe.h"
+#include "stats/ols.h"
 using namespace std;
 using namespace timeseries::adf;
 using namespace dataframe;

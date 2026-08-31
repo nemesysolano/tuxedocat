@@ -19,6 +19,7 @@ typedef enum TuxedoErrorEnum {
     ERR_NEGATIVE_LOG_ARG=14,
     ERR_CANT_CREATE_CLASSIFIER=15,
     ERR_CANT_OPEN_FILE=16,
-    ERR_BAD_INPUT = 17
+    ERR_BAD_INPUT = 17,
+    ERR_DUPLICATED = 18
 } TuxedoError;
 #endif

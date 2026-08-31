@@ -1,7 +1,7 @@
 #ifdef __TEST_MAIN__
 #include "polynomials-tests.h"
-#include "distributions.h"
-#include "timeseries-adf.h" // Required for mac_kinnon_p and RegressionType
+#include "stats/distributions.h"
+#include "timeseries/adf.h" // Required for mac_kinnon_p and RegressionType
 #include <iostream>
 #include <vector>
 #include <cmath>
@@ -13,7 +13,7 @@
 #include "timeseries-dataframe-tests.h"
 #include "ols-tests.h"
 #include "timeseries-classifiers-tests.h"
-
+#include "portfolio/PortfolioTest.h"
 using namespace std;
 
 int main(int argc, char* argv[]) {
@@ -85,7 +85,7 @@ int main(int argc, char* argv[]) {
     category_covariance_test();
     determinant_test();
     inverse_test();
-
+    portfolio::portfolio_event_handling_test();
     return 0;
 }
 #endif

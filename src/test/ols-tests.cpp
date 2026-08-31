@@ -1,6 +1,6 @@
 #ifdef __TEST_MAIN__
 #include "ols-tests.h"
-#include "tuxedo-error.h"
+#include "utils/tuxedo-error.h"
 #include <cassert>
 #include <cmath>
 #include <iostream>

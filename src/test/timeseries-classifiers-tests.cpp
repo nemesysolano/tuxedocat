@@ -1,13 +1,13 @@
 #ifdef __TEST_MAIN__
 #include "timeseries-classifiers-tests.h"
-#include "timeseries/timeseries-classifiers.h"
-#include "timeseries-dataframe.h"
+#include "timeseries/classifiers.h"
+#include "data/dataframe.h"
 #include <filesystem>
 #include <fstream>
 #include <cassert>
-#include "forecast.h"
-#include "timeseries/timeseries-features.h"
-#include "timeseries/timeseries-regression-data.h"
+#include "timeseries/forecast.h"
+#include "timeseries/features.h"
+#include "timeseries/regression-data.h"
 #include "utils/log.h"
 
 using namespace std;

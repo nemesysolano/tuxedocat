@@ -1,7 +1,7 @@
 #ifdef __TEST_MAIN__
 #ifndef POLYNOMIALS_TESTS_H
 #define POLYNOMIALS_TESTS_H
-#include "polynomials.h"
+#include "stats/polynomials.h"
 void evaluate_test() ;
 void evaluate_reversed_test() ;
 void evaluate_horizontally_test();

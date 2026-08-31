@@ -1,6 +1,6 @@
 #ifdef __TEST_MAIN__
 #include "timeseries-dataframe-tests.h"
-#include "timeseries-dataframe.h"
+#include "data/dataframe.h"
 #include <cassert>
 #include <sstream>
 #include <iostream>
@@ -8,7 +8,7 @@
 #include <functional>
 #include <iomanip> // For get_time
 #include <ctime>   // For timegm
-#include "timeseries-adf.h"
+#include "timeseries/adf.h"
 #include <cmath> // Required for std::isnan and std::abs
 #include <cassert>
 

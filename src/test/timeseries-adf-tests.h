@@ -1,7 +1,7 @@
 #ifdef __TEST_MAIN__
 #ifndef TIMESERIES_ADF_TESTS_H
 #define TIMESERIES_ADF_TESTS_H
-#include "timeseries-adf.h" // Required for mac_kinnon_p and RegressionType
+#include "timeseries/adf.h" // Required for mac_kinnon_p and RegressionType
 #include <iostream>
 #include <cassert>
 
