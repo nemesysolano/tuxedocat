@@ -89,6 +89,7 @@ int main(int argc, char* argv[]) {
     inverse_test();
     portfolio::portfolio_event_handling_test();
     broker::test_broker_winning_orders();
+    broker::test_broker_losing_orders();
     return 0;
 }
 #endif

@@ -16,7 +16,6 @@ namespace broker {
         for(const Order & order: event_orders) {
             if(!orders_.contains(order.symbol())) {
                 orders_.emplace(order.symbol(), order);
-                trace_with_message(format("ORDER TYPE = {}",  to_underlying(order.direction())));
 
                 executions.push_back(make_unique<PositionCreatedExecution>(
                     order.timestamp(), 
@@ -68,7 +67,6 @@ namespace broker {
                 }
 
                 if (exit) {
-                    trace_with_message(format("ORDER DIRECTION AT EXIT = {}", to_underlying(order.direction())));
                     executions.emplace_back(make_unique<PositionClosedExecution>(
                         bar.timestamp(),
                         bar.symbol(),
