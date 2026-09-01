@@ -1,4 +1,4 @@
-#ifndef __TEST_MAIN_H__
+#ifdef __TEST_MAIN_H__
 #define __TEST_MAIN_H__
 #include "BrokerTest.h"
 #include "utils/log.h"
@@ -270,7 +270,7 @@ namespace broker {
         const vector<unique_ptr<Execution>> & close_executions = close_fill_event.executions();   
         assert(close_executions.size() == 2); 
      
-        size_t positions_closed = 0;
+        size_t positions_updated = 0;
 
         for(const unique_ptr<Execution> & execution: close_executions) {
             assert(execution->execution_type() == ExecutionType::POSITION_UPDATED);
@@ -278,15 +278,15 @@ namespace broker {
            
             if(updated_execution.direction() == SignalDirection::LONG) {
                 assert((int)updated_execution.profit_loss() == quantity);
-                positions_closed++;
+                positions_updated++;
             } else if(updated_execution.direction() == SignalDirection::SHORT) {
                 assert((int)updated_execution.profit_loss() == quantity);
-                positions_closed++;
+                positions_updated++;
             }
 
         }
 
-        // assert(positions_closed == 2);
+        assert(positions_updated == 2);
         trace_with_message("[PASSED]");
     }
 }

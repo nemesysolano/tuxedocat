@@ -8,6 +8,12 @@ using namespace std;
 using namespace events;
 using namespace data;
 
+/*
+Assumptions:
+- Strategy runs after daily bar close
+- Order event is queued for next session
+- Market event for next day then updates or closes it
+*/
 namespace broker {
     void Broker::process_order(const OrderEvent & order_event) {
         const vector<Order> & event_orders = order_event.orders();
@@ -85,7 +91,7 @@ namespace broker {
                         profit_loss = (bar.close_price() - order.entry_price()) * order.quantity();
                         trace_with_message(
                             format(
-                                "(bar.close_price() - order.entry_price()) * order.quantity() = ({} - {}) * {} = {}",
+                                "LONG (bar.close_price() - order.entry_price()) * order.quantity() = ({} - {}) * {} = {}",
                                 bar.close_price(), order.entry_price(), order.quantity(), profit_loss
                             )
                         );
@@ -93,7 +99,7 @@ namespace broker {
                         profit_loss = (order.entry_price() - bar.close_price()) * order.quantity();
                         trace_with_message(
                             format(
-                                "(order.entry_price() - bar.close_price()) * order.quantity() = ({} - {}) * {} = {}",
+                                "SHORT (order.entry_price() - bar.close_price()) * order.quantity() = ({} - {}) * {} = {}",
                                  order.entry_price(), bar.close_price(), order.quantity(), profit_loss
                             )
                         );
