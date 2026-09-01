@@ -14,26 +14,36 @@ using namespace timeseries;
 namespace broker {
     const string AAPL = "AAPL";
     const string AMZN = "AMZN";
+    const int quantity = 10;
+    const double entry_price = 100;
+    const double take_profit_aapl = 110;
+    const double stop_loss_aapl = 97;
+    const double take_profit_amzn = 97;
+    const double stop_loss_amzn = 100;
+
+    vector<Order> create_orders(sys_seconds today) {
+        vector<Order> orders;
+        orders.emplace_back(
+            Order(today, AAPL, quantity, entry_price, SignalDirection::LONG, take_profit_aapl, stop_loss_aapl) 
+        );
+        orders.emplace_back(
+            Order(today, AMZN, quantity, entry_price, SignalDirection::SHORT, take_profit_amzn, stop_loss_amzn)
+        );
+
+        return orders;
+    }
 
     void test_broker_winning_orders() {
         size_t index;
         Broker broker;
+        const double aapl_profit_loss = quantity * (take_profit_aapl - entry_price);
+        const double amzn_profit_loss = quantity * (entry_price - take_profit_amzn);
+        assert(aapl_profit_loss > 0 and amzn_profit_loss > 0);
 
         // 1. Create Orders
-        vector<Order> orders;
         sys_seconds today = timeseries::sys_seconds_now();
-        orders.emplace_back(
-            // `quantity` * (`take_profit` - `entry_price`) === 10 * (100 - 110) === 100
-            Order(today, AAPL, /* quantity */ 10, /* entry_price */ 100, SignalDirection::LONG, /* take_profit */ 110, /* stop loss */ 97) 
-        );
-        orders.emplace_back(
-            // `quantity` * (`entry_price` - `take_profit`) === 10 (100 - 97) = 10 * 3 == 30
-            Order(today, AMZN, /* quantity */ 10, /* entry_price */ 100, SignalDirection::SHORT, /* take_profit */ 97, /* stop loss */ 100)
-        );
-
-        OrderEvent order_event(
-            orders
-        );
+        vector<Order> orders(create_orders(today));
+        OrderEvent order_event(orders);
 
         //2. Submit `OrderEvent` to `Broker`
         broker.process_event(order_event);
@@ -59,7 +69,7 @@ namespace broker {
             assert(order.entry_price() == position_created_execution.fill_price());
             assert(order.quantity() == position_created_execution.fill_quantity());
             assert(order.direction() == position_created_execution.direction());
-            assert(order.direction() == SignalDirection::LONG || SignalDirection::SHORT);
+            assert(order.direction() == SignalDirection::LONG || order.direction() == SignalDirection::SHORT);
             assert(broker.orders().contains(order.symbol()));
 
         }
@@ -99,10 +109,10 @@ namespace broker {
             trace_with_message(format("POSITION CLOSED with {}", closed_execution.profit_loss()));
 
             if(closed_execution.direction() == SignalDirection::LONG) {
-                assert((int)closed_execution.profit_loss() == 100);
+                assert((int)closed_execution.profit_loss() == aapl_profit_loss);
                 positions_closed++;
             } else if(closed_execution.direction() == SignalDirection::SHORT) {
-                assert((int)closed_execution.profit_loss() == 30);
+                assert((int)closed_execution.profit_loss() == amzn_profit_loss);
                 positions_closed++;
             }
 
@@ -111,6 +121,10 @@ namespace broker {
 
         assert(positions_closed == 2);
         trace_with_message("[PASSED]");
+    }
+
+    void test_broker_losing_orders() {
+
     }
 }
 
