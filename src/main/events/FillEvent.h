@@ -71,17 +71,21 @@ namespace events {
         private:
             double profit_loss_;
             Bar bar_;
+            SignalDirection direction_;
         public:
-            PositionUpdatedExecution(const sys_seconds timestamp, const string& symbol, double profit_loss, const Bar& bar, double commissions)
+            PositionUpdatedExecution(const sys_seconds timestamp, const string& symbol, double profit_loss, const Bar& bar, double commissions, SignalDirection direction)
                 : Execution(timestamp, symbol, commissions, ExecutionType::POSITION_UPDATED),
                   profit_loss_(profit_loss),
-                  bar_(bar) {}
-            PositionUpdatedExecution(const sys_seconds timestamp, const string& symbol, double profit_loss, const Bar&& bar, double commissions)
+                  bar_(bar),
+                  direction_(direction) {}
+            PositionUpdatedExecution(const sys_seconds timestamp, const string& symbol, double profit_loss, const Bar&& bar, double commissions, SignalDirection direction)
                 : Execution(timestamp, symbol, commissions, ExecutionType::POSITION_UPDATED),
                   profit_loss_(profit_loss),
-                  bar_(bar) {} 
+                  bar_(bar),
+                  direction_(direction) {} 
             double profit_loss() const { return profit_loss_; }
             const Bar& bar() const { return bar_; }
+            SignalDirection direction() const { return direction_; }
     };
 
     /* 

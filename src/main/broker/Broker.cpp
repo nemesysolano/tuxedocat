@@ -67,27 +67,45 @@ namespace broker {
                 }
 
                 if (exit) {
+                    Order closing_order(orders_.at(symbol));
+                    orders_.erase(bar.symbol());
+
                     executions.emplace_back(make_unique<PositionClosedExecution>(
                         bar.timestamp(),
                         bar.symbol(),
                         profit_loss,
-                        order.direction(),
+                        closing_order.direction(),
                         0.0
                     ));
-                    orders_.erase(bar.symbol());
+
                 } else {
+                    
+
                     if(order.direction() == SignalDirection::LONG) {
                         profit_loss = (bar.close_price() - order.entry_price()) * order.quantity();
+                        trace_with_message(
+                            format(
+                                "(bar.close_price() - order.entry_price()) * order.quantity() = ({} - {}) * {} = {}",
+                                bar.close_price(), order.entry_price(), order.quantity(), profit_loss
+                            )
+                        );
                     } else if (order.direction() == SignalDirection::SHORT) {
-                        profit_loss = order.entry_price() - bar.close_price() * order.quantity();
+                        profit_loss = (order.entry_price() - bar.close_price()) * order.quantity();
+                        trace_with_message(
+                            format(
+                                "(order.entry_price() - bar.close_price()) * order.quantity() = ({} - {}) * {} = {}",
+                                 order.entry_price(), bar.close_price(), order.quantity(), profit_loss
+                            )
+                        );
                     }
-
+                    
                     executions.push_back(make_unique<PositionUpdatedExecution>(
                         bar.timestamp(),
                         bar.symbol(),
                         profit_loss,
                         bar,
-                        0.0
+                        0.0,
+                        order.direction()
                     ));
                 }
             } 

@@ -90,6 +90,7 @@ int main(int argc, char* argv[]) {
     portfolio::portfolio_event_handling_test();
     broker::test_broker_winning_orders();
     broker::test_broker_losing_orders();
+    broker::test_broker_updating_orders();
     return 0;
 }
 #endif

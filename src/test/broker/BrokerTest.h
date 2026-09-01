@@ -9,6 +9,7 @@ using namespace data;
 namespace broker {
     void test_broker_winning_orders();
     void test_broker_losing_orders();
+    void test_broker_updating_orders();
 }
 
 
