@@ -1,4 +1,6 @@
 #include "Strategy.h"
+#include "events/SignalEvent.h"
+#include <vector>
 
 using namespace std;
 using namespace data;
@@ -7,19 +9,24 @@ using namespace events;
 namespace strategy {
     void Strategy::process_market(const MarketEvent & market_event) {
         const unordered_map<string,Bar> & bars = market_event.bars;
+        vector<Signal> signals;
 
         for (const auto & [symbol, bar] : bars) {
-            (void)symbol;
-            (void)bar;
 
             if(!this->bars_.contains(symbol)) {
                 this->bars_.emplace(symbol, vector<Bar>());
             }
 
-            vector<Bar> & v = this->bars_.at(symbol);
-            v.emplace_back(bar);
-            //TODO: Notify `SignalEvent` to `Portfolio`
+            vector<Bar> & bars = this->bars_.at(symbol);
+            bars.emplace_back(bar);
+            add_signal(bar, signals);
         }
+
+        SignalEvent signal_event(signals);
+#ifdef __TEST_MAIN__
+        signal_events_.push_back(signal_event);
+#endif
+        //TODO: Notify `SignalEvent` to `Portfolio`
     }
 
     void Strategy::process_event(const Event & event) {

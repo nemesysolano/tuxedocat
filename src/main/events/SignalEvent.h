@@ -21,8 +21,7 @@ namespace events {
             string symbol_;
             SignalDirection direction_;
         public:
-            Signal(sys_seconds timestamp, const string & symbol, SignalDirection direction):
-                timestamp_(timestamp), symbol_(symbol), direction_(direction) {}
+            Signal(sys_seconds timestamp, const string & symbol, SignalDirection direction): timestamp_(timestamp), symbol_(symbol), direction_(direction) {}
 
             sys_seconds timestamp() const { return timestamp_; }
             const string & symbol() const { return symbol_; }
