@@ -7,9 +7,9 @@ using namespace events;
 using namespace data;
 
 namespace broker {
-    void test_broker_winning_orders();
-    void test_broker_losing_orders();
-    void test_broker_updating_orders();
+    void test_filled_order_closed_on_opening();
+    void test_filled_scheduled_on_opening();
+    void test_filled_orders_closed();
 }
 
 
