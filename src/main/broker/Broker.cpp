@@ -20,17 +20,15 @@ namespace broker {
         vector<unique_ptr<Execution>> executions;
 
         for(const Order & order: event_orders) {
-            if(!orders_.contains(order.symbol())) {
-                orders_.emplace(order.symbol(), order);
-
-                executions.push_back(make_unique<PositionCreatedExecution>(
+            if(!(filled_orders_.contains(order.symbol()) || scheduled_orders_.contains(order.symbol()))) {
+                executions.push_back(make_unique<OrderScheduledExecution>(
                     order.timestamp(), 
                     order.symbol(), 
-                    order.entry_price(), 
                     order.quantity(), 
-                    0,
                     order.direction()
                 ));
+
+                scheduled_orders_.emplace(order.symbol(), order);
             }
         }
 
@@ -40,67 +38,66 @@ namespace broker {
         fill_events_.emplace_back(std::move(fill_event));
 #else
         //TODO: Notify `FillEvent` to `Portfolio`
-        (void)fill_event;
+        if(executions.size() > 0) {
+            (void)fill_event;
+        }
 #endif
     }
 
     void Broker::process_market(const MarketEvent & market_event) {
         const unordered_map<string, Bar> & bars = market_event.bars;
         vector<unique_ptr<Execution>> executions;
+        double profit_loss = 0.0;
 
         for (const auto & [symbol, bar] : bars) {
-            if (orders_.contains(symbol)) {
-                const Order & order = orders_.at(symbol);
-                double profit_loss = 0.0;
+            if (filled_orders_.contains(symbol)) {
+                Order filled_order(filled_orders_.at(symbol));
                 bool exit = false;
 
-                if (order.direction() == LONG) {
-                    if (bar.high_price() > order.take_profit()) {
-                        profit_loss = (order.take_profit() - order.entry_price()) * order.quantity();
+                if (filled_order.direction() == LONG) {
+                    if (bar.high_price() > filled_order.take_profit()) {
+                        profit_loss = (filled_order.take_profit() - filled_order.entry_price()) * filled_order.quantity();
                         exit = true;
-                    } else if (bar.low_price() < order.stop_loss()) {
-                        profit_loss = (order.stop_loss() - order.entry_price()) * order.quantity();
+                    } else if (bar.low_price() < filled_order.stop_loss()) {
+                        profit_loss = (filled_order.stop_loss() - filled_order.entry_price()) * filled_order.quantity();
                         exit = true;
                     }
-                } else if (order.direction() == SHORT) {
-                    if (bar.low_price() < order.take_profit()) {
-                        profit_loss = (order.entry_price() - order.take_profit()) * order.quantity();
+                } else if (filled_order.direction() == SHORT) {
+                    if (bar.low_price() < filled_order.take_profit()) {
+                        profit_loss = (filled_order.entry_price() - filled_order.take_profit()) * filled_order.quantity();
                         exit = true;
-                    } else if (bar.high_price() > order.stop_loss()) {
-                        profit_loss = (order.entry_price() - order.stop_loss()) * order.quantity();
+                    } else if (bar.high_price() > filled_order.stop_loss()) {
+                        profit_loss = (filled_order.entry_price() - filled_order.stop_loss()) * filled_order.quantity();
                         exit = true;
                     }
                 }
 
                 if (exit) {
-                    Order closing_order(orders_.at(symbol));
-                    orders_.erase(bar.symbol());
+                    filled_orders_.erase(filled_order.symbol());
 
                     executions.emplace_back(make_unique<PositionClosedExecution>(
                         bar.timestamp(),
                         bar.symbol(),
                         profit_loss,
-                        closing_order.direction(),
+                        filled_order.direction(),
                         0.0
                     ));
 
                 } else {
-                    
-
-                    if(order.direction() == SignalDirection::LONG) {
-                        profit_loss = (bar.close_price() - order.entry_price()) * order.quantity();
+                    if(filled_order.direction() == SignalDirection::LONG) {
+                        profit_loss = (bar.close_price() - filled_order.entry_price()) * filled_order.quantity();
                         trace_with_message(
                             format(
                                 "LONG (bar.close_price() - order.entry_price()) * order.quantity() = ({} - {}) * {} = {}",
-                                bar.close_price(), order.entry_price(), order.quantity(), profit_loss
+                                bar.close_price(), filled_order.entry_price(), filled_order.quantity(), profit_loss
                             )
                         );
-                    } else if (order.direction() == SignalDirection::SHORT) {
-                        profit_loss = (order.entry_price() - bar.close_price()) * order.quantity();
+                    } else if (filled_order.direction() == SignalDirection::SHORT) {
+                        profit_loss = (filled_order.entry_price() - bar.close_price()) * filled_order.quantity();
                         trace_with_message(
                             format(
                                 "SHORT (order.entry_price() - bar.close_price()) * order.quantity() = ({} - {}) * {} = {}",
-                                 order.entry_price(), bar.close_price(), order.quantity(), profit_loss
+                                 filled_order.entry_price(), bar.close_price(), filled_order.quantity(), profit_loss
                             )
                         );
                     }
@@ -111,10 +108,48 @@ namespace broker {
                         profit_loss,
                         bar,
                         0.0,
-                        order.direction()
+                        filled_order.direction()
                     ));
                 }
-            } 
+            } if (scheduled_orders_.contains(symbol)) {
+                Order scheduled_order(scheduled_orders_.at(symbol));
+                scheduled_orders_.erase(symbol);
+                Order filled_order(
+                    bar.timestamp(),
+                    scheduled_order.symbol(),
+                    scheduled_order.quantity(),
+                    bar.open_price(),
+                    scheduled_order.direction(),
+                    scheduled_order.take_profit(),
+                    scheduled_order.stop_loss()
+                );
+
+                profit_loss = 0.0;
+                if (filled_order.direction() == SignalDirection::LONG) {
+                    if (bar.open_price() >= filled_order.take_profit()) {
+                        profit_loss = (filled_order.take_profit() - filled_order.entry_price()) * filled_order.quantity();
+                    } else if (bar.open_price() <= filled_order.stop_loss()) {
+                        profit_loss = (filled_order.stop_loss() - filled_order.entry_price()) * filled_order.quantity();
+                    }
+                } else if (filled_order.direction() == SignalDirection::SHORT) {
+                    if (bar.open_price() <= filled_order.take_profit()) {
+                        profit_loss = (filled_order.entry_price() - filled_order.take_profit()) * filled_order.quantity();
+                    } else if (bar.open_price() >= filled_order.stop_loss()) {
+                        profit_loss = (filled_order.entry_price() - filled_order.stop_loss()) * filled_order.quantity();
+                    }
+                }
+
+                if (profit_loss != 0.0) {
+                    executions.push_back(make_unique<PositionClosedExecution>(
+                        filled_order.timestamp(), filled_order.symbol(), profit_loss, filled_order.direction(), 0.0
+                    ));
+                } else {
+                    executions.push_back(make_unique<PositionCreatedExecution>(
+                        filled_order.timestamp(), filled_order.symbol(), filled_order.entry_price(), filled_order.quantity(), 0, filled_order.direction()
+                    ));
+                    filled_orders_.emplace(filled_order.symbol(), filled_order);
+                }
+            }
         }
 
         FillEvent fill_event(std::move(executions));
@@ -123,7 +158,9 @@ namespace broker {
         fill_events_.emplace_back(std::move(fill_event));
 #else
         //TODO: Notify `FillEvent` to `Portfolio`
-        (void)fill_event;
+        if(executions.size() > 0) {
+            (void)fill_event;
+        }
 #endif
     }
 

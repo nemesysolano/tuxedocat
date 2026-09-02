@@ -20,25 +20,26 @@ namespace broker {
 
     class Broker {
         private:
-            unordered_map<string, Order> orders_;
+            unordered_map<string, Order> filled_orders_;
             unordered_map<string, Order> scheduled_orders_;
 #ifdef __TEST_MAIN__
             vector<FillEvent> fill_events_;
 #endif
         public:
 #ifdef __TEST_MAIN__
-            inline Broker(): orders_({}), scheduled_orders_({}), fill_events_(vector<FillEvent>())  {}
+            inline Broker(): filled_orders_({}), scheduled_orders_({}), fill_events_(vector<FillEvent>())  {}
 #else 
-            inline Broker(): orders_({}), scheduled_orders_({})  {}
+            inline Broker(): filled_orders_({}), scheduled_orders_({})  {}
 #endif
-            const unordered_map<string, Order>& orders() const { return orders_; }
+            const unordered_map<string, Order>& orders() const { return filled_orders_; }
             virtual void process_order(const OrderEvent & order_event);
             virtual void process_market(const MarketEvent & market_event);
             void process_event(const Event & event);
 
 #ifdef __TEST_MAIN__
             inline const vector<FillEvent> & fill_events() { return fill_events_;}
-            inline const unordered_map<string, Order> orders() {return orders_; }
+            inline const unordered_map<string, Order> & filled_orders() {return filled_orders_; }
+            inline const unordered_map<string, Order> & scheduled_orders() {return scheduled_orders_; }
 #endif
            
     };

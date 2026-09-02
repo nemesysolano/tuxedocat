@@ -10,6 +10,7 @@ using namespace data;
 
 namespace events {
     enum class ExecutionType {
+        ORDER_SCHEDULED,
         POSITION_CREATED,
         POSITION_CLOSED,
         POSITION_UPDATED,
@@ -33,6 +34,16 @@ namespace events {
             double commissions() const { return commissions_; }
             ExecutionType execution_type() const { return execution_type_; }
 
+    };
+
+    class OrderScheduledExecution: public Execution {
+        private:
+            int quantity_;
+        public:
+            OrderScheduledExecution(
+                const sys_seconds timestamp, const string& symbol, int quantity, SignalDirection direction
+            ) :  Execution(timestamp, symbol, 0, ExecutionType::ORDER_SCHEDULED), quantity_(quantity) {}
+            int quantity() const { return quantity_; }
     };
 
     class PositionCreatedExecution: public Execution {
