@@ -15,6 +15,7 @@
 #include "timeseries-classifiers-tests.h"
 #include "portfolio/PortfolioTest.h"
 #include "broker/BrokerTest.h"
+#include "strategy/StrategyTest.h"
 
 using namespace std;
 
@@ -88,6 +89,7 @@ int main(int argc, char* argv[]) {
     determinant_test();
     inverse_test();
     portfolio::portfolio_event_handling_test();
+    strategy::test_signal_event_with_long_and_short_signals();
     broker::test_filled_order_closed_on_opening();
     broker::test_filled_scheduled_on_opening();
     broker::test_filled_orders_closed();
