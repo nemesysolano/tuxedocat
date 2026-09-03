@@ -1,4 +1,5 @@
 #if !defined(__STRATEGY_TEST_H__) && defined(__TEST_MAIN__)
+#define __STRATEGY_TEST_H__
 #include "strategy/Strategy.h"
 
 using namespace std;

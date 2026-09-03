@@ -14,6 +14,7 @@ namespace events {
     class Event {
         public:
             explicit Event(EventType type) : event_type(type) {}
+            virtual ~Event() = default;
             const EventType event_type;
     };
 }

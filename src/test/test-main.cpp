@@ -16,7 +16,7 @@
 #include "portfolio/PortfolioTest.h"
 #include "broker/BrokerTest.h"
 #include "strategy/StrategyTest.h"
-
+#include "channel/ChannelTest.h"
 using namespace std;
 
 int main(int argc, char* argv[]) {
@@ -93,9 +93,7 @@ int main(int argc, char* argv[]) {
     broker::test_filled_order_closed_on_opening();
     broker::test_filled_scheduled_on_opening();
     broker::test_filled_orders_closed();
-    // broker::test_broker_winning_orders();
-    // broker::test_broker_losing_orders();
-    // broker::test_broker_updating_orders();
+    channel::test_channel();
     return 0;
 }
 #endif

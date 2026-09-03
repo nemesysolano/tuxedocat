@@ -99,14 +99,7 @@ namespace portfolio {
         executions.push_back(make_unique<PositionCreatedExecution>(timeseries::sys_seconds_add_days(timeseries::sys_seconds_now(), 2), fake_symbol, 101, 1, 1, SignalDirection::LONG));
         executions.push_back(make_unique<PositionCreatedExecution>(timeseries::sys_seconds_add_days(timeseries::sys_seconds_now(), 3), delusional_symbol, 102, 2, 2, SignalDirection::SHORT));
         executions.push_back(make_unique<PositionClosedExecution>(timeseries::sys_seconds_add_days(timeseries::sys_seconds_now(), 2), fake_symbol, 1, SignalDirection::LONG, 1));
-        executions.push_back(make_unique<PositionClosedExecution>(timeseries::sys_seconds_add_days(timeseries::sys_seconds_now(), 3), delusional_symbol, 2, SignalDirection::SHORT, 2));;
-
-        /*
-        //  Process `FillEvent` with PositionUpdatedExecution and increment `fill_count`
-            make_unique(timeseries::sys_seconds_add_days(timeseries::sys_seconds_now(), 2), fake_symbol, 101, 1, 1),
-            make_unique(timeseries::sys_seconds_add_days(timeseries::sys_seconds_now(), 3), delusional_symbol, 102, 2, 2)
-        */
-
+        executions.push_back(make_unique<PositionClosedExecution>(timeseries::sys_seconds_add_days(timeseries::sys_seconds_now(), 3), delusional_symbol, 2, SignalDirection::SHORT, 2));
 
         assert(portfolio.fill_count() == 0);
         FillEvent fill_event(executions);
