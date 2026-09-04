@@ -11,6 +11,7 @@
 #include "events/OrderEvent.h"
 #include "events/FillEvent.h"
 #include "data/Order.h"
+#include "events/EventProcessor.h"
 
 using namespace std;
 using namespace events;
@@ -18,7 +19,7 @@ using namespace data;
 
 namespace broker {
 
-    class Broker {
+    class Broker: public EventProcessor {
         private:
             unordered_map<string, Order> filled_orders_;
             unordered_map<string, Order> scheduled_orders_;
@@ -32,9 +33,9 @@ namespace broker {
             inline Broker(): filled_orders_({}), scheduled_orders_({})  {}
 #endif
             const unordered_map<string, Order>& orders() const { return filled_orders_; }
-            virtual void process_order(const OrderEvent & order_event);
-            virtual void process_market(const MarketEvent & market_event);
-            void process_event(const Event & event);
+            virtual EventResponse process_order(const OrderEvent & order_event);
+            virtual EventResponse process_market(const MarketEvent & market_event);
+            EventResponse process_event(const Event & event) override;
 
 #ifdef __TEST_MAIN__
             inline const vector<FillEvent> & fill_events() { return fill_events_;}

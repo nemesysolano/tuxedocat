@@ -15,7 +15,7 @@ Assumptions:
 - Market event for next day then updates or closes it
 */
 namespace broker {
-    void Broker::process_order(const OrderEvent & order_event) {
+    EventResponse Broker::process_order(const OrderEvent & order_event) {
         const vector<Order> & event_orders = order_event.orders();
         vector<unique_ptr<Execution>> executions;
 
@@ -33,18 +33,15 @@ namespace broker {
         }
 
         FillEvent fill_event(std::move(executions));
-        
+
 #ifdef __TEST_MAIN__
         fill_events_.emplace_back(std::move(fill_event));
-#else
-        //TODO: Notify `FillEvent` to `Portfolio`
-        if(executions.size() > 0) {
-            (void)fill_event;
-        }
 #endif
+        //TODO: Notify `FillEvent` to `Portfolio`
+        return make_unique<FillEvent>(std::move(fill_event));
     }
 
-    void Broker::process_market(const MarketEvent & market_event) {
+    EventResponse Broker::process_market(const MarketEvent & market_event) {
         const unordered_map<string, Bar> & bars = market_event.bars;
         vector<unique_ptr<Execution>> executions;
         double profit_loss = 0.0;
@@ -156,23 +153,22 @@ namespace broker {
 
 #ifdef __TEST_MAIN__
         fill_events_.emplace_back(std::move(fill_event));
-#else
-        //TODO: Notify `FillEvent` to `Portfolio`
-        if(executions.size() > 0) {
-            (void)fill_event;
-        }
 #endif
+        //TODO: Notify `FillEvent` to `Portfolio`
+        return make_unique<FillEvent>(std::move(fill_event));
     }
 
-    void Broker::process_event(const Event & event) {
+    EventResponse Broker::process_event(const Event & event) {
         if(event.event_type == EventType::ORDER) {
             const OrderEvent & order_event = static_cast<const OrderEvent &>(event);
-            process_order(order_event);
+            return process_order(order_event);
 
         } else if(event.event_type == EventType::MARKET) {
             const MarketEvent & market_event = static_cast<const MarketEvent &>(event);
-            process_market(market_event);
+            return process_market(market_event);
         }
+
+        return nullptr;
     }
 }
 

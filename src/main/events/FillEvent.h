@@ -3,6 +3,7 @@
 #include "Event.h"
 #include "data/Bar.h"
 #include <string>
+#include <utility>
 
 using namespace std;
 using namespace std::chrono;
@@ -108,7 +109,6 @@ namespace events {
         private:
             vector<unique_ptr<Execution>> executions_;
         public:
-            inline FillEvent(vector<unique_ptr<Execution>> & executions): Event(EventType::FILL), executions_(std::move(executions)){}
             inline FillEvent(vector<unique_ptr<Execution>> && executions): Event(EventType::FILL), executions_(std::move(executions)){}
             const vector<unique_ptr<Execution>> & executions() const {return executions_;}
     };

@@ -6,13 +6,14 @@
 #include "data/Bar.h"
 #include "events/MarketEvent.h"
 #include "events/SignalEvent.h"
+#include "events/EventProcessor.h"
 
 using namespace std;
 using namespace data;
 using namespace events;
 
 namespace strategy {
-    class Strategy {
+    class Strategy: public EventProcessor {
         private:
             map<string, vector<Bar>> bars_;
 #ifdef __TEST_MAIN__
@@ -26,8 +27,8 @@ namespace strategy {
             Strategy(): bars_({}) {};
 #endif
             virtual void add_signal(const Bar & bar, vector<Signal> & signals) = 0;
-            virtual void process_market(const MarketEvent & market_event);
-            virtual void process_event(const Event & event);
+            virtual EventResponse process_market(const MarketEvent & market_event);
+            virtual EventResponse process_event(const Event & event);
             inline const map<string, vector<Bar>> & bars() { return bars_;}
             
     };
