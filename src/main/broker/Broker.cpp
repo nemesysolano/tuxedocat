@@ -15,7 +15,7 @@ Assumptions:
 - Market event for next day then updates or closes it
 */
 namespace broker {
-    EventResponse Broker::process_order(const OrderEvent & order_event) {
+    unique_ptr<Event> Broker::process_order(const OrderEvent & order_event) {
         const vector<Order> & event_orders = order_event.orders();
         vector<unique_ptr<Execution>> executions;
 
@@ -41,7 +41,7 @@ namespace broker {
         return make_unique<FillEvent>(std::move(fill_event));
     }
 
-    EventResponse Broker::process_market(const MarketEvent & market_event) {
+    unique_ptr<Event> Broker::process_market(const MarketEvent & market_event) {
         const unordered_map<string, Bar> & bars = market_event.bars;
         vector<unique_ptr<Execution>> executions;
         double profit_loss = 0.0;
@@ -158,7 +158,7 @@ namespace broker {
         return make_unique<FillEvent>(std::move(fill_event));
     }
 
-    EventResponse Broker::process_event(const Event & event) {
+    unique_ptr<Event> Broker::process_event(const Event & event) {
         if(event.event_type == EventType::ORDER) {
             const OrderEvent & order_event = static_cast<const OrderEvent &>(event);
             return process_order(order_event);

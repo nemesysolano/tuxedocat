@@ -7,7 +7,7 @@ using namespace data;
 using namespace events;
 
 namespace strategy {
-    EventResponse Strategy::process_market(const MarketEvent & market_event) {
+    unique_ptr<Event> Strategy::process_market(const MarketEvent & market_event) {
         const unordered_map<string,Bar> & bars = market_event.bars;
         vector<Signal> signals;
 
@@ -30,7 +30,7 @@ namespace strategy {
         return make_unique<Event>(signal_event);
     }
 
-    EventResponse Strategy::process_event(const Event & event) {
+    unique_ptr<Event> Strategy::process_event(const Event & event) {
         if(event.event_type == EventType::MARKET) {
             const MarketEvent & market_event = static_cast<const MarketEvent &>(event);
             return process_market(market_event);

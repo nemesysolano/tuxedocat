@@ -6,10 +6,10 @@
 using namespace std;
 
 namespace events {
-    using EventResponse = unique_ptr<Event>;
     class EventProcessor {
         public:
-            virtual EventResponse process_event(const Event & event) = 0;
+            virtual unique_ptr<Event> process_event(const Event & event);
+            virtual ~EventProcessor() {};
     };
 }
 #endif

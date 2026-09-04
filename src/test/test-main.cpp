@@ -18,6 +18,8 @@
 #include "strategy/StrategyTest.h"
 #include "channel/ChannelTest.h"
 #include "ledger/LedgerTest.h"
+#include "backtest/EndPointTest.h"
+
 using namespace std;
 
 int main(int argc, char* argv[]) {
@@ -96,6 +98,7 @@ int main(int argc, char* argv[]) {
     broker::test_filled_orders_closed();
     channel::test_channel();
     ledger::test_log_events_are_recorded();
+    backtest::test_cyclic_traffic_thru_endpoints();
     return 0;
 }
 #endif

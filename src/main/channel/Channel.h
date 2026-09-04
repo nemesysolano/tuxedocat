@@ -21,8 +21,20 @@ namespace channel {
             condition_variable condition_;
 
         public:
-            void enque(unique_ptr<Event> event);
-            unique_ptr<Event> deque();
+            virtual void enque(unique_ptr<Event> event);
+            virtual unique_ptr<Event> deque();
+            virtual ~Channel(){}
+    };
+
+    class DualChannel: public Channel {
+        private:
+            Channel & input_;
+            Channel & output_;
+        public:
+            inline DualChannel(Channel & input, Channel & output): input_(input), output_(output) {}
+            inline void enque(unique_ptr<Event> event) override { output_.enque(std::move(event)); }
+            inline unique_ptr<Event> deque() override { return input_.deque();}
+            virtual ~DualChannel(){Channel::~Channel();}
     };
 }
 

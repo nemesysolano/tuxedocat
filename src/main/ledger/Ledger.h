@@ -21,7 +21,7 @@ namespace ledger {
 #else
             inline Ledger(): entries_({}) {}
 #endif
-            EventResponse process_event(const Event & event) override;
+            unique_ptr<Event> process_event(const Event & event) override;
             inline const vector<Log> & entries() { return entries_; }
     };
 }

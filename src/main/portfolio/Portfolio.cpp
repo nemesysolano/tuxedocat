@@ -4,7 +4,7 @@ using namespace std;
 using namespace events;
 
 namespace portfolio {
-    EventResponse Portfolio::process_event(const Event & event) {
+    unique_ptr<Event> Portfolio::process_event(const Event & event) {
         if(event.event_type == EventType::SIGNAL) {
             const SignalEvent & signal_event = static_cast<const SignalEvent &>(event);
             signal_count_++;
