@@ -34,6 +34,7 @@ namespace events {
         public:
             inline LogEvent(sys_seconds timestamp, double equity, double commissions) :Event(EventType::LOG), log_(timestamp, equity, commissions) {}
             inline LogEvent(const Log & log): Event(EventType::LOG), log_(log) {}
+            inline const Log & log() const {return log_;}
             
     };
 }

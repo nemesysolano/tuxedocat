@@ -17,6 +17,7 @@
 #include "broker/BrokerTest.h"
 #include "strategy/StrategyTest.h"
 #include "channel/ChannelTest.h"
+#include "ledger/LedgerTest.h"
 using namespace std;
 
 int main(int argc, char* argv[]) {
@@ -94,6 +95,7 @@ int main(int argc, char* argv[]) {
     broker::test_filled_scheduled_on_opening();
     broker::test_filled_orders_closed();
     channel::test_channel();
+    ledger::test_log_events_are_recorded();
     return 0;
 }
 #endif
