@@ -15,13 +15,7 @@ namespace portfolio {
             fill_count_++;
             return process_fill(fill_event);
 
-        } else if (event.event_type == EventType::MARKET) {
-            const MarketEvent & market_event = static_cast<const MarketEvent &>(event);
-            const unordered_map<string, Bar> & bars = market_event.bars;
-            bar_count_++;
-            return process_bars(bars);
-            
-        }
+        } 
 
         return nullptr;
     }

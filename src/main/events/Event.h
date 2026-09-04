@@ -3,6 +3,7 @@
 namespace events {
 
     enum class EventType {
+        START,
         MARKET,
         SIGNAL,
         ORDER,
