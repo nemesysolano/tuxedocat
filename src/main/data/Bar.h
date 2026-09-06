@@ -18,7 +18,7 @@ namespace data {
             int volume_;
 
         public:
-            Bar(sys_seconds timestamp,
+            inline Bar(sys_seconds timestamp,
                 const std::string & symbol,
                 double open_price,
                 double high_price,
@@ -34,7 +34,8 @@ namespace data {
                   close_price_(close_price),
                   volume_(volume) {}
 
-
+            inline Bar(const std::string & symbol): Bar(sys_seconds::min(), symbol, 0, 0, 0, 0, 0) {}
+            
             sys_seconds timestamp() const { return timestamp_; }
             const std::string & symbol() const {return symbol_;}
             double open_price() const { return open_price_; }
@@ -43,8 +44,22 @@ namespace data {
             double close_price() const { return close_price_; }
             int volume() const { return volume_; }
 
-        
-        ~Bar() = default;
+            inline void update(
+                sys_seconds timestamp, 
+                double open_price, 
+                double high_price, 
+                double low_price, 
+                double close_price, 
+                int volume  
+            ) {
+                this->timestamp_ = timestamp;
+                this->open_price_ = open_price; 
+                this->high_price_ = high_price; 
+                this->low_price_ = low_price; 
+                this->close_price_ = close_price; 
+                this->volume_ = volume;                 
+            }
+            ~Bar() = default;
 
     };
 }

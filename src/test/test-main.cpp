@@ -19,6 +19,7 @@
 #include "channel/ChannelTest.h"
 #include "ledger/LedgerTest.h"
 #include "backtest/EndPointTest.h"
+#include "feed/DataFrameFeedTest.h"
 
 using namespace std;
 
@@ -99,6 +100,7 @@ int main(int argc, char* argv[]) {
     channel::test_channel();
     ledger::test_log_events_are_recorded();
     backtest::test_cyclic_traffic_thru_endpoints();
+    feed::test_bars_loaded_accurately(argv[0]);
     return 0;
 }
 #endif
