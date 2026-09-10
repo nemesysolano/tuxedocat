@@ -9,6 +9,7 @@
 #include <iostream>
 #include <cassert>
 #include "stats/ols.h"
+#include "utils/log.h"
 
 using namespace std;
 using namespace ols;
@@ -73,6 +74,8 @@ namespace feed {
 
         auto & dataframe_feed = dataframe_feed_result.value();
         dataframe_feed.process_dataframes();
+
+        log_trace_with_message("[PASSED]");
     }
 }
 #endif

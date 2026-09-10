@@ -20,6 +20,7 @@
 #include "ledger/LedgerTest.h"
 #include "backtest/EndPointTest.h"
 #include "feed/DataFrameFeedTest.h"
+#include "process/ThreadPoolTest.h"
 
 using namespace std;
 
@@ -101,6 +102,7 @@ int main(int argc, char* argv[]) {
     ledger::test_log_events_are_recorded();
     backtest::test_cyclic_traffic_thru_endpoints();
     feed::test_bars_loaded_accurately(argv[0]);
+    process::thread_pool_test();
     return 0;
 }
 #endif
