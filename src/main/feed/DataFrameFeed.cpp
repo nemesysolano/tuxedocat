@@ -108,6 +108,7 @@ namespace feed {
 
     expected<DataFrameFeed,TuxedoError> DataFrameFeed::Create(const vector<string> file_paths, MarketEventHandler market_event_handler) {
         unordered_map<string, unique_ptr<DataFrame>> dataframes;
+        vector<pair<string,unique_ptr<DataFrame>>> dataframes_vector;
 
         for(auto const & file_path: file_paths) { // ERR_CANT_OPEN_FILE
             if(!filesystem::is_regular_file(file_path)) {
