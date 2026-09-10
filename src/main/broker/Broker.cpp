@@ -83,7 +83,7 @@ namespace broker {
                 } else {
                     if(filled_order.direction() == SignalDirection::LONG) {
                         profit_loss = (bar.close_price() - filled_order.entry_price()) * filled_order.quantity();
-                        trace_with_message(
+                        log_trace_with_message(
                             format(
                                 "LONG (bar.close_price() - order.entry_price()) * order.quantity() = ({} - {}) * {} = {}",
                                 bar.close_price(), filled_order.entry_price(), filled_order.quantity(), profit_loss
@@ -91,7 +91,7 @@ namespace broker {
                         );
                     } else if (filled_order.direction() == SignalDirection::SHORT) {
                         profit_loss = (filled_order.entry_price() - bar.close_price()) * filled_order.quantity();
-                        trace_with_message(
+                        log_trace_with_message(
                             format(
                                 "SHORT (order.entry_price() - bar.close_price()) * order.quantity() = ({} - {}) * {} = {}",
                                  filled_order.entry_price(), bar.close_price(), filled_order.quantity(), profit_loss

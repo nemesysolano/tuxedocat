@@ -22,6 +22,7 @@ namespace timeseries {
     inline sys_seconds sys_seconds_add_days(sys_seconds timestamp, int days){
         return timestamp + std::chrono::days{days};
     }
-    std::ostream & operator << (std::ostream out, const sys_seconds & seconds);
+    std::ostream & operator << (std::ostream & out, const sys_seconds & seconds);
+    std::ostream & operator << (std::ostream & out, const sys_seconds && seconds);
 }
 #endif

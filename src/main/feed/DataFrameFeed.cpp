@@ -28,8 +28,14 @@ namespace feed {
         VOLUME
     });
 
-    void DataFrameFeed::publish_market_event(const MarketEvent & market_event) {
+    void market_event_handler_default_impl(const MarketEvent & market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded) {
         (void)market_event;
+        (void)dataframe_feed;
+        (void)records_loaded;
+    }
+
+    void DataFrameFeed::publish_market_event(const MarketEvent & market_event, const unordered_map<string, size_t> & records_loaded) {
+        this->market_event_handler_(market_event, *this, records_loaded);
     }
 
     void DataFrameFeed::process_dataframes(){
@@ -60,7 +66,7 @@ namespace feed {
                     Bar & bar = bars.at(symbol);
                     auto index = records_loaded[symbol];
                     auto timestamp = timestamps[index];
-
+                    
                     bar.update(
                         timestamp, 
                         dataframe[timestamp, OPEN_PRICE].value_or(-1), 
@@ -71,13 +77,14 @@ namespace feed {
                     );
 
                     records_loaded[symbol]++;
-                    publish_market_event(market_event);
                 } else {
                     bars.erase(symbol);
+                    records_loaded.erase(symbol);
                     exhausted_dataframes++;
                 }
             }
-
+            
+            publish_market_event(market_event, records_loaded);
             has_records = exhausted_dataframes == dataframes_.size();
         }  
     }
@@ -99,8 +106,8 @@ namespace feed {
         return full_file_path.substr(name_offset, extension_start - name_offset);
     }
 
-    expected<DataFrameFeed,TuxedoError> DataFrameFeed::Create(const vector<string> file_paths) {
-        map<string, unique_ptr<DataFrame>> dataframes;
+    expected<DataFrameFeed,TuxedoError> DataFrameFeed::Create(const vector<string> file_paths, MarketEventHandler market_event_handler) {
+        unordered_map<string, unique_ptr<DataFrame>> dataframes;
 
         for(auto const & file_path: file_paths) { // ERR_CANT_OPEN_FILE
             if(!filesystem::is_regular_file(file_path)) {
@@ -115,10 +122,10 @@ namespace feed {
 
             dataframes.emplace(file_name(file_path), make_unique<DataFrame>(std::move(dataframe)));
 #ifdef __DEBUG__
-            debug_message(format("Loaded '{}'", file_path));
+            log_debug_message(format("Loaded '{}'", file_path));
 #endif
         }
 
-        return DataFrameFeed(std::move(dataframes));
+        return DataFrameFeed(std::move(dataframes), market_event_handler);
     }
 }

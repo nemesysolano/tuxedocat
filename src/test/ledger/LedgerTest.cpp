@@ -34,7 +34,7 @@ namespace ledger {
         const vector<LogEvent> & log_events = ledger.log_events();
         assert(log_events.size() == 2);
 
-        trace_with_message("[PASSED] test_log_events_are_recorded");
+        log_trace_with_message("[PASSED] test_log_events_are_recorded");
 
     }
 }

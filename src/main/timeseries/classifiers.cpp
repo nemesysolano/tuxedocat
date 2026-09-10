@@ -94,7 +94,7 @@ namespace timeseries::classifiers {
         const slice::Span2D & directions
     ) {
         if(X.rows() != directions.rows() || directions.cols() != 1 || X.rows() == 0) { 
-            trace_with_message("ERR_BAD_INPUT_DIMESNSIONS");
+            log_trace_with_message("ERR_BAD_INPUT_DIMESNSIONS");
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
         }
 
@@ -510,7 +510,7 @@ namespace timeseries::classifiers {
         const slice::Span2D & y  // (M×1) directions span                
     ) {
         if(X.rows() != y.rows() || y.cols() != 1 || X.rows() == 0) { 
-            trace_with_message("ERR_BAD_INPUT_DIMESNSIONS");
+            log_trace_with_message("ERR_BAD_INPUT_DIMESNSIONS");
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
         }        
 
@@ -612,7 +612,7 @@ namespace timeseries::classifiers {
         const slice::Span2D & y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`                
     ) {
         if(X.rows() != y.rows() || y.cols() != 1 || X.rows() == 0) { 
-            trace_with_message("ERR_BAD_INPUT_DIMESNSIONS");
+            log_trace_with_message("ERR_BAD_INPUT_DIMESNSIONS");
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
         }    
         
@@ -1084,7 +1084,7 @@ namespace timeseries::classifiers {
         const slice::Span2D& y // (M×1) directions span containing `direction[0]`, `direction[1]`,...,`direction[M-1]`
     )  {
         if (!(X.rows() == y.rows() && y.cols() == 1)) {
-            trace_with_message("ERR_BAD_INPUT_DIMESNSIONS");
+            log_trace_with_message("ERR_BAD_INPUT_DIMESNSIONS");
             return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
         }
         std::vector<size_t> current_indices;

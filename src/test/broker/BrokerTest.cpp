@@ -69,7 +69,7 @@ namespace broker {
             assert(closed_execution.profit_loss() == test_case.expected_profit_loss);
         }
 
-        trace_with_message("[PASSED] test_filled_order_closed_on_opening");
+        log_trace_with_message("[PASSED] test_filled_order_closed_on_opening");
     }
 
     /*
@@ -129,7 +129,7 @@ namespace broker {
             assert(broker.scheduled_orders().size() == 0);
         }
 
-        trace_with_message("[PASSED] test_filled_scheduled_on_opening");
+        log_trace_with_message("[PASSED] test_filled_scheduled_on_opening");
     }
 
     /* 
@@ -198,7 +198,7 @@ namespace broker {
             assert(closed_execution.profit_loss() == test_case.expected_profit_loss);
         }
 
-        trace_with_message("[PASSED] test_filled_orders_closed");
+        log_trace_with_message("[PASSED] test_filled_orders_closed");
     }
 }
 

@@ -40,7 +40,7 @@ namespace reports {
             auto dataframe_result = DataFrame::Create(input_stream);
 
             if(!dataframe_result) {
-                trace_with_message(std::format("{} can't beloaded", full_file_path));
+                log_trace_with_message(std::format("{} can't beloaded", full_file_path));
                 return nullptr;            
             }
 
@@ -48,33 +48,33 @@ namespace reports {
             input_stream.close();
 
             if(df.rows() < 1) {
-                trace_with_message(std::format("{} is empty.", full_file_path));
+                log_trace_with_message(std::format("{} is empty.", full_file_path));
                 return nullptr;
             }
 
             auto regression_zscore_data_result = RegressionData::CreateWithZScore(df);
             if(!regression_zscore_data_result.has_value()) {
-                trace_with_message(std::format("{} generated regression_zscore_data_result.", full_file_path));
+                log_trace_with_message(std::format("{} generated regression_zscore_data_result.", full_file_path));
                 return nullptr;                
             }
             auto & regression_zscore_data = regression_zscore_data_result.value();
-            trace_with_message("🍎 regression_zscore_data_result.");
+            log_trace_with_message("🍎 regression_zscore_data_result.");
 
             auto regression_data_pct_change_result = RegressionData::CreateWithPctChange(df);
             if(!regression_data_pct_change_result.has_value()){
-                trace_with_message(std::format("{} generated regression_data_pct_change_result.", full_file_path));
+                log_trace_with_message(std::format("{} generated regression_data_pct_change_result.", full_file_path));
                 return nullptr;
             }
             auto & regression_data_pct_change = regression_data_pct_change_result.value();
-            trace_with_message("🍋 regression_data_pct_change_result.");
+            log_trace_with_message("🍋 regression_data_pct_change_result.");
 
             auto regression_data_log_change_result = RegressionData::CreateWithLogChange(df);
             if(!regression_data_log_change_result.has_value()){
-                trace_with_message(std::format("{} generated regression_data_log_change_result..", full_file_path));
+                log_trace_with_message(std::format("{} generated regression_data_log_change_result..", full_file_path));
                 return nullptr;
             }
             auto & regression_data_log_change = regression_data_log_change_result.value();
-            trace_with_message("🍌 regression_data_log_change_result.");
+            log_trace_with_message("🍌 regression_data_log_change_result.");
 
             // 2. Compute confusion matrices immediately
             auto logistic_matrix = confusion_matrix(regression_data_pct_change, [](const RegressionData & d) -> std::unique_ptr<BinaryClassifier> { return std::move(LogisticRegression::Create(d.X_train(), d.Y_train()).value()); });
@@ -98,7 +98,7 @@ void quality(const vector<string> & files) {
 
     /*
     for (const auto& file : files) {
-        trace_with_message(file);
+        log_trace_with_message(file);
         reports.push_back(quality(file));
     }
     */

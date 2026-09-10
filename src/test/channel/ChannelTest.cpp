@@ -61,7 +61,7 @@ namespace channel {
         assert(event_type_counter.signal_events == 2);
         assert(event_type_counter.order_events == 3);
         assert(event_type_counter.fill_events == 5);
-        trace_with_message("[PASSED]");
+        log_trace_with_message("[PASSED]");
     }
 }
 #endif

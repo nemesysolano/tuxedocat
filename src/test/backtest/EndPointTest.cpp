@@ -20,7 +20,7 @@ namespace backtest {
             return make_unique<KillEvent>();
         } else {
             int id = counter.id() + 1;
-            trace_with_message(format("{} -> {}", name_, id));
+            log_trace_with_message(format("{} -> {}", name_, id));
             return make_unique<CounterProcessorEvent>(id);
         }
     };
@@ -62,7 +62,7 @@ namespace backtest {
         thread_4.join();
         thread_5.join();
         
-       trace_with_message(format("[PASSED]"));
+       log_trace_with_message(format("[PASSED]"));
     }
 
     

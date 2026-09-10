@@ -10,6 +10,7 @@
 #include "utils/tuxedo-error.h"
 #include "data/slice.h"
 #include <iostream>
+#include <cmath>
 
 namespace ols {
     struct OLSResult {
@@ -24,7 +25,9 @@ namespace ols {
 
     std::expected<std::unique_ptr<OLSResult>, TuxedoError> flat(slice::Span2D & X, slice::Span2D & y);
 
-    
+    inline bool quite_close(double a, double b, double  ε) {
+        return abs(b-a) < ε;
+    }
 }
 
 std::ostream & operator << (std::ostream & out, const ols::OLSResult & result);
