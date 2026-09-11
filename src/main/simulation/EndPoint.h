@@ -8,7 +8,7 @@ using namespace std;
 using namespace events;
 using namespace channel;
 
-namespace backtest {
+namespace simulation {
     class EndPoint {
         private:
             DualChannel & channel_;

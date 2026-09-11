@@ -12,7 +12,7 @@ using namespace std;
 using namespace events;
 using namespace channel;
 
-namespace backtest {
+namespace simulation {
     
     unique_ptr<Event> CounterProcessorTest::process_event(const Event & event) {
         const CounterProcessorEvent & counter = static_cast<const CounterProcessorEvent &>(event);

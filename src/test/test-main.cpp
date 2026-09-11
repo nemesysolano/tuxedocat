@@ -18,7 +18,7 @@
 #include "strategy/StrategyTest.h"
 #include "channel/ChannelTest.h"
 #include "journal/JournalTest.h"
-#include "backtest/EndPointTest.h"
+#include "simulation/EndPointTest.h"
 #include "feed/DataFrameFeedTest.h"
 #include "process/ThreadPoolTest.h"
 
@@ -100,7 +100,7 @@ int main(int argc, char* argv[]) {
     broker::test_filled_orders_closed();
     channel::test_channel();
     journal::test_log_events_are_recorded();
-    backtest::test_cyclic_traffic_thru_endpoints();
+    simulation::test_cyclic_traffic_thru_endpoints();
     feed::test_bars_loaded_accurately(argv[0]);
     process::thread_pool_test();
     return 0;

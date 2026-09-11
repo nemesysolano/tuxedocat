@@ -4,7 +4,8 @@
 using namespace std;
 using namespace events;
 using namespace channel;
-namespace backtest {
+
+namespace simulation {
     void EndPoint::process_events() {
         bool exit = false;
 

@@ -1,12 +1,12 @@
 #if !defined(__ENDPOINT_TEST_H__) && defined(__TEST_MAIN__)
 #define __ENDPOINT_TEST_H__
-#include "backtest/EndPoint.h"
+#include "simulation/EndPoint.h"
 
 using namespace std;
 using namespace events;
 using namespace channel;
 
-namespace backtest {
+namespace simulation {
     class CounterProcessorEvent: public Event {
         private:
             int id_;
