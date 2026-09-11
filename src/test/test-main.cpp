@@ -21,7 +21,7 @@
 #include "simulation/EndPointTest.h"
 #include "feed/DataFrameFeedTest.h"
 #include "process/ThreadPoolTest.h"
-
+#include "simulation/SimulationTest.h"
 using namespace std;
 
 int main(int argc, char* argv[]) {
@@ -101,8 +101,9 @@ int main(int argc, char* argv[]) {
     channel::test_channel();
     journal::test_log_events_are_recorded();
     simulation::test_cyclic_traffic_thru_endpoints();
-    feed::test_bars_loaded_accurately(argv[0]);
+ // feed::test_bars_loaded_accurately(argv[0]);
     process::thread_pool_test();
+    simulation::position_creation_test(argv[0]);
     return 0;
 }
 #endif

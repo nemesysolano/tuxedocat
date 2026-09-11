@@ -4,6 +4,7 @@
 
 namespace feed {
     void test_bars_loaded_accurately(const char * program_path);
+    vector<string> data_file_paths(const string & directory);
 }
 
 #endif
