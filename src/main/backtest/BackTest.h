@@ -5,7 +5,7 @@
 #include "broker/Broker.h"
 #include "portfolio/Portfolio.h"
 #include "strategy/Strategy.h"
-#include "ledger/Ledger.h"
+
 
 using namespace std;
 using namespace events;
@@ -14,7 +14,7 @@ using namespace feed;
 using namespace strategy;
 using namespace broker;
 using namespace portfolio;
-using namespace ledger;
+
 namespace backtest {
     class BackTest {
         private:
@@ -22,7 +22,7 @@ namespace backtest {
             Broker & broker;
             Portfolio & portfolio;
             Strategy & strategy;
-            Ledger & ledger;
+
     };
 }
 

@@ -1,11 +1,11 @@
-#include "Ledger.h"
+#include "Journal.h"
 #include "events/LogEvent.h"
 
 using namespace std;
 using namespace events;
 
-namespace ledger { 
-    unique_ptr<Event> Ledger::process_event(const Event & event){
+namespace journal { 
+    unique_ptr<Event> Journal::process_event(const Event & event){
         if(event.event_type == EventType::LOG) {
             const LogEvent & log_event = static_cast<const LogEvent &>(event);
             const Log & log = log_event.log();
