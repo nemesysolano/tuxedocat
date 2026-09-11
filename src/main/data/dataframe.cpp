@@ -3,6 +3,7 @@
 #include <sstream>
 #include <set>
 #include <cassert>
+#include <charconv>
 #include <algorithm> // <-- Required for std::set_intersection
 #include <iterator>  // <-- Required for std::inserter
 #include <cmath>
@@ -14,6 +15,14 @@ namespace dataframe {
     double identity_transformer(double x) {return x;}
     void identity_accumulator(std::span<double> row, size_t column_index, double x) { row[column_index] = x;}
 
+    namespace {
+        inline bool parse_double_fast(const std::string & cell, double & value) {
+            const char * begin = cell.data();
+            const char * end = begin + cell.size();
+            auto [ptr, ec] = std::from_chars(begin, end, value);
+            return ec == std::errc() && ptr == end;
+        }
+    }
 
     std::expected<DataFrame, TuxedoError> DataFrame::Create(std::istream &input, char field_delimiter) {
         std::vector<double> data;
@@ -27,92 +36,93 @@ namespace dataframe {
         std::string line;
         bool is_first_row = true;
 
-        // Use default \n delimiter. It works for both Linux (\n) and Windows (\r\n)
-        while (std::getline(input, line)) { 
-            // 1. Trim the \r if the file used \r\n line endings
+        while (std::getline(input, line)) {
             if (!line.empty() && line.back() == '\r') {
                 line.pop_back();
             }
-            if (line.empty()) continue; // Skip entirely empty lines
+            if (line.empty()) continue;
 
-            std::istringstream line_stream(line);
-            std::string cell;
+            size_t start = 0;
             size_t current_cols = 0;
 
-            // 6. Process Header Row
             if (is_first_row) {
-                while (std::getline(line_stream, cell, field_delimiter)) {
-                    // Check for unique column names
-                    if (column_name_to_column_index_.find(cell) != column_name_to_column_index_.end()) {
-                        return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT); 
-                    }
-                    
-                    // FIX: Skip the Date column (0) and shift the numeric columns back by 1
-                    // so that the first numeric column correctly maps to index 0.
+                while (true) {
+                    const size_t end = line.find(field_delimiter, start);
+                    const std::string cell = (end == std::string::npos)
+                        ? line.substr(start)
+                        : line.substr(start, end - start);
+
                     if (current_cols > 0) {
+                        if (column_name_to_column_index_.contains(cell)) {
+                            return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
+                        }
                         column_name_to_column_index_[cell] = current_cols - 1;
                     }
-                    
-                    current_cols++;
+
+                    ++current_cols;
+                    if (end == std::string::npos) {
+                        break;
+                    }
+                    start = end + 1;
                 }
-                
+
                 expected_cols = current_cols;
-                // We need at least one Date column and one Numeric column
                 if (expected_cols <= 1) {
-                    return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS); 
+                    return std::unexpected(TuxedoError::ERR_BAD_INPUT_DIMESNSIONS);
                 }
-                
+
                 is_first_row = false;
-                continue; // Move to the next line (data rows)
+                continue;
             }
 
-            // 2, 4, 5. Process Data Rows
             std::chrono::sys_seconds row_time;
-            while (std::getline(line_stream, cell, field_delimiter)) {
+            start = 0;
+            while (true) {
+                const size_t end = line.find(field_delimiter, start);
+                const std::string cell = (end == std::string::npos)
+                    ? line.substr(start)
+                    : line.substr(start, end - start);
+
                 if (current_cols == 0) {
-                    // Fallback for Apple Clang missing std::chrono::parse
                     std::tm t = {};
                     std::istringstream iss(cell);
                     iss >> std::get_time(&t, "%Y-%m-%d %H:%M:%S");
-                    
+
                     if (iss.fail()) {
                         return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
                     }
-                    
-                    // timegm safely converts std::tm to time_t assuming UTC time.
-                    std::time_t tt = timegm(&t); 
+
+                    std::time_t tt = timegm(&t);
                     row_time = std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::from_time_t(tt));
-                    
                     timestamp_to_row_index_[row_time] = rows;
                     timestamps_.insert(row_time);
                     timestamps_vector_.push_back(row_time);
                 } else {
-                    // Parse Numbers (Subsequent columns)
-                    try {
-                        data.push_back(std::stod(cell));
-                    } catch (const std::invalid_argument&) {
+                    double value = 0.0;
+                    if (!parse_double_fast(cell, value)) {
                         return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
-                    } catch (const std::out_of_range&) {
-                        return std::unexpected(TuxedoError::ERR_DATA_OUT_OF_RANGE);
                     }
+                    data.push_back(value);
                 }
-                current_cols++;
+
+                ++current_cols;
+                if (end == std::string::npos) {
+                    break;
+                }
+                start = end + 1;
             }
 
-            // 6. Validate subsequent row lengths match the expected length
             if (current_cols != expected_cols) {
                 return std::unexpected(TuxedoError::ERR_INCONSISTENT_ROW_LENGTH);
             }
-            
+
             rows++;
         }
 
-        // Ensure we actually parsed a valid header before creating the DataFrame
         if (expected_cols == 0) {
-            return std::unexpected(TuxedoError::ERR_EMPTY_VECTOR); // Or whichever error fits best
+            return std::unexpected(TuxedoError::ERR_EMPTY_VECTOR);
         }
 
-        // The Span2D bounds cover only the numeric data grid (expected_cols - 1)
         return DataFrame(rows, expected_cols - 1, std::move(data), std::move(column_name_to_column_index_), std::move(timestamp_to_row_index_), std::move(timestamps_), std::move(timestamps_vector_));
     }
 

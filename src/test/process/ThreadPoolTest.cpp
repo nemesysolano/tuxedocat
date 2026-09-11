@@ -2,12 +2,14 @@
 #include "ThreadPoolTest.h"
 #include <iostream>
 #include "utils/log.h"
+#include <format>
+
 using namespace std;
 
 namespace process {
     void thread_pool_test() {
-        ThreadPool pool(4);
-        std::vector<std::future<int>> results;
+        ThreadPool pool;
+        vector<future<int>> results;
 
         for (int i = 0; i < 8; ++i)
         {
@@ -18,9 +20,10 @@ namespace process {
         }
 
         for (auto& result : results)
-            std::cout << result.get() << ' ';
-        std::cout << std::endl;
+            cout << result.get() << ' ';
+        cout << endl;
 
+        log_trace_with_message(format("Ideal Threads ={}", ideal_threads()));
         log_trace_with_message("[PASSED]");
     }
 }

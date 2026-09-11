@@ -48,5 +48,22 @@ namespace process {
         }
     }
 
+    size_t get_sysctl_value(const char* name){
+        int value = 0;
+        size_t length = sizeof(value);
+        if (sysctlbyname(name, &value, &length, NULL, 0) == 0) {
+            return value;
+        }
+        return 0; // Return 0 if the key doesn't exist or fails     
+    }
 
+    size_t ideal_threads(){
+        unsigned int total_logical = std::thread::hardware_concurrency();
+#if defined(__APPLE__) && defined(__MACH__)
+        int p_cores = get_sysctl_value("hw.perflevel0.logicalcpu_max");
+        return (p_cores > 0) ? p_cores : total_logical;
+#else
+    return total_logical;
+#endif
+    }
 }

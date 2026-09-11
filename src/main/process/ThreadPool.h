@@ -10,10 +10,14 @@
 #include <future>
 #include <functional>
 #include <type_traits>
-
+#include <sys/types.h>
+#include <sys/sysctl.h>
 using namespace std;
 
 namespace process {
+    size_t get_sysctl_value(const char* name);
+    size_t ideal_threads();
+
  class ThreadPool {
     private:
         vector<thread> workers;
@@ -24,7 +28,8 @@ namespace process {
         bool stop;
 
     public:
-        ThreadPool(size_t nr_threads = thread::hardware_concurrency());
+        ThreadPool(size_t nr_threads);
+        inline ThreadPool(): ThreadPool(ideal_threads()){}
         ~ThreadPool();
 
         template<typename F, typename... Args>

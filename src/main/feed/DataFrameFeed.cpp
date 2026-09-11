@@ -9,10 +9,11 @@
 #include <set>
 #include <ranges> 
 #include <unordered_map>
+#include "process/ThreadPool.h"
 
 using namespace std;
 using namespace events;
-// ,,,Close
+
 namespace feed {
     const string OPEN_PRICE = "Open";
     const string HIGH_PRICE = "High";
@@ -107,24 +108,34 @@ namespace feed {
     }
 
     expected<DataFrameFeed,TuxedoError> DataFrameFeed::Create(const vector<string> file_paths, MarketEventHandler market_event_handler) {
+        process::ThreadPool thread_pool;
         unordered_map<string, unique_ptr<DataFrame>> dataframes;
-        vector<pair<string,unique_ptr<DataFrame>>> dataframes_vector;
+        vector<future<pair<string, unique_ptr<DataFrame>>>> dataframe_futures;
 
-        for(auto const & file_path: file_paths) { // ERR_CANT_OPEN_FILE
-            if(!filesystem::is_regular_file(file_path)) {
-                return unexpected(ERR_CANT_OPEN_FILE);
+        for (const auto & file_path : file_paths) {
+            auto future = thread_pool.enqueue([&file_path]() {
+                if (!filesystem::is_regular_file(file_path)) {
+                    return pair<string, unique_ptr<DataFrame>>(file_name(file_path), nullptr);
+                }
+
+                auto dataframe_result = DataFrame::Create(file_path);
+                if (!dataframe_result.has_value()) {
+                    return pair<string, unique_ptr<DataFrame>>(file_name(file_path), nullptr);
+                }
+
+                auto dataframe = std::make_unique<DataFrame>(std::move(dataframe_result.value()));
+                return pair<string, unique_ptr<DataFrame>>(file_name(file_path), std::move(dataframe));
+            });
+
+            dataframe_futures.emplace_back(std::move(future));
+        }
+
+        for (auto & future : dataframe_futures) {
+            auto loaded = future.get();
+            if (!loaded.second) {
+                continue;
             }
-
-            auto dataframe_result = DataFrame::Create(file_path);
-            if(!dataframe_result.has_value()) {
-                  return unexpected(dataframe_result.error());
-            }
-            DataFrame dataframe(std::move(dataframe_result.value()));
-
-            dataframes.emplace(file_name(file_path), make_unique<DataFrame>(std::move(dataframe)));
-#ifdef __DEBUG__
-            log_debug_message(format("Loaded '{}'", file_path));
-#endif
+            dataframes.emplace(std::move(loaded.first), std::move(loaded.second));
         }
 
         return DataFrameFeed(std::move(dataframes), market_event_handler);
