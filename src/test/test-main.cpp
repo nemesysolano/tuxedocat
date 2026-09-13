@@ -103,6 +103,7 @@ int main(int argc, char* argv[]) {
 
     process::thread_pool_test();
     simulation::test_linear_controllers();
+    simulation::test_circular_controllers();
     return 0;
 }
 #endif

@@ -24,6 +24,7 @@ namespace simulation {
             if(!exit) {
                 unique_ptr<Event> output = event_processor_.process_event(input_event);
                 if(output != nullptr) {
+                    exit = output->event_type == EventType::FILL;
                     send(std::move(output));
                 }
             } else {
