@@ -28,6 +28,7 @@ namespace simulation {
 
     void test_linear_controllers();
     void test_circular_controllers();
+    void test_tree_controllers();
 }
 
 #endif

@@ -84,7 +84,7 @@ namespace simulation {
             controller_2(channel_2, {reference_wrapper<Channel>(channel_3)}, processor_2),
             controller_3(channel_3, {reference_wrapper<Channel>(channel_0)}, processor_3);
 
-        auto controller_thread = [](reference_wrapper<Controller>  controller)  {
+        auto controller_thread = [](reference_wrapper<Controller> controller) {
             controller.get().receive();
         };
 
@@ -104,6 +104,65 @@ namespace simulation {
         assert(processor_1.counter() == 11);
         assert(processor_2.counter() == 12);
         assert(processor_3.counter() == 13);
+        log_trace_with_message("[PASSED]");
+    }
+
+    void test_tree_controllers() {
+        CounterProcessor 
+            processor_0(0),
+            processor_0_0(1), processor_0_1(2),
+            processor_0_0_0(3), processor_0_0_1(4),
+            processor_0_1_0(5), processor_0_1_1(6);
+
+        Channel
+            channel_0,
+            channel_0_0, channel_0_1,
+            channel_0_0_0, channel_0_0_1,
+            channel_0_1_0, channel_0_1_1;
+        NullChannel eop;
+
+        Controller
+            controller_0(channel_0, {reference_wrapper<Channel>(channel_0_0), reference_wrapper<Channel>(channel_0_1)}, processor_0),
+            controller_0_0(channel_0_0, {reference_wrapper<Channel>(channel_0_0_0), reference_wrapper<Channel>(channel_0_0_1)}, processor_0_0),
+            controller_0_1(channel_0_1, {reference_wrapper<Channel>(channel_0_1_0), reference_wrapper<Channel>(channel_0_1_1)}, processor_0_1),
+            controller_0_0_0(channel_0_0_0, {reference_wrapper<Channel>(eop)}, processor_0_0_0),
+            controller_0_0_1(channel_0_0_1, {reference_wrapper<Channel>(eop)}, processor_0_0_1),
+            controller_0_1_0(channel_0_1_0, {reference_wrapper<Channel>(eop)}, processor_0_1_0),
+            controller_0_1_1(channel_0_1_1, {reference_wrapper<Channel>(eop)}, processor_0_1_1);
+
+        auto controller_thread = [](reference_wrapper<Controller> controller) {
+            controller.get().receive();
+        };
+
+        thread t0(controller_thread, reference_wrapper<Controller>(controller_0));
+        thread t1(controller_thread, reference_wrapper<Controller>(controller_0_0));
+        thread t2(controller_thread, reference_wrapper<Controller>(controller_0_1));
+        thread t3(controller_thread, reference_wrapper<Controller>(controller_0_0_0));
+        thread t4(controller_thread, reference_wrapper<Controller>(controller_0_0_1));
+        thread t5(controller_thread, reference_wrapper<Controller>(controller_0_1_0));
+        thread t6(controller_thread, reference_wrapper<Controller>(controller_0_1_1));
+
+        size_t counter;
+        for(counter = 0; counter < 10; counter++) {
+            channel_0.enque(make_unique<Event>(EventType::LOG));
+        }
+        channel_0.enque(make_unique<Event>(EventType::KILL));
+
+        t0.join();
+        t1.join();
+        t2.join();
+        t3.join();
+        t4.join();
+        t5.join();
+        t6.join();
+
+        assert(processor_0.counter() == 10);
+        assert(processor_0_0.counter() == 11);
+        assert(processor_0_1.counter() == 12);
+        assert(processor_0_0_0.counter() == 13);
+        assert(processor_0_0_1.counter() == 14);
+        assert(processor_0_1_0.counter() == 15);
+        assert(processor_0_1_1.counter() == 16);
         log_trace_with_message("[PASSED]");
     }
 }
