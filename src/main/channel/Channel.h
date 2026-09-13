@@ -26,6 +26,13 @@ namespace channel {
             virtual ~Channel(){}
     };
 
+    class NullChannel: public Channel {
+        public:
+            inline void enque(unique_ptr<Event> event) override {(void)event;}
+            inline unique_ptr<Event> deque() override {return nullptr;}
+            virtual ~NullChannel(){Channel::~Channel();}
+    };
+
     class DualChannel: public Channel {
         private:
             Channel & input_;

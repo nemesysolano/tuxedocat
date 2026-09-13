@@ -1,11 +1,11 @@
 #ifndef __SIMULATION_H__
 #define __SIMULATION_H__
-#include "EndPoint.h"
 #include "feed/DataFrameFeed.h"
 #include "broker/Broker.h"
 #include "portfolio/Portfolio.h"
 #include "strategy/Strategy.h"
 #include "journal/Journal.h"
+#include "channel/Channel.h"
 
 using namespace std;
 using namespace events;

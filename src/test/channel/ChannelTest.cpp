@@ -2,12 +2,26 @@
 #include "ChannelTest.h"
 #include <cassert>
 #include <thread>
+#include "events/MarketEvent.h"
 #include "utils/log.h"
 using namespace std;
 using namespace events;
 namespace channel {
     Channel event_type_channel;
     EventTypeCounter event_type_counter;
+
+    void test_event_clone_preserves_subtype() {
+        unordered_map<string, Bar> bars;
+        bars.emplace("AAPL", Bar(sys_seconds::min(), "AAPL", 10.0, 11.0, 9.0, 10.5, 1000));
+
+        MarketEvent market_event(bars);
+        unique_ptr<Event> cloned = market_event.clone();
+
+        assert(cloned != nullptr);
+        assert(cloned->event_type == EventType::MARKET);
+        assert(dynamic_cast<MarketEvent *>(cloned.get()) != nullptr);
+        log_trace_with_message("[PASSED]");
+    }
 
     void count_event() {
         bool exit = false;

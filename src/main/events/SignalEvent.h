@@ -40,6 +40,9 @@ namespace events {
         public:
             inline SignalEvent(const vector<Signal> & signals ):Event(EventType::SIGNAL), signals_(signals){}
             inline SignalEvent(vector<Signal> && signals):Event(EventType::SIGNAL), signals_(std::move(signals)){}
+            inline unique_ptr<Event> clone() const override {
+                return make_unique<SignalEvent>(signals_);
+            }
             inline const vector<Signal> & signals() const { return signals_;}
     };
 }

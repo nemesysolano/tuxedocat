@@ -2,6 +2,7 @@
 #define __FILL_EVENT_H__
 #include "Event.h"
 #include "data/Bar.h"
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -29,6 +30,8 @@ namespace events {
                     symbol_(symbol),
                     commissions_(commissions),
                     execution_type_(execution_type) {}
+            virtual ~Execution() = default;
+            virtual unique_ptr<Execution> clone() const = 0;
 
             const sys_seconds& timestamp() const { return timestamp_; }
             const string& symbol() const { return symbol_; }
@@ -44,6 +47,9 @@ namespace events {
             OrderScheduledExecution(
                 const sys_seconds timestamp, const string& symbol, int quantity, SignalDirection direction
             ) :  Execution(timestamp, symbol, 0, ExecutionType::ORDER_SCHEDULED), quantity_(quantity) {}
+            unique_ptr<Execution> clone() const override {
+                return make_unique<OrderScheduledExecution>(*this);
+            }
             int quantity() const { return quantity_; }
     };
 
@@ -59,6 +65,9 @@ namespace events {
                     fill_quantity_(fill_quantity),
                     direction_(direction)
                     {}
+            unique_ptr<Execution> clone() const override {
+                return make_unique<PositionCreatedExecution>(*this);
+            }
 
             double fill_price() const { return fill_price_; }
             int fill_quantity() const { return fill_quantity_; }
@@ -74,6 +83,9 @@ namespace events {
                 : Execution(timestamp, symbol, commissions, ExecutionType::POSITION_CLOSED),
                   profit_loss_(profit_loss),
                   direction_(direction) {}
+            unique_ptr<Execution> clone() const override {
+                return make_unique<PositionClosedExecution>(*this);
+            }
 
             double profit_loss() const { return profit_loss_; }
             SignalDirection direction() const { return direction_; }
@@ -95,6 +107,9 @@ namespace events {
                   profit_loss_(profit_loss),
                   bar_(bar),
                   direction_(direction) {} 
+            unique_ptr<Execution> clone() const override {
+                return make_unique<PositionUpdatedExecution>(*this);
+            }
             double profit_loss() const { return profit_loss_; }
             const Bar& bar() const { return bar_; }
             SignalDirection direction() const { return direction_; }
@@ -110,6 +125,14 @@ namespace events {
             vector<unique_ptr<Execution>> executions_;
         public:
             inline FillEvent(vector<unique_ptr<Execution>> && executions): Event(EventType::FILL), executions_(std::move(executions)){}
+            unique_ptr<Event> clone() const override {
+                vector<unique_ptr<Execution>> cloned_executions;
+                cloned_executions.reserve(executions_.size());
+                for(const auto & execution: executions_) {
+                    cloned_executions.push_back(execution->clone());
+                }
+                return make_unique<FillEvent>(std::move(cloned_executions));
+            }
             const vector<unique_ptr<Execution>> & executions() const {return executions_;}
     };
 }

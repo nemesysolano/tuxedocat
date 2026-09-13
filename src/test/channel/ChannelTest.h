@@ -6,6 +6,8 @@ using namespace std;
 using namespace events;
 namespace channel { 
 
+    void test_event_clone_preserves_subtype();
+
     struct EventTypeCounter {
         int market_events;
         int signal_events;

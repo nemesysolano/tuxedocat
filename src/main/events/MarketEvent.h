@@ -13,6 +13,9 @@ namespace events {
     class MarketEvent: public Event {
         public:
             inline MarketEvent(const unordered_map<string, Bar> & bars_): Event(EventType::MARKET), bars(bars_){} 
+            inline unique_ptr<Event> clone() const override {
+                return make_unique<MarketEvent>(*this);
+            }
             const unordered_map<string,Bar> & bars;
     };
 }

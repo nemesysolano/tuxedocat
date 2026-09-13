@@ -34,6 +34,9 @@ namespace events {
         public:
             inline LogEvent(sys_seconds timestamp, double equity, double commissions) :Event(EventType::LOG), log_(timestamp, equity, commissions) {}
             inline LogEvent(const Log & log): Event(EventType::LOG), log_(log) {}
+            inline unique_ptr<Event> clone() const override {
+                return make_unique<LogEvent>(log_);
+            }
             inline const Log & log() const {return log_;}
             
     };

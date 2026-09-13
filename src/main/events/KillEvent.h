@@ -11,7 +11,10 @@ namespace events {
     */
     class KillEvent: public Event {
         public:
-            inline KillEvent(): Event(EventType::KILL){} 
+            inline KillEvent(): Event(EventType::KILL){}
+            inline unique_ptr<Event> clone() const override {
+                return make_unique<KillEvent>(*this);
+            }
     };
 }
 
