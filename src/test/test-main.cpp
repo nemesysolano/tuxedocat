@@ -1,7 +1,6 @@
 #ifdef __TEST_MAIN__
 #include "polynomials-tests.h"
 #include "stats/distributions.h"
-#include "timeseries/adf.h" // Required for mac_kinnon_p and RegressionType
 #include <iostream>
 #include <vector>
 #include <cmath>

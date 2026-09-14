@@ -1,16 +1,38 @@
 #ifdef __TEST_MAIN__
 #include "polynomials-tests.h"
 #include "stats/distributions.h"
-#include "timeseries/adf.h" // Required for mac_kinnon_p and RegressionType
 #include <iostream>
 #include <vector>
 #include <cassert>
 #include <cmath>
-#include "polynomials-tests.h"
-#include <iostream>
-#include <cmath>
 #include <mdspan>
 #include "data/slice.h"
+#include "utils/log.h"
+
+namespace {
+    auto make_test_table_6x3 = []() {
+        static const std::vector<double> storage = {
+            1.0, 2.0, 3.0,
+            2.0, 1.0, 4.0,
+            3.0, 0.5, 5.0,
+            4.0, -1.0, 6.0,
+            5.0, -2.0, 7.0,
+            6.0, -3.0, 8.0
+        };
+        return std::mdspan<const double, std::extents<size_t, 6, 3>>(storage.data());
+    };
+
+    auto make_test_tensor_12x2x3 = []() {
+        static const std::vector<double> storage = [] {
+            std::vector<double> tmp(12 * 2 * 3);
+            for (size_t i = 0; i < tmp.size(); ++i) {
+                tmp[i] = static_cast<double>((i % 3) + 1.0);
+            }
+            return tmp;
+        }();
+        return std::mdspan<const double, std::extents<size_t, 12, 2, 3>>(storage.data());
+    };
+}
 
 void evaluate_test() {
     std::cout << "Running evaluate_test..." << std::endl;
@@ -44,16 +66,20 @@ void evaluate_test() {
                 assert(( approx_equal(*res_mdspan, expected_manual) ));
             }
         }
-        std::cout << "  Passed verification for: " << table_name << std::endl;
     };
 
-    // Run tests on all specified mdspan tables
-    verify_table(timeseries::adf::tau_nc_smallp, "tau_nc_smallp");
-    verify_table(timeseries::adf::tau_c_smallp, "tau_c_smallp");
-    verify_table(timeseries::adf::tau_ct_smallp, "tau_ct_smallp");
-    verify_table(timeseries::adf::tau_ctt_smallp, "tau_ctt_smallp");
+    // Run tests on the self-contained polynomial tables
+    auto table_nc = make_test_table_6x3();
+    auto table_c = make_test_table_6x3();
+    auto table_ct = make_test_table_6x3();
+    auto table_ctt = make_test_table_6x3();
 
-    std::cout << "All evaluate_test cases passed!\n" << std::endl;
+    verify_table(table_nc, "test_table_nc");
+    verify_table(table_c, "test_table_c");
+    verify_table(table_ct, "test_table_ct");
+    verify_table(table_ctt, "test_table_ctt");
+
+    log_trace_with_message("[PASSED]");
 }
 
 void evaluate_reversed_test() {
@@ -88,16 +114,20 @@ void evaluate_reversed_test() {
                 assert(( approx_equal(*res_mdspan, expected_manual) ));
             }
         }
-        std::cout << "  Passed verification for: " << table_name << std::endl;
     };
 
-    // Run tests on all specified mdspan tables
-    verify_table_reversed(timeseries::adf::tau_nc_smallp, "tau_nc_smallp");
-    verify_table_reversed(timeseries::adf::tau_c_smallp, "tau_c_smallp");
-    verify_table_reversed(timeseries::adf::tau_ct_smallp, "tau_ct_smallp");
-    verify_table_reversed(timeseries::adf::tau_ctt_smallp, "tau_ctt_smallp");
+    // Run tests on the self-contained polynomial tables
+    auto table_nc = make_test_table_6x3();
+    auto table_c = make_test_table_6x3();
+    auto table_ct = make_test_table_6x3();
+    auto table_ctt = make_test_table_6x3();
 
-    std::cout << "All evaluate_reversed_test cases passed!\n" << std::endl;
+    verify_table_reversed(table_nc, "test_table_nc");
+    verify_table_reversed(table_c, "test_table_c");
+    verify_table_reversed(table_ct, "test_table_ct");
+    verify_table_reversed(table_ctt, "test_table_ctt");
+
+    log_trace_with_message("[PASSED]");
 }
 
 void evaluate_horizontally_test() {
@@ -107,12 +137,7 @@ void evaluate_horizontally_test() {
         return std::abs(a - b) < epsilon;
     };
 
-    // Create mock 12x2x3 tensor (12 sequences, 2 rows each, 3 columns)
-    std::vector<double> flat_data(12 * 2 * 3, 1.0); 
-    // Fill with sample data: row[r] = {1.0, 2.0, 3.0} for every sequence
-    for(size_t i=0; i<12*2*3; ++i) flat_data[i] = (i % 3) + 1.0; 
-
-    std::mdspan<const double, std::extents<size_t, 12, 2, 3>> tensor(flat_data.data());
+    auto tensor = make_test_tensor_12x2x3();
     std::vector<double> result_vec(2);
     std::span<double> res_span(result_vec);
 
@@ -126,7 +151,7 @@ void evaluate_horizontally_test() {
         assert(approx_equal(res_span[0], 11.0));
         assert(approx_equal(res_span[1], 11.0));
     }
-    std::cout << "  Passed all sequence tests N=1 to 12." << std::endl;
+    log_trace_with_message("[PASSED]");
 }
 
 void evaluate_horizontally_reversed_test() {
@@ -136,10 +161,7 @@ void evaluate_horizontally_reversed_test() {
         return std::abs(a - b) < epsilon;
     };
 
-    std::vector<double> flat_data(12 * 2 * 3, 1.0);
-    for(size_t i=0; i<12*2*3; ++i) flat_data[i] = (i % 3) + 1.0;
-
-    std::mdspan<const double, std::extents<size_t, 12, 2, 3>> tensor(flat_data.data());
+    auto tensor = make_test_tensor_12x2x3();
     std::vector<double> result_vec(2);
     std::span<double> res_span(result_vec);
 
@@ -152,7 +174,7 @@ void evaluate_horizontally_reversed_test() {
         assert(approx_equal(res_span[0], 17.0));
         assert(approx_equal(res_span[1], 17.0));
     }
-    std::cout << "  Passed all sequence tests N=1 to 12." << std::endl;
+    log_trace_with_message("[PASSED]");
 }
 
 void evaluate_horizontally_vectorized_test() {
@@ -163,9 +185,7 @@ void evaluate_horizontally_vectorized_test() {
     };
 
     // Create mock 12x2x3 tensor
-    std::vector<double> flat_data(12 * 2 * 3, 1.0);
-    for(size_t i=0; i<flat_data.size(); ++i) flat_data[i] = (i % 3) + 1.0; 
-    std::mdspan<const double, std::extents<size_t, 12, 2, 3>> tensor(flat_data.data());
+    auto tensor = make_test_tensor_12x2x3();
 
     // Test successful evaluation for sequences N=1 to 12
     for (size_t n = 0; n < 12; ++n) {
@@ -183,7 +203,7 @@ void evaluate_horizontally_vectorized_test() {
     assert(!err.has_value());
     assert(err.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
     
-    std::cout << "  Passed evaluate_horizontally_vectorized_test." << std::endl;
+   log_trace_with_message("[PASSED]");
 }
 
 void evaluate_horizontally_reversed_vectorized_test() {
@@ -193,9 +213,7 @@ void evaluate_horizontally_reversed_vectorized_test() {
         return std::abs(a - b) < epsilon;
     };
 
-    std::vector<double> flat_data(12 * 2 * 3, 1.0);
-    for(size_t i=0; i<flat_data.size(); ++i) flat_data[i] = (i % 3) + 1.0;
-    std::mdspan<const double, std::extents<size_t, 12, 2, 3>> tensor(flat_data.data());
+    auto tensor = make_test_tensor_12x2x3();
 
     // Test successful reversed evaluation
     for (size_t n = 0; n < 12; ++n) {
@@ -213,7 +231,7 @@ void evaluate_horizontally_reversed_vectorized_test() {
     assert(!err.has_value());
     assert(err.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
 
-    std::cout << "  Passed evaluate_horizontally_reversed_vectorized_test." << std::endl;
+    log_trace_with_message("[PASSED]");
 }
 
 void fit_test() {
@@ -268,7 +286,7 @@ void fit_test() {
     assert(!err_sample.has_value());
     assert(err_sample.error() == TuxedoError::ERR_SAMPLE_TOO_SMALL);
 
-    std::cout << "  Passed fit_test." << std::endl;
+    log_trace_with_message("[PASSED]");
 }
 
 void fit_degree_2_test() {
@@ -306,6 +324,6 @@ void fit_degree_2_test() {
         assert(approx_equal((double)coefs[2, 0].value(), 3.0));
     }
 
-    std::cout << "  Passed fit_degree_2_test." << std::endl;
+    log_trace_with_message("[PASSED]");
 }
 #endif

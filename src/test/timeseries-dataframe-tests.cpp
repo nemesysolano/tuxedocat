@@ -8,13 +8,11 @@
 #include <functional>
 #include <iomanip> // For get_time
 #include <ctime>   // For timegm
-#include "timeseries/adf.h"
 #include <cmath> // Required for std::isnan and std::abs
 #include <cassert>
 
 using namespace dataframe;
 using namespace slice;
-using namespace timeseries::adf;
 using namespace std;
 
 // Helper to keep test output consistent
