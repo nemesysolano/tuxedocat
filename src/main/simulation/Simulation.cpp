@@ -11,12 +11,12 @@ using namespace journal;
 
 namespace simulation {
     bool Simulation::execute() {
-        if (!finished_) {
-            return false;
+        if (finished_) {
+            return finished_;
         }
 
         feed_.process_dataframes();
         finished_ = true;
-        return true;
+        return finished_;
     }
 }
