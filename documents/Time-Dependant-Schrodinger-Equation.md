@@ -110,3 +110,19 @@ Applying the scaling factor $A^2$ to the cumulative integral from the lower boun
 $F_A(X,t) = A^2 \frac{α}{\sqrt{π}} \left[ \underbrace{\sum_{n=0}^{∞} \frac{c_n^2}{2^n n!} \int_{x_{\text{min}}}^X e^{-α^2(x-μ)^2} H_n^2(α(x-μ)) dx}_{\text{Static Cumulative Probability}} + \underbrace{\sum_{j=0}^{∞} \sum_{k>j}^{∞} \frac{2 c_j c_k \cos(ω(j-k)t)}{\sqrt{2^{j+k} j! k!}} \int_{x_{\text{min}}}^X e^{-α^2(x-μ)^2} H_j(α(x-μ)) H_k(α(x-μ)) dx}_{\text{Time-Evolution Cumulative Probability}} \right]$, where
 
 $α = \sqrt{\frac{mω}{ℏ}}$
+
+#### Free Particle
+
+Because a pure, single-momentum free particle cannot be localized to a specific price (its probability distribution would be perfectly flat from $-\infty$ to $\infty$), the system must be modeled using a **Gaussian wave packet**. This represents an asset whose price is initially known with a high degree of certainty (localized around a starting price $x_0$) but possesses some baseline uncertainty $σ_0$.
+
+If the asset has an initial price $x_0$ and an underlying price drift/momentum $p_0$, the time-evolved probability density function $\vert{}Ψ(x,t)\vert{}^2$ evaluates to a normal distribution whose variance strictly expands over time:
+
+$\vert{}Ψ(x,t)\vert{}^2 = \frac{1}{\sqrt{2\pi σ(t)^2}} \exp\left( -\frac{(x - x_0 - vt)^2}{2σ(t)^2} \right)$
+
+**Key System Components:**
+
+* **Drift Velocity ($v$):** $v = p_0 / m$. This represents the asset's directional trend. If the asset has upward momentum, the center of the probability distribution drifts higher over time $t$.
+* **Time-Dependent Variance ($σ(t)^2$):** The price dispersion spreads out as time moves forward, dictated by the equation:
+
+$σ(t) = σ_0 \sqrt{1 + \left(\frac{ℏ t}{2mσ_0^2}\right)^2}$
+

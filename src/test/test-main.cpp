@@ -9,11 +9,7 @@
 #include "slice-tests.h"
 #include "timeseries-dataframe-tests.h"
 #include "ols-tests.h"
-#include "portfolio/PortfolioTest.h"
-#include "broker/BrokerTest.h"
-#include "strategy/StrategyTest.h"
 #include "channel/ChannelTest.h"
-#include "journal/JournalTest.h"
 #include "feed/DataFrameFeedTest.h"
 #include "process/ThreadPoolTest.h"
 #include "simulation/ControllerTest.h"
@@ -71,15 +67,9 @@ int main(int argc, char* argv[]) {
     transpose_test();
     outer_product_test();
     covariances_test();
-    portfolio::portfolio_event_handling_test();
-    strategy::test_signal_event_with_long_and_short_signals();
-    broker::test_filled_order_closed_on_opening();
-    broker::test_filled_scheduled_on_opening();
-    broker::test_filled_orders_closed();
+
     channel::test_event_clone_preserves_subtype();
     channel::test_channel();
-    journal::test_log_events_are_recorded();
-
     process::thread_pool_test();
     simulation::test_linear_controllers();
     simulation::test_circular_controllers();

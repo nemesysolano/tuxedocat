@@ -5,12 +5,14 @@
 namespace events {
 
     enum class EventType {
-        START,
         MARKET,
         SIGNAL,
         ORDER,
         FILL,
+        UPDATE,
+        CLOSE,
         LOG,
+        FETCH,
         KILL
     };
 

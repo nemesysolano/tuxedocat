@@ -7,9 +7,6 @@
 using namespace data;
 using namespace std;
 namespace events {
-    /* 
-    It signals to all other components that a new bar has been processed by data handler (hearbeat).
-    */
     class MarketEvent: public Event {
         public:
             inline MarketEvent(const unordered_map<string, Bar> & bars_): Event(EventType::MARKET), bars(bars_){} 

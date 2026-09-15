@@ -12,7 +12,6 @@ using namespace data;
 
 namespace events {
     enum class ExecutionType {
-        ORDER_SCHEDULED,
         POSITION_CREATED,
         POSITION_CLOSED,
         POSITION_UPDATED,
@@ -40,18 +39,6 @@ namespace events {
 
     };
 
-    class OrderScheduledExecution: public Execution {
-        private:
-            int quantity_;
-        public:
-            OrderScheduledExecution(
-                const sys_seconds timestamp, const string& symbol, int quantity, SignalDirection direction
-            ) :  Execution(timestamp, symbol, 0, ExecutionType::ORDER_SCHEDULED), quantity_(quantity) {}
-            unique_ptr<Execution> clone() const override {
-                return make_unique<OrderScheduledExecution>(*this);
-            }
-            int quantity() const { return quantity_; }
-    };
 
     class PositionCreatedExecution: public Execution {
         private:
@@ -115,25 +102,22 @@ namespace events {
             SignalDirection direction() const { return direction_; }
     };
 
-    /* 
-    The confirmation of a trade, sent from `ExecutionHandler` back to the `Portfolio`.
-    It represents the "ground truth" of the transaction,
-    containing the actual fill price, quantity, comissions.
-    */
+
     class FillEvent: public Event {
         private:
             vector<unique_ptr<Execution>> executions_;
         public:
-            inline FillEvent(vector<unique_ptr<Execution>> && executions): Event(EventType::FILL), executions_(std::move(executions)){}
+            inline FillEvent(vector<unique_ptr<Execution>> && executions)
+                : Event(EventType::FILL), executions_(std::move(executions)) {}
             unique_ptr<Event> clone() const override {
                 vector<unique_ptr<Execution>> cloned_executions;
                 cloned_executions.reserve(executions_.size());
-                for(const auto & execution: executions_) {
+                for (const auto & execution : executions_) {
                     cloned_executions.push_back(execution->clone());
                 }
                 return make_unique<FillEvent>(std::move(cloned_executions));
             }
-            const vector<unique_ptr<Execution>> & executions() const {return executions_;}
+            const vector<unique_ptr<Execution>> & executions() const { return executions_; }
     };
 }
 
