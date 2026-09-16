@@ -23,8 +23,8 @@ namespace broker {
         return nullptr;
     }
 
-    unique_ptr<Event> Broker::process_event(const Event & event) {
-
+    unique_ptr<Event> Broker::process_event(unique_ptr<Event> event) {
+        (void)event;
         return nullptr;
     }
 }

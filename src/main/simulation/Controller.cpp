@@ -22,7 +22,7 @@ namespace simulation {
             exit = input_event.event_type == EventType::KILL;
 
             if(!exit) {
-                unique_ptr<Event> output = event_processor_.process_event(input_event);
+                unique_ptr<Event> output = event_processor_.process_event(std::move(input));
                 if(output != nullptr) {
                     exit = output->event_type == EventType::FILL;
                     send(std::move(output));

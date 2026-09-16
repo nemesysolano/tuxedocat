@@ -30,9 +30,9 @@ namespace strategy {
         return make_unique<Event>(signal_event);
     }
 
-    unique_ptr<Event> Strategy::process_event(const Event & event) {
-        if(event.event_type == EventType::MARKET) {
-            const MarketEvent & market_event = static_cast<const MarketEvent &>(event);
+    unique_ptr<Event> Strategy::process_event(unique_ptr<Event> event) {
+        if(event && event->event_type == EventType::MARKET) {
+            const MarketEvent & market_event = static_cast<const MarketEvent &>(*event);
             return process_market(market_event);
         }
 

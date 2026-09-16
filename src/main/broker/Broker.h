@@ -35,7 +35,7 @@ namespace broker {
             const unordered_map<string, Order>& orders() const { return filled_orders_; }
             virtual unique_ptr<Event> process_order(const OrderEvent & order_event);
             virtual unique_ptr<Event> process_market(const MarketEvent & market_event);
-            unique_ptr<Event> process_event(const Event & event) override;
+            unique_ptr<Event> process_event(unique_ptr<Event> event) override;
 
 #ifdef __TEST_MAIN__
             inline const vector<FillEvent> & fill_events() { return fill_events_;}

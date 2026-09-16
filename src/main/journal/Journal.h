@@ -21,7 +21,7 @@ namespace journal {
 #else
             inline Journal(): entries_({}) {}
 #endif
-            unique_ptr<Event> process_event(const Event & event) override;
+            unique_ptr<Event> process_event(unique_ptr<Event> event) override;
             inline const vector<Log> & entries() { return entries_; }
     };
 }

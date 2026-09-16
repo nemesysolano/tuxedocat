@@ -8,7 +8,7 @@ using namespace std;
 namespace events {
     class EventProcessor {
         public:
-            virtual unique_ptr<Event> process_event(const Event & event);
+            virtual unique_ptr<Event> process_event(unique_ptr<Event> event);
             virtual ~EventProcessor() {};
     };
 }

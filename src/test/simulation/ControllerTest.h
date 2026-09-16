@@ -13,7 +13,7 @@ namespace simulation {
             size_t counter_;
         public:
             inline CounterProcessor(size_t counter): counter_(counter){}
-            unique_ptr<Event> process_event(const Event & event) override;
+            unique_ptr<Event> process_event(unique_ptr<Event> event) override;
             ~CounterProcessor() {EventProcessor::~EventProcessor();};
             inline size_t counter() const {return counter_;}
     };
@@ -23,7 +23,7 @@ namespace simulation {
             size_t bound_;
         public:
             inline BoundedProcessor(size_t counter, size_t bound): CounterProcessor(counter), bound_(bound){} 
-            unique_ptr<Event> process_event(const Event & event) override;
+            unique_ptr<Event> process_event(unique_ptr<Event> event) override;
     };
 
     void test_linear_controllers();

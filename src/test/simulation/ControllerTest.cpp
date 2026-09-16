@@ -9,13 +9,13 @@ using namespace events;
 using namespace channel;
 
 namespace simulation {
-    unique_ptr<Event> CounterProcessor::process_event(const Event & event) {
+    unique_ptr<Event> CounterProcessor::process_event(unique_ptr<Event> event) {
         (void)event;
         counter_++;
         return make_unique<Event>(EventType::LOG);
     }
 
-     unique_ptr<Event> BoundedProcessor::process_event(const Event & event) {
+     unique_ptr<Event> BoundedProcessor::process_event(unique_ptr<Event> event) {
         (void)event;
         if(counter_ < bound_) {
             counter_++;

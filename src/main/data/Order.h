@@ -10,8 +10,7 @@ using namespace std::chrono;
 namespace data {
     class Order {
         private:
-            sys_seconds timestamp_;
-            string symbol_;
+             string symbol_;
             int quantity_;
             double entry_price_;
             SignalDirection direction_;
@@ -20,7 +19,6 @@ namespace data {
 
         public:
             Order(
-                const sys_seconds& timestamp,
                 const string& symbol,
                 int quantity,
                 double entry_price,
@@ -28,15 +26,13 @@ namespace data {
                 double take_profit,
                 double stop_loss
             )
-                : timestamp_(timestamp),
-                  symbol_(symbol),
+                : symbol_(symbol),
                   quantity_(quantity),
                   entry_price_(entry_price),
                   direction_(direction),
                   take_profit_(take_profit),
                   stop_loss_(stop_loss) {}
 
-            const sys_seconds& timestamp() const { return timestamp_; }
             const string& symbol() const { return symbol_; }
             double quantity() const { return quantity_; }
             int entry_price() const { return entry_price_; }
