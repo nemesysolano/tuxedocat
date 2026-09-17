@@ -3,6 +3,17 @@
 using namespace std;
 
 namespace process {
+    size_t get_sysctl_value(const char* name) {
+#if defined(__APPLE__) && defined(__MACH__)
+        int value = 0;
+        size_t size = sizeof(value);
+        if (sysctlbyname(name, &value, &size, nullptr, 0) == 0) {
+            return static_cast<size_t>(value);
+        }
+#endif
+        return 0;
+    }
+
     ThreadPool::ThreadPool(std::size_t nr_workers) {
         stop = false;
         for (std::size_t i = 0; i < nr_workers; ++i) {
