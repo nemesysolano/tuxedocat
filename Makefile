@@ -1,11 +1,11 @@
 CC := clang++
 # Added -Isrc/main to the include paths so test files can find main headers
 
-CFLAGS := -Wall -Wextra -DEIGEN_USE_BLAS -std=c++23 -stdlib=libc++ -MMD -MP -Iinclude -Isrc/main -I/opt/homebrew/include/eigen3
+CFLAGS := -Wall -Wextra -Wno-deprecated-declarations -DEIGEN_USE_BLAS -std=c++23 -stdlib=libc++ -MMD -MP -Iinclude -Isrc/main -I/opt/homebrew/include/eigen3
 ifeq ($(shell uname -s), Darwin)
     CFLAGS += -I/opt/homebrew/include/eigen3
 else
-    CFLAGS += -I/usr/include/eigen3 -Wno-deprecated-declarations
+    CFLAGS += -I/usr/include/eigen3
 endif
 
 SRC_DIR := src
