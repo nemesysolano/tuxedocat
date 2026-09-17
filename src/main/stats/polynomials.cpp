@@ -58,7 +58,7 @@ namespace polynomials {
         }
 
         // Solve the Linear System V * w = Y using SVD
-        Eigen::VectorXd w = V.bdcSvd<Eigen::ComputeThinU | Eigen::ComputeThinV>().solve(Y_vec);
+        Eigen::VectorXd w = V.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(Y_vec);
 
         // Package into MutableSlice2D to return (output is ALWAYS a column vector (degree+1, 1))
         slice::MutableSlice2D result(num_coefficients, 1);

@@ -1,6 +1,13 @@
 CC := clang++
 # Added -Isrc/main to the include paths so test files can find main headers
-CFLAGS := -Wall -Wextra -Iinclude -Isrc/main -I/opt/homebrew/include/eigen3  -DEIGEN_USE_BLAS -std=c++23 -MMD -MP
+
+CFLAGS := -Wall -Wextra -DEIGEN_USE_BLAS -std=c++23 -stdlib=libc++ -MMD -MP -Iinclude -Isrc/main -I/opt/homebrew/include/eigen3
+ifeq ($(shell uname -s), Darwin)
+    CFLAGS += -I/opt/homebrew/include/eigen3
+else
+    CFLAGS += -I/usr/include/eigen3 -Wno-deprecated-declarations
+endif
+
 SRC_DIR := src
 OBJ_DIR := obj
 BIN_DIR := bin
@@ -12,7 +19,12 @@ OBJS := $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 # Define dependency files matching the object files
 DEPS := $(OBJS:.o=.d)
 
-LDFLAGS := -framework Accelerate
+LDFLAGS := -stdlib=libc++
+ifeq ($(shell uname -s), Darwin)
+    LDFLAGS += -framework Accelerate
+else
+    LDFLAGS += -lopenblas 
+endif
 
 # Evaluate definitions and default to shared library if neither __TEST_MAIN__ nor __CLI_MAIN__ is provided
 ifneq ($(filter 1,$(if $(__TEST_MAIN__),1)$(if $(__CLI_MAIN__),1)),)

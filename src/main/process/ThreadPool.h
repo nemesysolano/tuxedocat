@@ -11,7 +11,12 @@
 #include <functional>
 #include <type_traits>
 #include <sys/types.h>
-#include <sys/sysctl.h>
+
+#if defined(__APPLE__) && defined(__MACH__)
+    #include <sys/sysctl.h>
+#else
+    #include <unistd.h>
+#endif
 using namespace std;
 
 namespace process {
