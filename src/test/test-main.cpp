@@ -13,6 +13,7 @@
 #include "feed/DataFrameFeedTest.h"
 #include "process/ThreadPoolTest.h"
 #include "simulation/ControllerTest.h"
+#include "portfolio/PortfolioTest.h"
 using namespace std;
 
 int main(int argc, char* argv[]) {
@@ -74,6 +75,7 @@ int main(int argc, char* argv[]) {
     simulation::test_linear_controllers();
     simulation::test_circular_controllers();
     simulation::test_tree_controllers();
+    portfolio::test_portfolio_input_output();
     return 0;
 }
 

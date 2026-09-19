@@ -1,6 +1,10 @@
 #ifndef __EVENT_H__
 #define __EVENT_H__
 #include <memory>
+#include <iostream>
+#include <string>
+
+using namespace std;
 
 namespace events {
 

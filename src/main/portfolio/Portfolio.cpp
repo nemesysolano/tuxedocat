@@ -1,4 +1,5 @@
 #include "Portfolio.h"
+#include "utils/log.h"
 
 using namespace std;
 using namespace events;
@@ -12,6 +13,7 @@ namespace portfolio {
 
     unique_ptr<Event>  Portfolio::process_signal_event(const SignalEvent & event){
         if(event.signals().size() == 0) {
+            log_trace_with_message("FetchEvent");
             return make_unique<FetchEvent>();
         } else {
             vector<Order> orders;
