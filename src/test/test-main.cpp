@@ -14,6 +14,8 @@
 #include "process/ThreadPoolTest.h"
 #include "simulation/ControllerTest.h"
 #include "portfolio/PortfolioTest.h"
+#include "broker/BrokerTest.h"
+
 using namespace std;
 
 int main(int argc, char* argv[]) {
@@ -76,6 +78,7 @@ int main(int argc, char* argv[]) {
     simulation::test_circular_controllers();
     simulation::test_tree_controllers();
     portfolio::test_portfolio_input_output();
+    broker::test_broker_input_output();
     return 0;
 }
 
