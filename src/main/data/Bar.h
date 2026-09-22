@@ -65,13 +65,6 @@ namespace data {
                 this->volume_ = volume;                 
             }
             ~Bar() = default;
-
-            static optional<indexed_result> nearest_higher_high(const span<Bar> & series); // $x_{\max}(t)$
-            static optional<indexed_result> nearest_lower_low(const span<Bar> & series); // $x_{\min}(t)$
-            static double time_dependent_variance(double x_max, double x_min); // $σ^2(t)$
-            static optional<indexed_result> time_dependent_variance(const span<Bar> & series); // $σ^2(t)$
-            static optional<double> inverse_variance_weight(const span<Bar> & series); // $\hat w(t) = \frac{w(t)}{\displaystyle\sum_{i=0}^{k-1} w(t-i)}$
-            static optional<double> scaled_price(const span<Bar> & series); // $\hat x(t) = x_t\hat w(t)$
-    };
+     };
 }
 #endif
