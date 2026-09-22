@@ -6,5 +6,6 @@ using namespace std;
 
 namespace broker {
     void test_broker_positions_closed();
+    void test_broker_positions_updated();
 }
 #endif

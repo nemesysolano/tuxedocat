@@ -79,6 +79,7 @@ int main(int argc, char* argv[]) {
     simulation::test_tree_controllers();
     portfolio::test_portfolio_input_output();
     broker::test_broker_positions_closed();
+    broker::test_broker_positions_updated();
     return 0;
 }
 
