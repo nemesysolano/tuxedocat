@@ -6,7 +6,9 @@
 #include <concepts>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 using namespace std;
 using namespace std::chrono;
@@ -38,9 +40,20 @@ namespace events {
             const string& symbol() const { return symbol_; }
             double commissions() const { return commissions_; }
             ExecutionType execution_type() const { return execution_type_; }
-
     };
 
+    template<typename T>
+    vector<unique_ptr<T>> clone_execution_vector(const vector<unique_ptr<T>> & source) {
+        vector<unique_ptr<T>> cloned;
+        cloned.reserve(source.size());
+        for (const auto & item : source) {
+            if (item) {
+                auto cloned_exec = item->clone();
+                cloned.push_back(unique_ptr<T>(static_cast<T*>(cloned_exec.release())));
+            }
+        }
+        return cloned;
+    }
 
     class PositionCreatedExecution: public Execution {
         private:
@@ -54,11 +67,13 @@ namespace events {
                     fill_quantity_(fill_quantity),
                     direction_(direction)
                     {}
-            unique_ptr<Execution> clone() const override;
+            unique_ptr<Execution> clone() const override {
+                return make_unique<PositionCreatedExecution>(*this);
+            }
 
             double fill_price() const { return fill_price_; }
             int fill_quantity() const { return fill_quantity_; }
-            SignalDirection direction() const { return direction_;}
+            SignalDirection direction() const { return direction_; }
     };
 
     class PositionClosedExecution: public Execution {
@@ -70,7 +85,9 @@ namespace events {
                 : Execution(timestamp, symbol, commissions, ExecutionType::POSITION_CLOSED),
                   profit_loss_(profit_loss),
                   direction_(direction) {}
-            unique_ptr<Execution> clone() const override;
+            unique_ptr<Execution> clone() const override {
+                return make_unique<PositionClosedExecution>(*this);
+            }
 
             double profit_loss() const { return profit_loss_; }
             SignalDirection direction() const { return direction_; }
@@ -91,71 +108,54 @@ namespace events {
                 : Execution(timestamp, symbol, commissions, ExecutionType::POSITION_UPDATED),
                   profit_loss_(profit_loss),
                   bar_(bar),
-                  direction_(direction) {} 
-            unique_ptr<Execution> clone() const override;
+                  direction_(direction) {}
+            unique_ptr<Execution> clone() const override {
+                return make_unique<PositionUpdatedExecution>(*this);
+            }
             double profit_loss() const { return profit_loss_; }
             const Bar& bar() const { return bar_; }
             SignalDirection direction() const { return direction_; }
     };
 
-    template <typename D, typename E> class PositionEvent : public Event {
+    class FillEvent : public Event {
         protected:
-            vector<unique_ptr<E>> executions_;
-
+            vector<unique_ptr<PositionCreatedExecution>> positions_created_;
+            vector<unique_ptr<PositionClosedExecution>> positions_closed_;
+            vector<unique_ptr<PositionUpdatedExecution>> positions_updated_;
+            unordered_map<string, Bar> bars_;
         public:
-            PositionEvent(vector<unique_ptr<E>> executions, EventType type)
-                : Event(type) {
-                static_assert(std::derived_from<E, Execution>);
-                executions_ = std::move(executions);
-            }
+            inline FillEvent() : FillEvent(
+                vector<unique_ptr<PositionCreatedExecution>>{},
+                vector<unique_ptr<PositionClosedExecution>>{},
+                vector<unique_ptr<PositionUpdatedExecution>>{},
+                unordered_map<string, Bar>{}
+            ){}
+
+            inline FillEvent(
+                vector<unique_ptr<PositionCreatedExecution>> && positions_created,
+                vector<unique_ptr<PositionClosedExecution>> && positions_closed,
+                vector<unique_ptr<PositionUpdatedExecution>> && positions_updated,
+                unordered_map<string, Bar> bars
+            ) : Event(EventType::FILL),
+                positions_created_(std::move(positions_created)),
+                positions_closed_(std::move(positions_closed)),
+                positions_updated_(std::move(positions_updated)),
+                bars_(std::move(bars)) {}
 
             unique_ptr<Event> clone() const override {
-                vector<unique_ptr<E>> cloned_executions;
-                cloned_executions.reserve(executions_.size());
-
-                for (const auto& execution : executions_) {
-                    unique_ptr<Execution> cloned_execution = execution->clone();
-                    cloned_executions.emplace_back(static_cast<E*>(cloned_execution.release()));
-                }
-
-                // D is supplied by CRTP.
-                return make_unique<D>(std::move(cloned_executions));
+                return make_unique<FillEvent>(
+                    clone_execution_vector(positions_created_),
+                    clone_execution_vector(positions_closed_),
+                    clone_execution_vector(positions_updated_),
+                    bars_
+                );
             }
 
-            const vector<unique_ptr<E>>& executions() const {
-                return executions_;
-            }
+            const vector<unique_ptr<PositionCreatedExecution>> & positions_created() const { return positions_created_; }
+            const vector<unique_ptr<PositionClosedExecution>> & positions_closed() const { return positions_closed_; }
+            const vector<unique_ptr<PositionUpdatedExecution>> & positions_updated() const { return positions_updated_; }
+            const unordered_map<string, Bar> & bars() const { return bars_; }
     };
-
-    class FillEvent: public PositionEvent<FillEvent, PositionCreatedExecution> {
-        public:
-            inline FillEvent(vector<unique_ptr<PositionCreatedExecution>> executions)
-                : PositionEvent<FillEvent, PositionCreatedExecution>(std::move(executions), EventType::FILL) {}
-    };
-
-    class CloseEvent: public PositionEvent<CloseEvent, PositionClosedExecution> {
-        public:
-            inline CloseEvent(vector<unique_ptr<PositionClosedExecution>> executions)
-                : PositionEvent<CloseEvent, PositionClosedExecution>(std::move(executions), EventType::CLOSE) {}        
-    };
-
-    class UpdateEvent: public PositionEvent<UpdateEvent, PositionUpdatedExecution> {
-        public:
-            inline UpdateEvent(vector<unique_ptr<PositionUpdatedExecution>> executions)
-                : PositionEvent<UpdateEvent, PositionUpdatedExecution>(std::move(executions), EventType::UPDATE) {}        
-    };
-
-    inline unique_ptr<Execution> PositionCreatedExecution::clone() const {
-        return make_unique<PositionCreatedExecution>(*this);
-    }
-
-    inline unique_ptr<Execution> PositionClosedExecution::clone() const {
-        return make_unique<PositionClosedExecution>(*this);
-    }
-
-    inline unique_ptr<Execution> PositionUpdatedExecution::clone() const {
-        return make_unique<PositionUpdatedExecution>(*this);
-    }
 
 }
 

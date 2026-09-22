@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
     simulation::test_circular_controllers();
     simulation::test_tree_controllers();
     portfolio::test_portfolio_input_output();
-    broker::test_broker_input_output();
+    broker::test_broker_positions_closed();
     return 0;
 }
 

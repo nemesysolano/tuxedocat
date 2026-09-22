@@ -5,6 +5,6 @@ using namespace events;
 using namespace std;
 
 namespace broker {
-    void test_broker_input_output();
+    void test_broker_positions_closed();
 }
 #endif

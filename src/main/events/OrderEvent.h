@@ -14,8 +14,8 @@ namespace events {
         private:
             vector<Order> orders_;
         public:
-            inline explicit OrderEvent(const vector<Order> & orders)
-                : Event(EventType::ORDER), orders_(orders) {}
+            inline explicit OrderEvent( vector<Order>  orders)
+                : Event(EventType::ORDER), orders_(std::move(orders)) {}
             inline unique_ptr<Event> clone() const override {
                 return make_unique<OrderEvent>(orders_);
             }

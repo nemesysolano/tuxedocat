@@ -21,7 +21,7 @@ namespace broker {
 
     class Broker: public EventProcessor {
         private:
-            unordered_map<string, Order> filled_orders_;
+            unordered_map<string, FilledOrder> filled_orders_;
             unordered_map<string, Order> scheduled_orders_;
 #ifdef __TEST_MAIN__
             vector<FillEvent> fill_events_;
@@ -32,17 +32,16 @@ namespace broker {
 #else 
             inline Broker(): filled_orders_({}), scheduled_orders_({})  {}
 #endif
-            const unordered_map<string, Order>& orders() const { return filled_orders_; }
-            virtual unique_ptr<Event> process_order(const OrderEvent & order_event);
-            void process_market_event(const MarketEvent & market_event);
+            const unordered_map<string, FilledOrder> & filled_orders() const { return filled_orders_; }
+            unique_ptr<Event> process_order_event(const OrderEvent & order_event);
+            unique_ptr<Event> process_market_event(unique_ptr<Event> market_event);
             unique_ptr<Event> process_event(unique_ptr<Event> event) override;
 
 #ifdef __TEST_MAIN__
             inline const vector<FillEvent> & fill_events() { return fill_events_;}
-            inline const unordered_map<string, Order> & filled_orders() {return filled_orders_; }
-            inline const unordered_map<string, Order> & scheduled_orders() {return scheduled_orders_; }
 #endif
-           
+            inline const unordered_map<string, FilledOrder> & filled_orders() {return filled_orders_;}
+            inline const unordered_map<string, Order> & scheduled_orders() {return scheduled_orders_;}
     };
 }
 #endif

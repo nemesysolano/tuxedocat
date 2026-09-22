@@ -13,10 +13,10 @@ namespace events {
         SIGNAL,
         ORDER,
         FILL,
-        UPDATE,
-        CLOSE,
         LOG,
         FETCH,
+        CLOSE,
+        UPDATE,
         KILL
     };
 

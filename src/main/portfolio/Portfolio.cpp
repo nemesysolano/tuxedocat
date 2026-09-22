@@ -13,7 +13,6 @@ namespace portfolio {
 
     unique_ptr<Event>  Portfolio::process_signal_event(const SignalEvent & event){
         if(event.signals().size() == 0) {
-            log_trace_with_message("FetchEvent");
             return make_unique<FetchEvent>();
         } else {
             vector<Order> orders;
@@ -22,14 +21,6 @@ namespace portfolio {
     }
 
     unique_ptr<FetchEvent>  Portfolio::process_fill_event(const FillEvent & event){
-        return make_unique<FetchEvent>();
-    }
-
-    unique_ptr<LogEvent>  Portfolio::process_close_event(const CloseEvent & event){
-        return make_unique<LogEvent>(sys_seconds_now(), 0, 0);
-    }
-
-    unique_ptr<FetchEvent> Portfolio::process_update_event(const UpdateEvent & event){
         return make_unique<FetchEvent>();
     }
 
@@ -65,26 +56,6 @@ namespace portfolio {
                 const FillEvent & fill_event = static_cast<const FillEvent &>(event_ref);
 #endif
                 return process_fill_event(fill_event);
-            }
-                
-            case EventType::CLOSE: {
-                close_count_++;
-#ifdef __DEBUG__
-                const CloseEvent & close_event = dynamic_cast<const CloseEvent &>(event_ref);
-#else
-                const CloseEvent & close_event = static_cast<const CloseEvent &>(event_ref);
-#endif
-                return process_close_event(close_event);
-            }
-
-            case EventType::UPDATE: {
-                update_count_++;
-#ifdef __DEBUG__
-                const UpdateEvent & update_event = dynamic_cast<const UpdateEvent &>(event_ref);
-#else
-                const UpdateEvent & update_event = static_cast<const UpdateEvent &>(event_ref);
-#endif
-                return Portfolio::process_update_event(update_event);
             }
 
             case EventType::KILL: {
