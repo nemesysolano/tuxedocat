@@ -14,7 +14,7 @@ using namespace events;
 
 namespace strategy {
     class Strategy: public EventProcessor {
-        private:
+        protected:
             map<string, vector<Bar>> bars_;
 #ifdef __TEST_MAIN__
             vector<SignalEvent> signal_events_;

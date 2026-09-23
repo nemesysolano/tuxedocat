@@ -89,11 +89,11 @@ $$
 
 Here, $I(x_{\min}(t))$ and $I(x_{\max}(t))$ are the distances in bars from
 the current bar at time $t$ to the bars containing the nearest lower low and
-nearest higher high, respectively. Thus, $N$ is a positive integer chosen so
-that the averaging window does not extend beyond the closer bracket extreme.
-The definition requires both extremes to exist and $N \geq 1$; a boundary
-policy is needed when either extreme is unavailable or occurs on the current
-bar.
+nearest higher high, respectively; furthermore $z(t)$ is called **gaussian bracketed average**. 
+Thus, $N$ is a positive integer chosen so that the averaging window does not 
+extend beyond the closer bracket extreme. The definition requires both extremes 
+to exist and $N \geq 1$; a boundary policy is needed when either extreme is unavailable 
+or occurs on the current bar.
 
 The comparisons $l(t) > z(t)$ and $h(t) < z(t)$ may be tested as candidate
 bullish and bearish signals, respectively. They are hypotheses rather than

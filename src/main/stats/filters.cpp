@@ -1,4 +1,7 @@
 #include "filters.h"
+#include <cmath>
+#include <limits>
+
 using namespace std;
 using namespace data;
 namespace filters {
@@ -63,13 +66,15 @@ namespace filters {
         return pair<size_t, double>(distance, variance);
     }
 
-    optional<double> inverse_variance_weight(const span<Bar> & series){ // $\hat w(t) = \frac{w(t)}{\displaystyle\sum_{i=0}^{k-1} w(t-i)}$
+    optional<indexed_result> inverse_variance_weight(const span<Bar> & series){ // $\hat w(t) = \frac{w(t)}{\displaystyle\sum_{i=0}^{k-1} w(t-i)}$
         if (series.size() < 2) {
             return {};
         }
 
         double weight_sum = 0.0;
         double current_weight = 0.0;
+        size_t distance = 0;
+
         for (size_t offset = 0; offset < series.size(); ++offset) {
             const size_t prefix_size = series.size() - offset;
             const span<Bar> prefix(series.data(), prefix_size);
@@ -88,15 +93,18 @@ namespace filters {
             if (offset == 0) {
                 current_weight = weight;
             }
+
+            distance = variance_result->first;
         }
 
         if (!isfinite(weight_sum) || weight_sum <= 0.0) {
             return {};
         }
-
-        return current_weight / weight_sum;
+        
+        return pair<size_t, double>(distance, current_weight / weight_sum);
     }
-    optional<double> scaled_price(const span<Bar> & series) {
+
+    optional<indexed_result> scaled_price(const span<Bar> & series) {
         if (series.empty()) {
             return {};
         }
@@ -107,6 +115,40 @@ namespace filters {
         }
 
         const double x_t = series.back().close_price();
-        return x_t * weight_result.value();
+        return pair<size_t, double>(weight_result.value().first, x_t * weight_result.value().second);
+    }
+
+    optional<indexed_result> gaussian_bracketed_average(const span<Bar> & series){ // $z(t) = \frac{1}{N}\sum_{i=0}^{N-1} \hat x(t-i)$
+        const auto invalid_result = [] {
+            return indexed_result{0, std::numeric_limits<double>::quiet_NaN()};
+        };
+
+        if (series.empty()) {
+            return invalid_result();
+        }
+
+        const auto variance_result = time_dependent_variance(series);
+        if (!variance_result.has_value() || variance_result->first == 0) {
+            return invalid_result();
+        }
+
+        const size_t window_size = variance_result->first;
+        double sum = 0.0;
+        for (size_t offset = 0; offset < window_size; ++offset) {
+            const span<Bar> prefix(series.data(), series.size() - offset);
+            const auto scaled_result = scaled_price(prefix);
+            if (!scaled_result.has_value() || !isfinite(scaled_result->second)) {
+                return invalid_result();
+            }
+
+            sum += scaled_result->second;
+        }
+
+        const double average = sum / static_cast<double>(window_size);
+        if (!isfinite(average)) {
+            return invalid_result();
+        }
+
+        return indexed_result{window_size, average};
     }
 }
