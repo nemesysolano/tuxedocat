@@ -3,9 +3,12 @@
 #include <limits>
 
 using namespace std;
-using namespace data;
+using namespace data
+;
 namespace filters {
-    optional<indexed_result> nearest_higher_high(const span<Bar> & series){
+    const indexed_result invalid_result(0, numeric_limits<double>::quiet_NaN());
+
+    optional<indexed_result> nearest_higher_high(span<const Bar> series){
         if (series.size() < 2) {
             return {};
         }
@@ -21,7 +24,7 @@ namespace filters {
         return {};
     }
     
-    optional<indexed_result> nearest_lower_low(const span<Bar> & series){
+    optional<indexed_result> nearest_lower_low(span<const Bar> series){
         if (series.size() < 2) {
             return {};
         }
@@ -46,7 +49,7 @@ namespace filters {
         return (log_ratio * log_ratio) / (4.0 * log(2.0));
     }
 
-    std::optional<indexed_result> time_dependent_variance(const span<Bar> & series){
+    std::optional<indexed_result> time_dependent_variance(span<const Bar> series){
         auto higher_high_result = nearest_higher_high(series);
         if(!higher_high_result.has_value()) {
             return {};
@@ -66,7 +69,7 @@ namespace filters {
         return pair<size_t, double>(distance, variance);
     }
 
-    optional<indexed_result> inverse_variance_weight(const span<Bar> & series){ // $\hat w(t) = \frac{w(t)}{\displaystyle\sum_{i=0}^{k-1} w(t-i)}$
+    optional<indexed_result> inverse_variance_weight(span<const Bar> series){ // $\hat w(t) = \frac{w(t)}{\displaystyle\sum_{i=0}^{k-1} w(t-i)}$
         if (series.size() < 2) {
             return {};
         }
@@ -77,7 +80,7 @@ namespace filters {
 
         for (size_t offset = 0; offset < series.size(); ++offset) {
             const size_t prefix_size = series.size() - offset;
-            const span<Bar> prefix(series.data(), prefix_size);
+            const span<const Bar> prefix(series.data(), prefix_size);
             const auto variance_result = time_dependent_variance(prefix);
             if (!variance_result.has_value()) {
                 return {};
@@ -104,7 +107,7 @@ namespace filters {
         return pair<size_t, double>(distance, current_weight / weight_sum);
     }
 
-    optional<indexed_result> scaled_price(const span<Bar> & series) {
+    optional<indexed_result> scaled_price(span<const Bar> series) {
         if (series.empty()) {
             return {};
         }
@@ -118,27 +121,24 @@ namespace filters {
         return pair<size_t, double>(weight_result.value().first, x_t * weight_result.value().second);
     }
 
-    optional<indexed_result> gaussian_bracketed_average(const span<Bar> & series){ // $z(t) = \frac{1}{N}\sum_{i=0}^{N-1} \hat x(t-i)$
-        const auto invalid_result = [] {
-            return indexed_result{0, std::numeric_limits<double>::quiet_NaN()};
-        };
-
+    indexed_result gaussian_bracketed_average(span<const Bar> series){ // $z(t) = \frac{1}{N}\sum_{i=0}^{N-1} \hat x(t-i)$
+ 
         if (series.empty()) {
-            return invalid_result();
+            return invalid_result;
         }
 
         const auto variance_result = time_dependent_variance(series);
         if (!variance_result.has_value() || variance_result->first == 0) {
-            return invalid_result();
+            return invalid_result;
         }
 
         const size_t window_size = variance_result->first;
         double sum = 0.0;
         for (size_t offset = 0; offset < window_size; ++offset) {
-            const span<Bar> prefix(series.data(), series.size() - offset);
+            const span<const Bar> prefix(series.data(), series.size() - offset);
             const auto scaled_result = scaled_price(prefix);
             if (!scaled_result.has_value() || !isfinite(scaled_result->second)) {
-                return invalid_result();
+                return invalid_result;
             }
 
             sum += scaled_result->second;
@@ -146,7 +146,7 @@ namespace filters {
 
         const double average = sum / static_cast<double>(window_size);
         if (!isfinite(average)) {
-            return invalid_result();
+            return invalid_result;
         }
 
         return indexed_result{window_size, average};

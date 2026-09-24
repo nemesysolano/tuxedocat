@@ -19,7 +19,7 @@ namespace strategy {
 
             vector<Bar> & bars = this->bars_.at(symbol);
             bars.emplace_back(bar);
-            add_signal(bar, signals);
+            add_signal(symbol, signals);
         }
 
         SignalEvent signal_event(signals);

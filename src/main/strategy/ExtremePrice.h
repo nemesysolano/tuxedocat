@@ -9,11 +9,9 @@ using namespace events;
 
 namespace strategy {
     class ExtremePrice: public Strategy {
-        protected:
-            vector<double> signals_;
         public:
-            inline ExtremePrice(): Strategy(), signals_({}) {}
-            void add_signal(const Bar & bar, vector<Signal> & signals) override;
+            inline ExtremePrice(): Strategy(){}
+            void add_signal(const string & symbol, vector<Signal> & signals) override;
     };
 }
 
