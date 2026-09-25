@@ -7,17 +7,17 @@ using namespace data;
 using namespace events;
 
 namespace strategy {
-    unique_ptr<Event> Strategy::process_market(const MarketEvent & market_event) {
+    unique_ptr<SignalEvent> Strategy::process_market(const MarketEvent & market_event) {
         const unordered_map<string,Bar> & bars = market_event.bars;
         vector<Signal> signals;
-
+        
         for (const auto & [symbol, bar] : bars) {
 
-            if(!this->bars_.contains(symbol)) {
-                this->bars_.emplace(symbol, vector<Bar>());
+            if(!bars_.contains(symbol)) {
+                bars_.emplace(symbol, vector<Bar>());
             }
 
-            vector<Bar> & bars = this->bars_.at(symbol);
+            vector<Bar> & bars = bars_.at(symbol);
             bars.emplace_back(bar);
             add_signal(symbol, signals);
         }
@@ -27,7 +27,7 @@ namespace strategy {
         signal_events_.push_back(signal_event);
 #endif
         //TODO: Notify `SignalEvent` to `Portfolio`
-        return make_unique<Event>(signal_event);
+        return make_unique<SignalEvent>(std::move(signal_event));
     }
 
     unique_ptr<Event> Strategy::process_event(unique_ptr<Event> event) {

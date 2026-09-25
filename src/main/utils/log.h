@@ -7,13 +7,13 @@
 #define log_trace() log_source_location("👁 TRACE ") << std::endl
 #define log_trace_with_message(message) log_source_location("👁 TRACE ") << ' ' << message << std::endl
 #define log_debug_message(message) log_source_location("🐞 DEBUG ") << ' ' << message << std::endl
+#define log_error_message(message) log_source_location("💀 ERROR ") << ' ' << message << std::endl
 #else
 #define log_source_location(label)
 #define log_trace()
 #define log_trace_with_message(message)
 #define log_debug_message(message)
+#define log_error_message(message) std::cout << "💀 ERROR " << message << std::endl
 #endif
-
-#define log_error_message(message) log_source_location("💀 ERROR ") << ' ' << message << std::endl
 
 #endif

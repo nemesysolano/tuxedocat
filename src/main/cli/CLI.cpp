@@ -7,6 +7,7 @@
 #include "Files.h"
 #include "strategy/ExtremePrice.h"
 #include "feed/DataFrameFeed.h"
+#include <cassert>
 
 using namespace std;
 using namespace strategy;
@@ -29,9 +30,7 @@ namespace cli {
 
     int play(int argc, char * argv[]) {
         string program_name(argv[0]);
-#ifdef __DEBUG__
-        log_debug_message(format("{} HANDLED!", program_name));
-#endif
+
         if(argc < PLAY_MIN_ARGC) {
             log_error_message("Not enough argument. Use `tuxedocat play <strategy> <directory>`.");
             return -1;
@@ -51,21 +50,36 @@ namespace cli {
             return -3;            
         }
 
-        // auto market_event_handler_test_impl =  [&strategy](const MarketEvent & market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded) {
-        //     const unordered_map<string,Bar> &  bars = market_event.bars;
+        auto market_event_handler_test_impl = [&strategy](unique_ptr<MarketEvent> market_event,
+                const DataFrameFeed & dataframe_feed,
+                const unordered_map<string, size_t> & records_loaded) {
+            (void)dataframe_feed;
+            (void)records_loaded;
 
-        //     for (const auto & [symbol, bar] : bars) {
-        //         auto dataframe_result = dataframe_feed.dataframe(symbol);
-        //         auto const & dataframe = dataframe_result.value().get();
-        //         auto index = records_loaded.at(symbol)-1;
-        //         auto const & timestamps = dataframe.timestamps_vector();
-        //         auto const & timestamp = timestamps[index];
+            unique_ptr<Event> event(strategy->process_event(std::move(market_event)));
+            if (!event || event->event_type != EventType::SIGNAL) {
+                log_error_message("Market event did not produce a valid signal event.");
+                return;
+            }
+#ifdef __DEBUG__
+            const SignalEvent & signal_event = dynamic_cast<const SignalEvent &>(*event.get());            
+#else
+            const SignalEvent & signal_event = static_cast<const SignalEvent &>(*event.get());
+#endif
+            assert(signal_event.event_type == EventType::SIGNAL);
 
-        //         strategy.process_event();
-        //     }
-        // };
+        };
 
-        // auto dataframe_feed_result = DataFrameFeed::Create(files, market_event_handler_default_impl);
+        auto dataframe_feed_result = DataFrameFeed::Create(files, market_event_handler_test_impl);
+        if(!dataframe_feed_result.has_value()) {
+            log_error_message(format("No valid csv file in '{}'", directory));
+            return -4;              
+        }
+
+        auto & dataframe_feed = dataframe_feed_result.value();
+
+        
+        dataframe_feed.process_dataframes();
         return 0;
     }
 

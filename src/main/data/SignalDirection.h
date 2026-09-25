@@ -4,7 +4,7 @@
 namespace data {
     enum SignalDirection {
         LONG = 1,
-        EXIT = 0,
+        IDLE = 0,
         SHORT = -1
     };
 }

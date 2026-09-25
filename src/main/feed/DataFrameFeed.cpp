@@ -56,11 +56,11 @@ namespace feed {
 
             for(const string & symbol: symbols) {
                 const DataFrame & dataframe = * dataframes_.at(symbol);
-                const vector<sys_seconds> & timestamps_vector = dataframe.timestamps_vector();                            
+                const vector<sys_seconds> & timestamps_vector = dataframe.timestamps_vector();
                 size_t index = records_loaded[symbol];
-                const auto & timestamp = timestamps_vector.at(index);
 
-                if(index < dataframe.rows()) {                    
+                if(index < dataframe.rows()) {
+                    const auto & timestamp = timestamps_vector.at(index);
                     bars.emplace(symbol, Bar(
                         timestamp,
                         symbol,
@@ -75,11 +75,11 @@ namespace feed {
                     exhausted_dataframes++;
                 }
             }
-            
+
             publish_market_event(make_unique<MarketEvent>(std::move(bars)), records_loaded);
-            has_records = exhausted_dataframes == dataframes_.size();
+            has_records = exhausted_dataframes != dataframes_.size();
             bars.clear();
-        }  
+        }
     }
 
     string DataFrameFeed::file_name(const string & full_file_path) {
@@ -133,7 +133,6 @@ namespace feed {
         }
 
         if(loaded_dataframes > 0) {
-            log_trace_with_message(format("loaded_dataframes = {}", loaded_dataframes));
             return DataFrameFeed(std::move(dataframes), market_event_handler);
         } else
             return unexpected(TuxedoError::ERR_BAD_INPUT);

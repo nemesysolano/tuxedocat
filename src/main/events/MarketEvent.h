@@ -9,12 +9,11 @@ using namespace std;
 namespace events {
     class MarketEvent: public Event {
         public:
-            inline MarketEvent(const unordered_map<string, Bar> & bars_): Event(EventType::MARKET), bars(bars_){} 
-            inline MarketEvent(const unordered_map<string, Bar> && bars_): MarketEvent(bars_){}
+            inline MarketEvent(unordered_map<string, Bar> bars_): Event(EventType::MARKET), bars(std::move(bars_)) {}
             inline unique_ptr<Event> clone() const override {
-                return make_unique<MarketEvent>(*this);
+                return make_unique<MarketEvent>(bars);
             }
-            const unordered_map<string,Bar> & bars;
+            const unordered_map<string, Bar> bars;
     };
 }
 

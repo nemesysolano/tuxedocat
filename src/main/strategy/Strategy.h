@@ -27,7 +27,7 @@ namespace strategy {
             Strategy(): bars_({}) {};
 #endif
             virtual void add_signal(const string & symbol, vector<Signal> & signals) = 0;
-            virtual unique_ptr<Event> process_market(const MarketEvent & market_event);
+            virtual unique_ptr<SignalEvent> process_market(const MarketEvent & market_event);
             virtual unique_ptr<Event> process_event(unique_ptr<Event> event);
             inline const map<string, vector<Bar>> & bars() { return bars_;}
             
