@@ -28,7 +28,7 @@ namespace feed {
             ? string()
             : directory.substr(0, separator);
 
-        filesystem::path exe_path = filesystem::canonical(current_program_path).parent_path()  / "toolchain" / "test-data";
+        filesystem::path exe_path = filesystem::canonical(current_program_path).parent_path()  / "data";
         log_debug_message(exe_path.string());
 
         vector<string> data_file_paths_;
@@ -42,12 +42,11 @@ namespace feed {
     }
 
 
-    void test_bars_loaded_accurately(const char * program_directory_) {
-        const string program_directory(program_directory_);
+    void test_bars_loaded_accurately(const string & program_directory) {
         vector<string> data_file_paths_(data_file_paths(program_directory));
 
-        auto market_event_handler_test_impl =  [](const MarketEvent & market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded) {
-            const unordered_map<string,Bar> &  bars = market_event.bars;
+        auto market_event_handler_test_impl =  [](unique_ptr<MarketEvent> market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded) {
+            const unordered_map<string,Bar> &  bars = market_event->bars;
 
             for (const auto & [symbol, bar] : bars) {
                 auto dataframe_result = dataframe_feed.dataframe(symbol);

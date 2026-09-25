@@ -20,8 +20,8 @@ namespace feed {
     extern const string VOLUME ;
 
     class DataFrameFeed;
-    using MarketEventHandler = function<void(const MarketEvent & market_event, const DataFrameFeed & dataframe, const unordered_map<string, size_t> & records_loaded)>;
-    void market_event_handler_default_impl(const MarketEvent & market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded);
+    using MarketEventHandler = function<void(unique_ptr<MarketEvent> market_event, const DataFrameFeed & dataframe, const unordered_map<string, size_t> & records_loaded)>;
+    void market_event_handler_default_impl(unique_ptr<MarketEvent> market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded);
 
     class DataFrameFeed{
         private:
@@ -41,7 +41,7 @@ namespace feed {
             DataFrameFeed& operator=(const DataFrameFeed&) = delete;
             DataFrameFeed(DataFrameFeed&&) noexcept = default;
             DataFrameFeed& operator=(DataFrameFeed&&) noexcept = default;
-            virtual void publish_market_event(const MarketEvent & market_event, const unordered_map<string, size_t> & records_loaded);
+            virtual void publish_market_event(unique_ptr<MarketEvent> market_event, const unordered_map<string, size_t> & records_loaded);
             void process_dataframes();
             
             inline const vector<string> & symbols() { return symbols_; }

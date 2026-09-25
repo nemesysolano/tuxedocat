@@ -13,6 +13,7 @@ namespace cli {
     class Files {
         public:
             static vector<string> listing(const string & directory); 
+            static string program_directory(char* argv[]);
     };
 }
 #endif

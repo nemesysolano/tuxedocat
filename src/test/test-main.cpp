@@ -15,12 +15,17 @@
 #include "simulation/ControllerTest.h"
 #include "portfolio/PortfolioTest.h"
 #include "broker/BrokerTest.h"
+#include "cli/Files.h"
+
 
 using namespace std;
+using namespace cli;
+
 
 int main(int argc, char* argv[]) {
     (void)argc;
-    (void)argv;
+    const string program_path = Files::program_directory(argv);
+    std::cout << "Program path: " << program_path << std::endl;
     evaluate_test();
     evaluate_reversed_test();
     standard_cdf_test();
@@ -80,6 +85,7 @@ int main(int argc, char* argv[]) {
     portfolio::test_portfolio_input_output();
     broker::test_broker_positions_closed();
     broker::test_broker_positions_updated();
+    feed::test_bars_loaded_accurately(program_path);
     return 0;
 }
 

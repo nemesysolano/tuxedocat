@@ -29,14 +29,14 @@ namespace feed {
         VOLUME
     });
 
-    void market_event_handler_default_impl(const MarketEvent & market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded) {
+    void market_event_handler_default_impl(unique_ptr<MarketEvent> market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded) {
         (void)market_event;
         (void)dataframe_feed;
         (void)records_loaded;
     }
 
-    void DataFrameFeed::publish_market_event(const MarketEvent & market_event, const unordered_map<string, size_t> & records_loaded) {
-        this->market_event_handler_(market_event, *this, records_loaded);
+    void DataFrameFeed::publish_market_event(unique_ptr<MarketEvent> market_event, const unordered_map<string, size_t> & records_loaded) {
+        this->market_event_handler_(std::move(market_event), *this, records_loaded);
     }
 
     void DataFrameFeed::process_dataframes(){
@@ -50,43 +50,35 @@ namespace feed {
             ranges::to<unordered_map<string, size_t>>();
 
         unordered_map<string, Bar> bars;
-        for (const string & symbol : symbols) {
-            bars.emplace(symbol, Bar(symbol));
-        }
-
-        MarketEvent market_event(bars);
 
         while(has_records) {
             size_t exhausted_dataframes = 0;
 
             for(const string & symbol: symbols) {
                 const DataFrame & dataframe = * dataframes_.at(symbol);
-                const vector<sys_seconds> & timestamps = dataframe.timestamps_vector();
+                const vector<sys_seconds> & timestamps_vector = dataframe.timestamps_vector();                            
+                size_t index = records_loaded[symbol];
+                const auto & timestamp = timestamps_vector.at(index);
 
-                if(records_loaded[symbol] < dataframe.rows()) {
-                    Bar & bar = bars.at(symbol);
-                    auto index = records_loaded[symbol];
-                    auto timestamp = timestamps[index];
-                    
-                    bar.update(
-                        timestamp, 
-                        dataframe[timestamp, OPEN_PRICE].value_or(-1), 
-                        dataframe[timestamp, HIGH_PRICE].value_or(-1), 
-                        dataframe[timestamp, LOW_PRICE].value_or(-1), 
-                        dataframe[timestamp, CLOSE_PRICE].value_or(-1), 
-                        dataframe[timestamp, VOLUME].value_or(-1)  
-                    );
-
-                    records_loaded[symbol]++;
+                if(index < dataframe.rows()) {                    
+                    bars.emplace(symbol, Bar(
+                        timestamp,
+                        symbol,
+                        dataframe[timestamp, OPEN_PRICE].value(),
+                        dataframe[timestamp, HIGH_PRICE].value(),
+                        dataframe[timestamp, LOW_PRICE].value(),
+                        dataframe[timestamp, CLOSE_PRICE].value(),
+                        (int)dataframe[timestamp, VOLUME].value()
+                    ));
+                    records_loaded[symbol] = index + 1;
                 } else {
-                    bars.erase(symbol);
-                    records_loaded.erase(symbol);
                     exhausted_dataframes++;
                 }
             }
             
-            publish_market_event(market_event, records_loaded);
+            publish_market_event(make_unique<MarketEvent>(std::move(bars)), records_loaded);
             has_records = exhausted_dataframes == dataframes_.size();
+            bars.clear();
         }  
     }
 
@@ -111,6 +103,7 @@ namespace feed {
         process::ThreadPool thread_pool;
         unordered_map<string, unique_ptr<DataFrame>> dataframes;
         vector<future<pair<string, unique_ptr<DataFrame>>>> dataframe_futures;
+        size_t loaded_dataframes = 0;
 
         for (const auto & file_path : file_paths) {
             auto future = thread_pool.enqueue([&file_path]() {
@@ -135,9 +128,14 @@ namespace feed {
             if (!loaded.second) {
                 continue;
             }
-            dataframes.emplace(std::move(loaded.first), std::move(loaded.second));
+            dataframes.emplace(loaded.first, std::move(loaded.second));            
+            loaded_dataframes++;
         }
 
-        return DataFrameFeed(std::move(dataframes), market_event_handler);
+        if(loaded_dataframes > 0) {
+            log_trace_with_message(format("loaded_dataframes = {}", loaded_dataframes));
+            return DataFrameFeed(std::move(dataframes), market_event_handler);
+        } else
+            return unexpected(TuxedoError::ERR_BAD_INPUT);
     }
 }

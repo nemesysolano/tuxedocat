@@ -39,7 +39,7 @@ if __name__== "__main__":
     end_date = datetime.datetime.now() + datetime.timedelta(days=1)
     start_date = end_date - datetime.timedelta(days=365*10 + 1)
     ts = ts.history(start=start_date, end=end_date, interval="1d")
-    file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "test-data", f"{symbol}.csv")    
+    file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "data", f"{symbol}.csv")    
     ts.to_csv(file_path)
     remove_pattern_from_file(file_path)
     print(file_path)

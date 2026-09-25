@@ -6,8 +6,12 @@
 #include <filesystem>
 #include "Files.h"
 #include "strategy/ExtremePrice.h"
+#include "feed/DataFrameFeed.h"
+
 using namespace std;
 using namespace strategy;
+using namespace feed;
+
 namespace cli {
     const int PLAY_MIN_ARGC = 4;
     const int PLAY_STRATEGY_ARG = 2;
@@ -47,6 +51,21 @@ namespace cli {
             return -3;            
         }
 
+        // auto market_event_handler_test_impl =  [&strategy](const MarketEvent & market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded) {
+        //     const unordered_map<string,Bar> &  bars = market_event.bars;
+
+        //     for (const auto & [symbol, bar] : bars) {
+        //         auto dataframe_result = dataframe_feed.dataframe(symbol);
+        //         auto const & dataframe = dataframe_result.value().get();
+        //         auto index = records_loaded.at(symbol)-1;
+        //         auto const & timestamps = dataframe.timestamps_vector();
+        //         auto const & timestamp = timestamps[index];
+
+        //         strategy.process_event();
+        //     }
+        // };
+
+        // auto dataframe_feed_result = DataFrameFeed::Create(files, market_event_handler_default_impl);
         return 0;
     }
 
