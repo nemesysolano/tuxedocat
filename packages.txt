@@ -3,3 +3,7 @@ scipy
 statsmodels
 pandas
 scikit-learn
+yfinance
+matplotlib
+mplfinance
+plotly
