@@ -13,7 +13,7 @@ namespace strategy {
 
     ExtremePrice::ExtremePrice(bool output_signal): Strategy(), output_signal_(output_signal), last_z_({}){
         if(output_signal_) {
-            println("symbol,timestamp,open,high,low,close,volume,last_z,z,signal");
+            println("symbol,timestamp,open,high,low,close,volume,z,signal");
         }
     }
 
