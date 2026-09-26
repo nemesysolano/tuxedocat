@@ -2,11 +2,16 @@
 #define __SLICE_H__
 #include <span>
 #include <iostream>
+
+#ifdef __sun__
+#include <mdspan.hpp>
+#else
 #include <mdspan>
+#endif
+
 #include <expected>
 #include <functional>
 #include "utils/tuxedo-error.h"
-#include <mdspan>
 #include <vector> // <--- Add this
 #include <memory>
 #define row_span(matrix_span, row_num) std::span<const double>(matrix_span.data_handle() + (row_num * matrix_span.extent(1)), matrix_span.extent(1))

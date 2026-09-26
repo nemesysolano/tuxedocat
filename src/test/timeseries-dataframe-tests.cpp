@@ -282,7 +282,7 @@ void test_dataframe_create_from_column_index() {
     auto df_res = dataframe::DataFrame::Create(iss);
     assert(df_res.has_value());
     auto& df = df_res.value(); // Must be non-const because CreateFromColumn is not marked const
-
+    assert(df.rows() == 3 && df.cols() == 2);
     // Helper to easily create sys_seconds
     auto make_ts = [](const std::string& ts_str) {
         std::tm t = {};
@@ -304,8 +304,12 @@ void test_dataframe_create_from_column_index() {
     if (success) {
         auto& sub_df = sub_df_res.value();
         success = success && (sub_df.rows() == 2) && (sub_df.cols() == 1);
+        cout << "sub_df.rows(): " << sub_df.rows() << ", sub_df.cols(): " << sub_df.cols() << endl;
+        assert(success);
         success = success && sub_df["2023-01-01 10:00:00", "B"].value() == 10.0;
+        assert(success);
         success = success && sub_df["2023-01-01 12:00:00", "B"].value() == 30.0;
+        assert(success);
     }
 
     // 3. Test Invalid Column Index

@@ -171,7 +171,11 @@ namespace dataframe {
                 accumulator(std::span<double>(accumulated), c, current);
             }
 
-            new_data.append_range(accumulated); 
+#ifdef __sun__
+            new_data.insert(new_data.end(), accumulated.begin(), accumulated.end());
+#else
+            new_data.append_range(accumulated);
+#endif
         }
 
         // The timestamp mappings remain structurally identical, just clone them

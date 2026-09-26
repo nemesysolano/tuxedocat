@@ -24,7 +24,7 @@ namespace process {
 
     ThreadPool::~ThreadPool() {
         {
-            std::lock_guard<std::mutex> lock(mutex);
+            std::lock_guard<std::mutex> lock(internal_mutex);
             stop = true;
         }
         cv.notify_all();
@@ -40,20 +40,20 @@ namespace process {
         for (;;) {
             std::function<void()> cur_task;
             {
-                std::unique_lock<std::mutex> lock(mutex);
+                std::unique_lock<std::mutex> lock(internal_mutex);
                 cv.wait(lock, [this]() {
-                    return stop || !queue.empty();
+                    return stop || !internal_queue.empty();
                 });
 
-                if (stop && queue.empty()) {
+                if (stop && internal_queue.empty()) {
                     break;
                 }
-                if (queue.empty()) {
+                if (internal_queue.empty()) {
                     continue;
                 }
 
-                cur_task = queue.front();
-                queue.pop();
+                cur_task = internal_queue.front();
+                internal_queue.pop();
             }
 
             cur_task();

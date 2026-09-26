@@ -26,9 +26,9 @@ namespace process {
  class ThreadPool {
     private:
         vector<thread> workers;
-        mutex mutex;
+        mutex internal_mutex;
         condition_variable cv;
-        queue<function<void()>> queue;
+        queue<function<void()>> internal_queue;
         void worker();
         bool stop;
 
@@ -47,8 +47,8 @@ namespace process {
 
             std::future<result_type> future_object = task->get_future();
             {
-                std::lock_guard<std::mutex> lock(mutex);
-                queue.emplace([task]() {
+                std::lock_guard<std::mutex> lock(internal_mutex);
+                internal_queue.emplace([task]() {
                     (*task)();
                 });
             }

@@ -144,7 +144,7 @@ namespace broker {
                 market_event->bars        
             );
         } else {
-            return std::move(market_event);
+            return market_event;
         }
     }
 
@@ -161,11 +161,13 @@ namespace broker {
                 process_order_event(dynamic_cast<const OrderEvent &>(event_ref));
     #else
                 process_order_event(static_cast<const OrderEvent &>(event_ref));
-    #endif                
+    #endif    
+                return nullptr;            
             }
 
             default:
                 return nullptr;
+                break;
         }
     }
 }

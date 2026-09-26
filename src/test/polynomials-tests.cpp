@@ -5,13 +5,50 @@
 #include <vector>
 #include <cassert>
 #include <cmath>
-#include <mdspan>
 #include "data/slice.h"
 #include "utils/log.h"
 
 namespace {
+    // Lightweight adapter classes to feed plain vectors into template functions 
+    // without any dependency on mdspan, dextents, or extents.
+    class MatrixViewAdapter {
+        const std::vector<double>& data_ref_;
+        size_t rows_;
+        size_t cols_;
+    public:
+        MatrixViewAdapter(const std::vector<double>& data, size_t rows, size_t cols)
+            : data_ref_(data), rows_(rows), cols_(cols) {}
+
+        size_t extent(size_t dim) const {
+            return (dim == 0) ? rows_ : cols_;
+        }
+
+        const double& operator[](size_t row, size_t col) const {
+            return data_ref_[row * cols_ + col];
+        }
+    };
+
+    class TensorViewAdapter {
+        const std::vector<double>& data_ref_;
+        size_t d0_, d1_, d2_;
+    public:
+        TensorViewAdapter(const std::vector<double>& data, size_t d0, size_t d1, size_t d2)
+            : data_ref_(data), d0_(d0), d1_(d1), d2_(d2) {}
+
+        size_t extent(size_t dim) const {
+            if (dim == 0) return d0_;
+            if (dim == 1) return d1_;
+            return d2_;
+        }
+
+        const double& operator[](size_t i, size_t j, size_t k) const {
+            return data_ref_[i * (d1_ * d2_) + j * d2_ + k];
+        }
+    };
+
+    // Plain vector data generators
     auto make_test_table_6x3 = []() {
-        static const std::vector<double> storage = {
+        return std::vector<double>{
             1.0, 2.0, 3.0,
             2.0, 1.0, 4.0,
             3.0, 0.5, 5.0,
@@ -19,18 +56,14 @@ namespace {
             5.0, -2.0, 7.0,
             6.0, -3.0, 8.0
         };
-        return std::mdspan<const double, std::extents<size_t, 6, 3>>(storage.data());
     };
 
     auto make_test_tensor_12x2x3 = []() {
-        static const std::vector<double> storage = [] {
-            std::vector<double> tmp(12 * 2 * 3);
-            for (size_t i = 0; i < tmp.size(); ++i) {
-                tmp[i] = static_cast<double>((i % 3) + 1.0);
-            }
-            return tmp;
-        }();
-        return std::mdspan<const double, std::extents<size_t, 12, 2, 3>>(storage.data());
+        std::vector<double> tmp(12 * 2 * 3);
+        for (size_t i = 0; i < tmp.size(); ++i) {
+            tmp[i] = static_cast<double>((i % 3) + 1.0);
+        }
+        return tmp;
     };
 }
 
@@ -41,26 +74,21 @@ void evaluate_test() {
         return std::abs(a - b) < epsilon;
     };
 
-    auto verify_table = [&](const auto& table_data, const std::string& table_name) {
-        // Confirm the table is explicitly 6x3
-        assert(table_data.extent(0) == 6);
-        assert(table_data.extent(1) == 3);
+    auto verify_table = [&](const std::vector<double>& table_data, const std::string& table_name) {
+        assert(table_data.size() == 18);
 
-        // Test points
         std::vector<double> test_taus = {-2.5, -0.5, 0.0, 1.0, 3.14};
 
         for (size_t row_idx = 0; row_idx < 6; ++row_idx) {
             for (double tau : test_taus) {
-                // Ground truth calculation (Standard Polynomial: leading coefficient first)
-                // P(t) = a_2 * t^2 + a_1 * t + a_0
-                // For standard evaluation, index 0 is a_2, index 1 is a_1, index 2 is a_0
-                double a_2 = table_data[row_idx, 0];
-                double a_1 = table_data[row_idx, 1];
-                double a_0 = table_data[row_idx, 2];
+                double a_2 = table_data[row_idx * 3 + 0];
+                double a_1 = table_data[row_idx * 3 + 1];
+                double a_0 = table_data[row_idx * 3 + 2];
                 double expected_manual = (a_2 * tau * tau) + (a_1 * tau) + a_0;
 
-                // Evaluate using the template overload
-                auto res_mdspan = polynomials::evaluate(table_data, row_idx, tau);
+                // Wrap plain vector in adapter to pass to production function
+                MatrixViewAdapter adapter(table_data, 6, 3);
+                auto res_mdspan = polynomials::evaluate(adapter, row_idx, tau);
                 
                 assert(res_mdspan.has_value());
                 assert(( approx_equal(*res_mdspan, expected_manual) ));
@@ -68,7 +96,6 @@ void evaluate_test() {
         }
     };
 
-    // Run tests on the self-contained polynomial tables
     auto table_nc = make_test_table_6x3();
     auto table_c = make_test_table_6x3();
     auto table_ct = make_test_table_6x3();
@@ -89,26 +116,20 @@ void evaluate_reversed_test() {
         return std::abs(a - b) < epsilon;
     };
 
-    auto verify_table_reversed = [&](const auto& table_data, const std::string& table_name) {
-        // Confirm the table is explicitly 6x3
-        assert(table_data.extent(0) == 6);
-        assert(table_data.extent(1) == 3);
+    auto verify_table_reversed = [&](const std::vector<double>& table_data, const std::string& table_name) {
+        assert(table_data.size() == 18);
 
-        // Test points
         std::vector<double> test_taus = {-2.5, -0.5, 0.0, 1.0, 3.14};
 
         for (size_t row_idx = 0; row_idx < 6; ++row_idx) {
             for (double tau : test_taus) {
-                // Ground truth calculation (Reversed Polynomial: constant coefficient first)
-                // P(t) = a_2 * t^2 + a_1 * t + a_0
-                // For reversed evaluation, index 0 is a_0, index 1 is a_1, index 2 is a_2
-                double a_0 = table_data[row_idx, 0];
-                double a_1 = table_data[row_idx, 1];
-                double a_2 = table_data[row_idx, 2];
+                double a_0 = table_data[row_idx * 3 + 0];
+                double a_1 = table_data[row_idx * 3 + 1];
+                double a_2 = table_data[row_idx * 3 + 2];
                 double expected_manual = (a_2 * tau * tau) + (a_1 * tau) + a_0;
 
-                // Evaluate using the template overload
-                auto res_mdspan = polynomials::evaluate_reversed(table_data, row_idx, tau);
+                MatrixViewAdapter adapter(table_data, 6, 3);
+                auto res_mdspan = polynomials::evaluate_reversed(adapter, row_idx, tau);
                 
                 assert(res_mdspan.has_value());
                 assert(( approx_equal(*res_mdspan, expected_manual) ));
@@ -116,7 +137,6 @@ void evaluate_reversed_test() {
         }
     };
 
-    // Run tests on the self-contained polynomial tables
     auto table_nc = make_test_table_6x3();
     auto table_c = make_test_table_6x3();
     auto table_ct = make_test_table_6x3();
@@ -137,17 +157,16 @@ void evaluate_horizontally_test() {
         return std::abs(a - b) < epsilon;
     };
 
-    auto tensor = make_test_tensor_12x2x3();
+    auto tensor_vec = make_test_tensor_12x2x3();
+    TensorViewAdapter tensor(tensor_vec, 12, 2, 3);
+
     std::vector<double> result_vec(2);
     std::span<double> res_span(result_vec);
 
-    // Test N=1 to 12
     for (size_t n = 0; n < 12; ++n) {
         auto err = polynomials::evaluate_horizontally(tensor, n, 2.0, res_span);
         
         assert(err == TuxedoError::NO_ERROR);
-        // Expected Row 0: 1*2^2 + 2*2 + 3 = 11.0
-        // Expected Row 1: 1*2^2 + 2*2 + 3 = 11.0
         assert(approx_equal(res_span[0], 11.0));
         assert(approx_equal(res_span[1], 11.0));
     }
@@ -161,16 +180,16 @@ void evaluate_horizontally_reversed_test() {
         return std::abs(a - b) < epsilon;
     };
 
-    auto tensor = make_test_tensor_12x2x3();
+    auto tensor_vec = make_test_tensor_12x2x3();
+    TensorViewAdapter tensor(tensor_vec, 12, 2, 3);
+
     std::vector<double> result_vec(2);
     std::span<double> res_span(result_vec);
 
-    // Test N=1 to 12
     for (size_t n = 0; n < 12; ++n) {
         auto err = polynomials::evaluate_horizontally_reversed(tensor, n, 2.0, res_span);
         
         assert(err == TuxedoError::NO_ERROR);
-        // Reversed: P(t) = 3*2^2 + 2*2 + 1 = 17.0
         assert(approx_equal(res_span[0], 17.0));
         assert(approx_equal(res_span[1], 17.0));
     }
@@ -184,26 +203,23 @@ void evaluate_horizontally_vectorized_test() {
         return std::abs(a - b) < epsilon;
     };
 
-    // Create mock 12x2x3 tensor
-    auto tensor = make_test_tensor_12x2x3();
+    auto tensor_vec = make_test_tensor_12x2x3();
+    TensorViewAdapter tensor(tensor_vec, 12, 2, 3);
 
-    // Test successful evaluation for sequences N=1 to 12
     for (size_t n = 0; n < 12; ++n) {
         auto res = polynomials::evaluate_horizontally(tensor, n, 2.0);
         
         assert(res.has_value());
-        assert(res->size() == 2); // m=2 rows
-        // Horner: 1*2^2 + 2*2 + 3 = 11.0
+        assert(res->size() == 2);
         assert(approx_equal((*res)[0], 11.0));
         assert(approx_equal((*res)[1], 11.0));
     }
 
-    // Test error case: Invalid p_idx
     auto err = polynomials::evaluate_horizontally(tensor, 15, 2.0);
     assert(!err.has_value());
     assert(err.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
     
-   log_trace_with_message("[PASSED]");
+    log_trace_with_message("[PASSED]");
 }
 
 void evaluate_horizontally_reversed_vectorized_test() {
@@ -213,20 +229,18 @@ void evaluate_horizontally_reversed_vectorized_test() {
         return std::abs(a - b) < epsilon;
     };
 
-    auto tensor = make_test_tensor_12x2x3();
+    auto tensor_vec = make_test_tensor_12x2x3();
+    TensorViewAdapter tensor(tensor_vec, 12, 2, 3);
 
-    // Test successful reversed evaluation
     for (size_t n = 0; n < 12; ++n) {
         auto res = polynomials::evaluate_horizontally_reversed(tensor, n, 2.0);
         
         assert(res.has_value());
         assert(res->size() == 2);
-        // Reversed Horner: 3*2^2 + 2*2 + 1 = 17.0
         assert(approx_equal((*res)[0], 17.0));
         assert(approx_equal((*res)[1], 17.0));
     }
 
-    // Test error case: Invalid p_idx
     auto err = polynomials::evaluate_horizontally_reversed(tensor, 15, 2.0);
     assert(!err.has_value());
     assert(err.error() == TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
