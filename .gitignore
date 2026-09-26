@@ -4,3 +4,4 @@ obj/*
 !obj/.gitignore
 **/._*
 pydevs/*
+contrib/mdspan/*
