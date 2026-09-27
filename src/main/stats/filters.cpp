@@ -210,14 +210,13 @@ namespace filters {
                 continue;
             }
 
-            // weighted_average += prices[i] * normalized_weight;
-            weighted_average += prices[i] * normalized_weight;
+            weighted_average += prices[i] * normalized_weight;            
         }
 
         if (!isfinite(weighted_average)) {
             return invalid_result;
         }
 
-        return indexed_result{window_size, weighted_average / window_size};
+        return indexed_result{window_size, weighted_average};
     }
 }
