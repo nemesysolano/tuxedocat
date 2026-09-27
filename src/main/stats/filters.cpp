@@ -59,6 +59,7 @@ namespace filters {
         if(!lower_low_result.has_value()) {
             return {};
         }        
+        
         const double x_max = higher_high_result->second;
         const size_t x_max_distance = higher_high_result->first;
         const double x_min = lower_low_result->second;
@@ -157,7 +158,7 @@ namespace filters {
         
 
         const size_t window_size = max(higher_high_result->first, lower_low_result->first);
-        if (window_size == 0 || window_size >= series.size()) {
+        if (window_size < 1 || window_size >= series.size()) {
             return invalid_result;
         }
 
@@ -209,6 +210,7 @@ namespace filters {
                 continue;
             }
 
+            // weighted_average += prices[i] * normalized_weight;
             weighted_average += prices[i] * normalized_weight;
         }
 
@@ -216,6 +218,6 @@ namespace filters {
             return invalid_result;
         }
 
-        return indexed_result{window_size, weighted_average};
+        return indexed_result{window_size, weighted_average / window_size};
     }
 }

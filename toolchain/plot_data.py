@@ -1,5 +1,6 @@
 import pandas as pd
 import mplfinance as mpf
+import numpy as np
 import sys
 
 if __name__ == "__main__":
@@ -9,15 +10,31 @@ if __name__ == "__main__":
     # mplfinance requires OHLC column names to be strictly capitalized
     curve = curve.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close'})
 
-    # Define the additional Z line plot on a secondary Y-axis
-    z_plot = mpf.make_addplot(curve['z'], type='line', color='blue', secondary_y=True)
+    # Create coordinate series for markers. 
+    # 'where' keeps the price when the condition is met and replaces it with NaN otherwise.
+    long_signals = curve['Low'].where(curve['signal'] == 1, np.nan)
+    short_signals = curve['High'].where(curve['signal'] == -1, np.nan)
 
-    # Render the candlestick chart with the added Z plot
+    # Start the list of additional plots with the Z line on a secondary axis
+    plots_to_add = [
+        mpf.make_addplot(curve['z'], type='line', color='gray', secondary_y=True, alpha=0.6, width=1)
+    ]
+
+    # Conditionally add the scatter plots only if there is at least one valid signal
+    if long_signals.notna().any():
+        print("we have long signals")
+        plots_to_add.append(mpf.make_addplot(long_signals, type='scatter', markersize=50, marker='o', color='blue'))
+        
+    if short_signals.notna().any():
+        print("we have short signals")
+        plots_to_add.append(mpf.make_addplot(short_signals, type='scatter', markersize=50, marker='o', color='red'))
+
+    # Render the candlestick chart with the added entry scatter plots and Z line
     mpf.plot(
         curve,
         type='candle',
-        addplot=z_plot,
-        title='Candlestick and Z Plot',
-        style='yahoo',  # Provides a clean, traditional financial chart style
+        addplot=plots_to_add,
+        title='Candlestick, Z Line, and Entry Signals',
+        style='yahoo',
         ylabel='Price'
     )

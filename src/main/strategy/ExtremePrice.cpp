@@ -30,42 +30,40 @@ namespace strategy {
             double z = result.second;
 
             if(is_valid_number(z)) {
+                SignalDirection direction = SignalDirection::IDLE;
 
-                SignalDirection direction = (
-                    curr_bar.low_price() > z && curr_bar.close_price() > curr_bar.open_price() ? 
-                    SignalDirection::LONG : 
-                    (curr_bar.high_price() < z && curr_bar.close_price() < curr_bar.open_price() ? SignalDirection::SHORT: SignalDirection::IDLE)
-                );
-
-                signals.emplace_back(Signal(curr_bar.timestamp(), symbol, direction ));
-
-                if(output_signal_) {
-                    if (signals.empty()) {
-                        return;
+                if(last_z_.contains(symbol)) {
+                    double last_z = last_z_[symbol];
+                    if(z > last_z && curr_bar.close_price() > curr_bar.open_price()) {
+                        direction = SignalDirection::LONG;
+                    } else if (z < last_z && curr_bar.close_price() < curr_bar.open_price()) {
+                        direction = SignalDirection::SHORT;
                     }
-
-                    const Signal & signal = signals.back();
-                    println(
-                        "{},{},{},{},{},{},{},{},{}",
-                        signal.timestamp(),
-                        signal.symbol(),
-                        curr_bar.open_price(),
-                        curr_bar.high_price(),
-                        curr_bar.low_price(),
-                        curr_bar.close_price(),
-                        curr_bar.volume(),
-                        z,
-                        to_underlying(signal.direction())
-                    );
-                }
-
+                } 
+                
+                signals.emplace_back(Signal(curr_bar.timestamp(), symbol, direction ));
                 last_z_[symbol] = z;
 
             } else {
                 signals.emplace_back(Signal(curr_bar.timestamp(), symbol, SignalDirection::IDLE));
+                z = last_z_[symbol];
             }
 
-
+            if(output_signal_) {
+                const Signal & signal = signals.back();
+                println(
+                    "{},{},{},{},{},{},{},{},{}",
+                    signal.timestamp(),
+                    signal.symbol(),
+                    curr_bar.open_price(),
+                    curr_bar.high_price(),
+                    curr_bar.low_price(),
+                    curr_bar.close_price(),
+                    curr_bar.volume(),
+                    z,
+                    to_underlying(signal.direction())
+                );
+            }
         }
     }
 }

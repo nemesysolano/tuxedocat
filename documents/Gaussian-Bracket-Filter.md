@@ -59,3 +59,9 @@ $$
 $$
 
 provided all raw weights in the window are finite and positive. The raw weight $w(t)$ is not constrained to lie in $[0,1]$; only the normalized weight $\hat w(t)$ is.
+
+## Bracketed Moving Average $z(t)$
+
+$$
+z(t) = \sum^{N-1}_{i=0} x(t) \hat w(t-i)
+$$ 
