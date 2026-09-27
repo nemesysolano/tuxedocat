@@ -82,7 +82,7 @@ namespace filters {
         }
         log_debug_message(format("{}, {}", higher_high_result->first, lower_low_result->first));
 
-        const size_t window_size = max(higher_high_result->first, lower_low_result->first);
+        const size_t window_size = min(higher_high_result->first, lower_low_result->first);
         if (window_size == 0 || window_size >= series.size()) {
             return {};
         }
@@ -157,7 +157,7 @@ namespace filters {
         }
         
 
-        const size_t window_size = max(higher_high_result->first, lower_low_result->first);
+        const size_t window_size = min(higher_high_result->first, lower_low_result->first);
         if (window_size < 1 || window_size >= series.size()) {
             return invalid_result;
         }

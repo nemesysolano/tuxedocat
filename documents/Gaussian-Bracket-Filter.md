@@ -10,6 +10,17 @@ The bracket is assumed to exist. At the beginning or end of a finite data set,
 or when a price is an extreme, a caller must define a boundary policy (for
 example, omit that observation or use a wider search range).
 
+The current `ExtremePrice` strategy uses a carry-forward policy: when a
+causal bracket does not exist, it emits the most recent valid $z(t)$ and an
+idle signal. This can produce flat segments in the output during runs of new
+highs or new lows; those segments are boundary-policy output, not additional
+filter observations.
+
+In the implementation, the bracket search is causal: $x_{\max}(t)$ is the
+nearest prior bar high above the current bar high, and $x_{\min}(t)$ is the
+nearest prior bar low below the current bar low. The prices used in $z(t)$
+are the corresponding bar closes.
+
 ## Time-Dependent Variance
 
 The time-dependent variance at $t$ is defined from the logarithmic width of the
@@ -59,6 +70,11 @@ $$
 $$
 
 provided all raw weights in the window are finite and positive. The raw weight $w(t)$ is not constrained to lie in $[0,1]$; only the normalized weight $\hat w(t)$ is.
+
+The implementation omits a lagged bar when its bracket, variance, or close is
+invalid, then renormalizes the remaining valid weights. If no valid weights
+remain, $z(t)$ is invalid and the strategy applies the carry-forward policy
+described above.
 
 ## Bracketed Moving Average $z(t)$
 
