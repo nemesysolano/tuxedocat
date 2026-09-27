@@ -13,7 +13,7 @@ namespace strategy {
 
     ExtremePrice::ExtremePrice(bool output_signal): Strategy(), output_signal_(output_signal), last_z_({}){
         if(output_signal_) {
-            println("timestamp,symbol,open,high,low,close,volume,z,signal");
+            println("timestamp,symbol,open,high,low,close,volume,z,signal,distance");
         }
     }
 
@@ -26,13 +26,15 @@ namespace strategy {
             const auto & bars = this->bars_.at(symbol);
             const span<const Bar> bars_span(bars);
             const Bar & curr_bar = bars_span.back();
+            const Bar & prev_bar = *(--bars_span.rbegin());
             indexed_result result = gaussian_bracketed_average(bars_span);
             double z = result.second;
+            double distance = result.first;
 
             if(is_valid_number(z)) {
                 SignalDirection direction = SignalDirection::IDLE;
 
-                if(last_z_.contains(symbol)) {
+                if(last_z_.contains(symbol) && distance > 1) {
                     double last_z = last_z_[symbol];
                     if(z > last_z && curr_bar.close_price() > curr_bar.open_price()) {
                         direction = SignalDirection::LONG;
@@ -52,7 +54,7 @@ namespace strategy {
             if(output_signal_) {
                 const Signal & signal = signals.back();
                 println(
-                    "{},{},{},{},{},{},{},{},{}",
+                    "{},{},{},{},{},{},{},{},{},{}",
                     signal.timestamp(),
                     signal.symbol(),
                     curr_bar.open_price(),
@@ -61,7 +63,8 @@ namespace strategy {
                     curr_bar.close_price(),
                     curr_bar.volume(),
                     z,
-                    to_underlying(signal.direction())
+                    to_underlying(signal.direction()),
+                    distance
                 );
             }
         }
