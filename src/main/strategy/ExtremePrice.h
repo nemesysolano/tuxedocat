@@ -10,6 +10,7 @@ using namespace events;
 namespace strategy {
     class ExtremePrice: public Strategy {
         protected:
+            static constexpr size_t MIN_BARS_SIZE = 14;
             bool output_signal_;
             unordered_map<string, double> last_z_;
         public:
