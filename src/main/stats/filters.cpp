@@ -13,7 +13,7 @@ namespace filters {
         size_t window_size_from_distances(size_t first, size_t second) {
             const size_t average_distance =
                 first / 2 + second / 2 + (first % 2 + second % 2) / 2;
-            return min(average_distance, size_t{8});
+            return min(average_distance, size_t{7}) + 1;
         }
 
         struct weighted_sample {
