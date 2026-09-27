@@ -794,7 +794,7 @@ namespace dataframe {
 
         // 5. Use the private constructor to build and return the aligned DataFrame
         return DataFrame(
-            new_timestamps.size(), 
+            current_row, 
             1, 
             std::move(new_data), 
             std::move(new_col_map), 

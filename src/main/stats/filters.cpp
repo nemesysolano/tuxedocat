@@ -145,7 +145,7 @@ namespace filters {
         return pair<size_t, double>(weight_result->first, x_t * weight_result->second);
     }
 
-    indexed_result gaussian_bracketed_average(span<const Bar> series){ // $z(t)=\sum_{i=0}^{N-1} x(t-i)\hat w(t-i)$
+    indexed_result gaussian_bracketed_average(span<const Bar> series){ // z(t) = \sum^{N-1}_{i=0} x(t-i) \hat w(t-i)
         if (series.empty()) {
             return invalid_result;
         }

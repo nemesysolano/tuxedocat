@@ -3,11 +3,6 @@
 #include <span>
 #include <iostream>
 
-#ifdef __sun__
-#include <mdspan.hpp>
-#else
-#include <mdspan>
-#endif
 
 #include <expected>
 #include <functional>

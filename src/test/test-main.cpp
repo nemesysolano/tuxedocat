@@ -87,6 +87,7 @@ int main(int argc, char* argv[]) {
     broker::test_broker_positions_updated();
     feed::test_bars_loaded_accurately(program_path);
     return 0;
+    
 }
 
 #endif

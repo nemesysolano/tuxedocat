@@ -30,7 +30,7 @@ namespace channel {
         public:
             inline void enque(unique_ptr<Event> event) override {(void)event;}
             inline unique_ptr<Event> deque() override {return nullptr;}
-            virtual ~NullChannel(){Channel::~Channel();}
+            virtual ~NullChannel() = default;
     };
 
     class DualChannel: public Channel {
@@ -41,7 +41,7 @@ namespace channel {
             inline DualChannel(Channel & input, Channel & output): input_(input), output_(output) {}
             inline void enque(unique_ptr<Event> event) override { output_.enque(std::move(event)); }
             inline unique_ptr<Event> deque() override { return input_.deque();}
-            virtual ~DualChannel(){Channel::~Channel();}
+            virtual ~DualChannel() = default;
     };
 }
 

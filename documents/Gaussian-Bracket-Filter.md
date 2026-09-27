@@ -63,5 +63,5 @@ provided all raw weights in the window are finite and positive. The raw weight $
 ## Bracketed Moving Average $z(t)$
 
 $$
-z(t) = \sum^{N-1}_{i=0} x(t) \hat w(t-i)
+z(t) = \sum^{N-1}_{i=0} x(t-i) \hat w(t-i)
 $$ 

@@ -4,6 +4,7 @@
 #include <vector>
 #include <span>
 #include <iostream>
+#include <cmath>
 #include "data/slice.h"
 using namespace std;
 
@@ -239,10 +240,10 @@ void matrix_multiplication_test() {
     assert(res.has_value());
     auto & C = res.value();
     assert(C.rows() == 2 && C.cols() == 2);
-    assert(std::abs(C[0, 0].value() - 58.0) < 1e-6);
-    assert(std::abs(C[0, 1].value() - 64.0) < 1e-6);
-    assert(std::abs(C[1, 0].value() - 139.0) < 1e-6);
-    assert(std::abs(C[1, 1].value() - 154.0) < 1e-6);
+    assert((std::abs(C[0, 0].value() - 58.0) < 1e-6));
+    assert((std::abs(C[0, 1].value() - 64.0) < 1e-6));
+    assert((std::abs(C[1, 0].value() - 139.0) < 1e-6));
+    assert((std::abs(C[1, 1].value() - 154.0) < 1e-6));
 
     // 3. Test dimension mismatch (2x3 * 2x3 should fail)
     auto fail_res = A * A; 
@@ -255,7 +256,7 @@ void matrix_multiplication_test() {
     slice::Slice2D A_nan(std::span<double>(data_nan), 2, 3);
     auto nan_res = A_nan * B;
     assert(nan_res.has_value());
-    assert(std::isnan(nan_res.value()[0, 0].value()));
+    assert((std::isnan(nan_res.value()[0, 0].value())));
 
     std::cout << "matrix_multiplication_test passed." << std::endl;
 }
@@ -280,12 +281,12 @@ void transpose_test() {
     assert(T.cols() == 2);
 
     // 4. Verify Data mapping
-    assert(std::abs(T[0, 0].value() - 1.0) < 1e-6);
-    assert(std::abs(T[0, 1].value() - 4.0) < 1e-6);
-    assert(std::abs(T[1, 0].value() - 2.0) < 1e-6);
-    assert(std::abs(T[1, 1].value() - 5.0) < 1e-6);
-    assert(std::abs(T[2, 0].value() - 3.0) < 1e-6);
-    assert(std::abs(T[2, 1].value() - 6.0) < 1e-6);
+    assert((std::abs(T[0, 0].value() - 1.0) < 1e-6));
+    assert((std::abs(T[0, 1].value() - 4.0) < 1e-6));
+    assert((std::abs(T[1, 0].value() - 2.0) < 1e-6));
+    assert((std::abs(T[1, 1].value() - 5.0) < 1e-6));
+    assert((std::abs(T[2, 0].value() - 3.0) < 1e-6));
+    assert((std::abs(T[2, 1].value() - 6.0) < 1e-6));
 
     // 5. Test identity: Transpose of Transpose should be A
     auto res2 = slice::transpose(T);
@@ -294,7 +295,7 @@ void transpose_test() {
     
     for (size_t i = 0; i < A.rows(); ++i) {
         for (size_t j = 0; j < A.cols(); ++j) {
-            assert(std::abs(T2[i, j].value() - A[i, j].value()) < 1e-6);
+            assert((std::abs(T2[i, j].value() - A[i, j].value()) < 1e-6));
         }
     }
 
@@ -322,15 +323,15 @@ void outer_product_test() {
     auto & M1 = res1.value();
     
     assert(M1.rows() == 3 && M1.cols() == 3);
-    assert(std::abs(M1[0, 0].value() - 4.0) < 1e-6);
-    assert(std::abs(M1[0, 1].value() - 5.0) < 1e-6);
-    assert(std::abs(M1[0, 2].value() - 6.0) < 1e-6);
-    assert(std::abs(M1[1, 0].value() - 8.0) < 1e-6);
-    assert(std::abs(M1[1, 1].value() - 10.0) < 1e-6);
-    assert(std::abs(M1[1, 2].value() - 12.0) < 1e-6);
-    assert(std::abs(M1[2, 0].value() - 12.0) < 1e-6);
-    assert(std::abs(M1[2, 1].value() - 15.0) < 1e-6);
-    assert(std::abs(M1[2, 2].value() - 18.0) < 1e-6);
+    assert((std::abs(M1[0, 0].value() - 4.0) < 1e-6));
+    assert((std::abs(M1[0, 1].value() - 5.0) < 1e-6));
+    assert((std::abs(M1[0, 2].value() - 6.0) < 1e-6));
+    assert((std::abs(M1[1, 0].value() - 8.0) < 1e-6));
+    assert((std::abs(M1[1, 1].value() - 10.0) < 1e-6));
+    assert((std::abs(M1[1, 2].value() - 12.0) < 1e-6));
+    assert((std::abs(M1[2, 0].value() - 12.0) < 1e-6));
+    assert((std::abs(M1[2, 1].value() - 15.0) < 1e-6));
+    assert((std::abs(M1[2, 2].value() - 18.0) < 1e-6));
 
     // 3. Test Argument Reversal: Row x Col
     // The mathematical outer product operation should gracefully flip this 
@@ -342,7 +343,7 @@ void outer_product_test() {
     assert(M2.rows() == 3 && M2.cols() == 3);
     for (size_t i = 0; i < 3; ++i) {
         for (size_t j = 0; j < 3; ++j) {
-            assert(std::abs(M1[i, j].value() - M2[i, j].value()) < 1e-6);
+            assert((std::abs(M1[i, j].value() - M2[i, j].value()) < 1e-6));
         }
     }
 
@@ -399,7 +400,7 @@ void covariances_test() {
     assert(cov0.rows() == 3 && cov0.cols() == 3);
     for (size_t i = 0; i < 3; ++i) {
         for (size_t j = 0; j < 3; ++j) {
-            assert(std::abs(cov0[i, j].value() - 0.0) < 1e-6);
+            assert((std::abs(cov0[i, j].value() - 0.0) < 1e-6));
         }
     }
 
@@ -410,7 +411,7 @@ void covariances_test() {
     assert(cov1.rows() == 3 && cov1.cols() == 3);
     for (size_t i = 0; i < 3; ++i) {
         for (size_t j = 0; j < 3; ++j) {
-            assert(std::abs(cov1[i, j].value() - 9.0) < 1e-6);
+            assert((std::abs(cov1[i, j].value() - 9.0) < 1e-6));
         }
     }
 

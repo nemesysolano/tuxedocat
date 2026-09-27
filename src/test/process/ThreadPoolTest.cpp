@@ -3,6 +3,7 @@
 #include <iostream>
 #include "utils/log.h"
 #include <format>
+#include <sstream> 
 
 using namespace std;
 
@@ -19,10 +20,11 @@ namespace process {
             results.emplace_back(std::move(future));
         }
 
+        stringstream out;
+        
         for (auto& result : results)
-            cout << result.get() << ' ';
-        cout << endl;
-
+            out << result.get() << ' ';
+        log_debug_message(format("{}", out.str()));
         log_trace_with_message(format("Ideal Threads ={}", ideal_threads()));
         log_trace_with_message("[PASSED]");
     }
