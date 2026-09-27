@@ -49,7 +49,7 @@ $$
 w(t) = \frac{1}{σ^2(t)}.
 $$
 
-Let $N = \max\{\min\{I(x_{\min}(t)), I(x_{\max}(t))\}, 2\}$, where $I(x_{\min}(t))$ and $I(x_{\max}(t))$ are the numbers of bars from the current bar at time $t$ back to the nearest lower low and nearest higher high, respectively. For the causal window $[t-(N-1), t]$, define the raw inverse-variance weights locally for each lagged bar by
+Let $N = (I(x_{\min}(t)) + I(x_{\max}(t)))/2$, where $I(x_{\min}(t))$ and $I(x_{\max}(t))$ are the numbers of bars from the current bar at time $t$ back to the nearest lower low and nearest higher high, respectively. For the causal window $[t-(N-1), t]$, define the raw inverse-variance weights locally for each lagged bar by
 
 $$
  w(t-j) = \frac{1}{\sigma^2(t-j)}

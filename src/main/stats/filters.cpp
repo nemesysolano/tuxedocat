@@ -10,6 +10,12 @@ namespace filters {
     const indexed_result invalid_result(0, numeric_limits<double>::quiet_NaN());
 
     namespace {
+        size_t window_size_from_distances(size_t first, size_t second) {
+            const size_t average_distance =
+                first / 2 + second / 2 + (first % 2 + second % 2) / 2;
+            return max(average_distance, size_t{2});
+        }
+
         struct weighted_sample {
             size_t lag;
             double raw_weight;
@@ -23,9 +29,9 @@ namespace filters {
                 return {};
             }
 
-            const size_t window_size = max(
-                min(higher_high_result->first, lower_low_result->first),
-                size_t{2}
+            const size_t window_size = window_size_from_distances(
+                higher_high_result->first,
+                lower_low_result->first
             );
             if (window_size > series.size()) {
                 return {};
@@ -147,7 +153,7 @@ namespace filters {
         const double x_min = lower_low_result->second;
         const size_t x_min_distance = lower_low_result->first;
 
-        const size_t distance = min(x_max_distance, x_min_distance);
+        const size_t distance = window_size_from_distances(x_max_distance, x_min_distance);
         const double variance = time_dependent_variance(x_max, x_min);
         return pair<size_t, double>(distance, variance);
     }
