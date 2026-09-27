@@ -23,11 +23,10 @@ namespace filters {
                 return {};
             }
 
-            const size_t window_size = max({
-                higher_high_result->first,
-                lower_low_result->first,
+            const size_t window_size = max(
+                min(higher_high_result->first, lower_low_result->first),
                 size_t{2}
-            });
+            );
             if (window_size > series.size()) {
                 return {};
             }
@@ -148,7 +147,7 @@ namespace filters {
         const double x_min = lower_low_result->second;
         const size_t x_min_distance = lower_low_result->first;
 
-        const size_t distance = max(x_max_distance, x_min_distance);
+        const size_t distance = min(x_max_distance, x_min_distance);
         const double variance = time_dependent_variance(x_max, x_min);
         return pair<size_t, double>(distance, variance);
     }
