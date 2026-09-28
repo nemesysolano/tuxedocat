@@ -12,6 +12,8 @@ namespace cli {
     class Files {
         public:
             static vector<string> listing(const string & directory); 
+            static bool is_directory(const string & path);
+            static bool is_regular_file(const string & path);
             static string program_directory(char* argv[]);
     };
 }

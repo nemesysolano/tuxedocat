@@ -1,0 +1,7 @@
+Drop Binary Classification: If the deep learning model or mathematical logic relies purely on predicting 1 or -1 directionally, switch to regression. 
+Try forecasting the exact continuous magnitude of the return, which provides a stronger gradient for learning.
+
+Redefine the Target: Stop predicting price direction. Instead, predict specific intraday volatility boundaries
+(e.g., "Will the high be >1.5 standard deviations above the open?"). Since the model excels at hitting intraday extremes 
+(as seen in the earlier 94% extreme accuracy), restructuring it into a mean-reversion volatility harvester using tight 
+limit orders is your most viable path forward.

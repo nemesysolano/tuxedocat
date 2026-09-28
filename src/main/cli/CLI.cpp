@@ -28,6 +28,9 @@ namespace cli {
     }
 
     int play(int argc, char * argv[]) {
+        
+        // rm documents/results/*.csv; for FILE in $(ls data/*.csv); do bin/tuxedocat play extreme-price $FILE > documents/results/$FILE:t; done;
+        
         string program_name(argv[0]);
 
         if(argc < PLAY_MIN_ARGC) {
@@ -42,16 +45,25 @@ namespace cli {
             return -2;                
         }
 
-        string directory(argv[PLAY_DIRECTORY_ARG]);
-        vector<string> files(Files::listing(directory));
+        string path(argv[PLAY_DIRECTORY_ARG]);
+        vector<string> files;
+
+        if(Files::is_directory(path)) {
+            files = Files::listing(path);
+        } else if(Files::is_regular_file(path)){
+            files.push_back(path);
+        }
+        
         if(files.size() == 0) {
-            log_error_message(format("'{}' is not a valid directory or is empty.", directory));
+            log_error_message(format("'{}' is not a valid directory or is empty.", path));
             return -3;            
         }
 
-        auto market_event_handler_test_impl = [&strategy](unique_ptr<MarketEvent> market_event,
-                const DataFrameFeed & dataframe_feed,
-                const unordered_map<string, size_t> & records_loaded) {
+        auto market_event_handler_test_impl = [&strategy](
+            unique_ptr<MarketEvent> market_event,
+            const DataFrameFeed & dataframe_feed,
+            const unordered_map<string, size_t> & records_loaded
+        ) {
             (void)dataframe_feed;
             (void)records_loaded;
 
@@ -71,7 +83,7 @@ namespace cli {
 
         auto dataframe_feed_result = DataFrameFeed::Create(files, market_event_handler_test_impl);
         if(!dataframe_feed_result.has_value()) {
-            log_error_message(format("No valid csv file in '{}'", directory));
+            log_error_message(format("No valid csv file in '{}'", path));
             return -4;              
         }
 

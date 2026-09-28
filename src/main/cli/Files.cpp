@@ -21,6 +21,18 @@ namespace cli {
         return data_file_paths_;
     }
 
+    bool Files::is_directory(const string & directory) {
+       const filesystem::path dir_path = filesystem::absolute(directory);
+
+        return (filesystem::exists(dir_path) && filesystem::is_directory(dir_path));
+    }
+
+    bool Files::is_regular_file(const string & path) {
+        const filesystem::path file_path = filesystem::absolute(path);
+
+        return (filesystem::exists(file_path) && filesystem::is_regular_file(file_path));
+    }
+
     string Files::program_directory(char* argv[]) {
         if (argv == nullptr || argv[0] == nullptr || argv[0][0] == '\0') {
             return {};

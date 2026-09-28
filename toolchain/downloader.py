@@ -34,7 +34,7 @@ def remove_pattern_from_file(file_path):
 
 if __name__== "__main__":
     symbol = sys.argv[1]
-    # for TICKER in $(cat documents/top-etf-jun-26.csv); do echo $TICKER; done;
+    # for TICKER in $(cat documents/finviz-smallcaps.csv); do echo $TICKER; done;
     ts = yf.Ticker(symbol)
     end_date = datetime.datetime.now() + datetime.timedelta(days=1)
     start_date = end_date - datetime.timedelta(days=365*10 + 1)
