@@ -4,7 +4,7 @@
 #include <vector>
 #include <filesystem>
 #include "Files.h"
-#include "strategy/ExtremePrice.h"
+#include "strategy/SmallCaps.h"
 #include "feed/DataFrameFeed.h"
 #include <cassert>
 
@@ -17,11 +17,11 @@ namespace cli {
     const int PLAY_STRATEGY_ARG = 2;
     const int PLAY_DIRECTORY_ARG = 3;
 
-    const string PLAY_EXTREME_PRICE_STRATEGY("extreme-price");
+    const string PLAY_EXTREME_PRICE_STRATEGY("small-caps");
 
     unique_ptr<Strategy> strategy_factory(const string & name) {
         if(name == PLAY_EXTREME_PRICE_STRATEGY) {
-            return make_unique<ExtremePrice>();
+            return make_unique<SmallCaps>();
         }
 
         return nullptr;
@@ -29,7 +29,7 @@ namespace cli {
 
     int play(int argc, char * argv[]) {
         
-        // rm documents/results/*.csv; for FILE in $(ls data/*.csv); do bin/tuxedocat play extreme-price $FILE > documents/results/$FILE:t; done;
+        // rm documents/results/*.csv; for FILE in $(ls data/*.csv); do bin/tuxedocat play small-caps $FILE > documents/results/$FILE:t; done;
         
         string program_name(argv[0]);
 

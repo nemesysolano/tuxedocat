@@ -10,7 +10,7 @@ The bracket is assumed to exist. At the beginning or end of a finite data set,
 or when a price is an extreme, a caller must define a boundary policy (for
 example, omit that observation or use a wider search range).
 
-The current `ExtremePrice` strategy uses a carry-forward policy: when a
+The current `SmallCaps` strategy uses a carry-forward policy: when a
 causal bracket does not exist, it emits the most recent valid $z(t)$ and an
 idle signal. This can produce flat segments in the output during runs of new
 highs or new lows; those segments are boundary-policy output, not additional
