@@ -7,10 +7,13 @@
 #include <ranges>
 #include <functional>
 #include <unordered_map>
+#include <ranges>
+#include <memory>
 
 using namespace std;
 using namespace dataframe;
 using namespace events;
+using namespace ranges;
 
 namespace feed {
     extern const string OPEN_PRICE;
@@ -19,11 +22,14 @@ namespace feed {
     extern const string CLOSE_PRICE ;
     extern const string VOLUME ;
 
-    class DataFrameFeed;
+    class DataFrameFeed;    
     using MarketEventHandler = function<void(unique_ptr<MarketEvent> market_event, const DataFrameFeed & dataframe, const unordered_map<string, size_t> & records_loaded)>;
     void market_event_handler_default_impl(unique_ptr<MarketEvent> market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded);
 
+    class DataFrameFeedProssingContext;
     class DataFrameFeed{
+        friend class DataFrameFeedProssingContext;
+
         private:
             unordered_map<string, unique_ptr<DataFrame>> dataframes_;
             vector<string> symbols_;
@@ -42,8 +48,6 @@ namespace feed {
             DataFrameFeed(DataFrameFeed&&) noexcept = default;
             DataFrameFeed& operator=(DataFrameFeed&&) noexcept = default;
             virtual void publish_market_event(unique_ptr<MarketEvent> market_event, const unordered_map<string, size_t> & records_loaded);
-            void process_dataframes();
-            
             inline const vector<string> & symbols() { return symbols_; }
             inline const expected<reference_wrapper<DataFrame>,TuxedoError> dataframe(const string & symbol) const {
                 if(dataframes_.contains(symbol)) {
@@ -56,6 +60,18 @@ namespace feed {
 
             static string file_name(const string & full_file_path);
             static expected<DataFrameFeed,TuxedoError> Create(const vector<string> file_paths, MarketEventHandler market_event_handler);
+    };
+
+    class DataFrameFeedProssingContext {
+        private:
+            DataFrameFeed & dataframe_feed_;
+            bool has_records_;
+            unordered_map<string, size_t> records_loaded_;
+            unordered_map<string, Bar> bars_;            
+        public:
+            DataFrameFeedProssingContext(DataFrameFeed & dataframe_feed);
+            bool process();
+            void process_all();
     };
 }
 #endif

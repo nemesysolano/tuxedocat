@@ -3,7 +3,7 @@
 
 using namespace std;
 
-namespace cli {
+namespace cli {    
     vector<string> Files::listing(const string & directory) {
         const filesystem::path dir_path = filesystem::absolute(directory);
 
@@ -19,6 +19,22 @@ namespace cli {
         }
 
         return data_file_paths_;
+    }
+
+    vector<string> Files::to_listing(const char * path) {
+        string path_(path);
+        return to_listing(path_);
+    }
+
+    vector<string> Files::to_listing(const string & path) {
+        vector<string> files;
+        if(Files::is_directory(path)) {
+            files = Files::listing(path);
+        } else if(Files::is_regular_file(path)){
+            files.push_back(path);
+        }        
+
+        return files;
     }
 
     bool Files::is_directory(const string & directory) {

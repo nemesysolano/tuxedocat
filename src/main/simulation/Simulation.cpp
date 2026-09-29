@@ -14,8 +14,9 @@ namespace simulation {
         if (finished_) {
             return finished_;
         }
+        DataFrameFeedProssingContext context(feed_);
 
-        feed_.process_dataframes();
+        context.process_all();
         finished_ = true;
         return finished_;
     }

@@ -72,8 +72,8 @@ namespace feed {
         assert(dataframe_feed_result.has_value());
 
         auto & dataframe_feed = dataframe_feed_result.value();
-        dataframe_feed.process_dataframes();
-
+        DataFrameFeedProssingContext context(dataframe_feed);
+        context.process_all();
         log_trace_with_message("[PASSED]");
     }
 }

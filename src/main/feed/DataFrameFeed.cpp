@@ -39,49 +39,6 @@ namespace feed {
         this->market_event_handler_(std::move(market_event), *this, records_loaded);
     }
 
-    void DataFrameFeed::process_dataframes(){
-        bool has_records = true;
-        auto symbols(views::keys(dataframes_));
-
-        unordered_map<string, size_t> records_loaded = symbols |
-            views::transform([](const auto & symbol) {
-                return pair<string, size_t>{symbol, 0};
-            }) |
-            ranges::to<unordered_map<string, size_t>>();
-
-        unordered_map<string, Bar> bars;
-
-        while(has_records) {
-            size_t exhausted_dataframes = 0;
-
-            for(const string & symbol: symbols) {
-                const DataFrame & dataframe = * dataframes_.at(symbol);
-                const vector<sys_seconds> & timestamps_vector = dataframe.timestamps_vector();
-                size_t index = records_loaded[symbol];
-
-                if(index < dataframe.rows()) {
-                    const auto & timestamp = timestamps_vector.at(index);
-                    bars.emplace(symbol, Bar(
-                        timestamp,
-                        symbol,
-                        dataframe[timestamp, OPEN_PRICE].value(),
-                        dataframe[timestamp, HIGH_PRICE].value(),
-                        dataframe[timestamp, LOW_PRICE].value(),
-                        dataframe[timestamp, CLOSE_PRICE].value(),
-                        (int)dataframe[timestamp, VOLUME].value()
-                    ));
-                    records_loaded[symbol] = index + 1;
-                } else {
-                    exhausted_dataframes++;
-                }
-            }
-
-            publish_market_event(make_unique<MarketEvent>(std::move(bars)), records_loaded);
-            has_records = exhausted_dataframes != dataframes_.size();
-            bars.clear();
-        }
-    }
-
     string DataFrameFeed::file_name(const string & full_file_path) {
 #ifdef _WIN32
         const size_t name_start = full_file_path.find_last_of("\\");
@@ -136,5 +93,57 @@ namespace feed {
             return DataFrameFeed(std::move(dataframes), market_event_handler);
         } else
             return unexpected(TuxedoError::ERR_BAD_INPUT);
+    }
+
+
+    DataFrameFeedProssingContext::DataFrameFeedProssingContext(DataFrameFeed & dataframe_feed):
+        dataframe_feed_(dataframe_feed),
+        has_records_(true),
+        records_loaded_(
+            dataframe_feed.symbols_ |
+            views::transform([](const auto & symbol) {
+                return pair<string, size_t>{symbol, 0};
+            }) |
+            ranges::to<unordered_map<string, size_t>>()),
+        bars_({})
+    {
+    }
+
+    bool DataFrameFeedProssingContext::process() {
+        while(has_records_) {
+            size_t exhausted_dataframes = 0;
+
+            for(const string & symbol: dataframe_feed_.symbols_) {
+                const DataFrame & dataframe = * dataframe_feed_.dataframes_.at(symbol);
+                const vector<sys_seconds> & timestamps_vector = dataframe.timestamps_vector();
+                size_t index = records_loaded_[symbol];
+
+                if(index < dataframe.rows()) {
+                    const auto & timestamp = timestamps_vector.at(index);
+                    bars_.emplace(symbol, Bar(
+                        timestamp,
+                        symbol,
+                        dataframe[timestamp, OPEN_PRICE].value(),
+                        dataframe[timestamp, HIGH_PRICE].value(),
+                        dataframe[timestamp, LOW_PRICE].value(),
+                        dataframe[timestamp, CLOSE_PRICE].value(),
+                        (int)dataframe[timestamp, VOLUME].value()
+                    ));
+                    records_loaded_[symbol] = index + 1;
+                } else {
+                    exhausted_dataframes++;
+                }
+            }
+
+            dataframe_feed_.publish_market_event(make_unique<MarketEvent>(std::move(bars_)), records_loaded_);
+            has_records_ = exhausted_dataframes != dataframe_feed_.dataframes_.size();
+            bars_.clear();            
+        }
+
+        return has_records_;
+    }
+
+    void  DataFrameFeedProssingContext::process_all() {
+        while(process());
     }
 }

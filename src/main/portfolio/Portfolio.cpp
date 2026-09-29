@@ -7,7 +7,19 @@ using namespace timeseries;
 
 namespace portfolio {
     void Portfolio::process_market_event(const MarketEvent & event){
-        
+        auto & self = *this;
+
+        for (const auto & [symbol, bars] : event.bars) {
+            if(!self.bars_.contains(symbol)) {
+                self.bars_.emplace(symbol, vector<Bar>{});
+            }
+
+            vector<Bar> & bars_vector = self.bars_.at(symbol);
+
+            for (const auto & bar : bars_vector) {
+                bars_vector.push_back(bar);
+            }
+        }        
     }
 
 
