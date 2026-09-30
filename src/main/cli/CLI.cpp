@@ -6,11 +6,16 @@
 #include "Files.h"
 #include "strategy/SmallCaps.h"
 #include "feed/DataFrameFeed.h"
+#include "timeseries/timeseries.h"
 #include <cassert>
+#include <functional>
+#include <cmath>
+#include <iomanip>
 
 using namespace std;
 using namespace strategy;
 using namespace feed;
+using namespace timeseries;
 
 namespace cli {
     const int PLAY_MIN_ARGC = 4;
@@ -21,10 +26,66 @@ namespace cli {
 
     unique_ptr<Strategy> strategy_factory(const string & name) {
         if(name == PLAY_EXTREME_PRICE_STRATEGY) {
-            return make_unique<SmallCaps>();
+            return make_unique<SmallCaps>(false);
         }
 
         return nullptr;
+    }
+
+   void print_journal(
+        const vector<Signal> & signals,
+        const DataFrameFeed & dataframe_feed
+    ) {
+        unordered_map<string, map<sys_seconds, pair<Bar, reference_wrapper<const Signal>>>> journal;
+
+        // Grouping signals by symbol into `journal` map.
+        for(const Signal & signal: signals) {
+            const DataFrame & dataframe = dataframe_feed.dataframe(signal.symbol()).value();
+            const sys_seconds timestamp = signal.timestamp();
+
+            if(!dataframe.timestamps().contains(signal.timestamp())) {
+                continue;
+            }
+
+            const string & symbol = signal.symbol();
+            if(!journal.contains(symbol)) {
+                journal.emplace(symbol, map<sys_seconds, pair<Bar, reference_wrapper<const Signal>>>());
+            }
+            map<sys_seconds, pair<Bar, reference_wrapper<const Signal>>> & entries = journal.at(signal.symbol());
+
+            entries.emplace(timestamp, pair<Bar, reference_wrapper<const Signal>>(
+                Bar(
+                    timestamp,
+                    symbol,
+                    dataframe[signal.timestamp(), OPEN_PRICE].value(),
+                    dataframe[signal.timestamp(), HIGH_PRICE].value(),
+                    dataframe[signal.timestamp(), LOW_PRICE].value(),
+                    dataframe[signal.timestamp(), CLOSE_PRICE].value(),
+                    (int)dataframe[signal.timestamp(), VOLUME].value()
+                ),
+                std::cref(signal)
+            ));
+        }
+
+        // Output `journal` into standard output as json format.
+        println("symbol,timestamp,open,high,low,close,volume,z,signal,window_size");
+        for (const auto & [symbol, entries] : journal) {
+            for(const auto & [timestamp, pair]: entries) {
+                println(
+                    "{},{},{},{},{},{},{},{},{},{}",
+                    symbol,
+                    timestamp,
+                    pair.first.open_price(),
+                    pair.first.high_price(),
+                    pair.first.low_price(),
+                    pair.first.close_price(),
+                    pair.first.volume(),
+                    pair.second.get().z(),
+                    to_underlying(pair.second.get().direction()),
+                    pair.second.get().window_size()
+                );                
+            }
+        }
     }
 
     int play(int argc, char * argv[]) {
@@ -58,8 +119,9 @@ namespace cli {
             log_error_message(format("'{}' is not a valid directory or is empty.", path));
             return -3;            
         }
+        vector<Signal> signals;
 
-        auto market_event_handler_test_impl = [&strategy](
+        auto market_event_handler_test_impl = [&strategy, &signals](
             unique_ptr<MarketEvent> market_event,
             const DataFrameFeed & dataframe_feed,
             const unordered_map<string, size_t> & records_loaded
@@ -78,7 +140,7 @@ namespace cli {
             const SignalEvent & signal_event = static_cast<const SignalEvent &>(*event.get());
 #endif
             assert(signal_event.event_type == EventType::SIGNAL);
-
+            signals.append_range(signal_event.signals());
         };
 
         auto dataframe_feed_result = DataFrameFeed::Create(files, market_event_handler_test_impl);
@@ -91,6 +153,7 @@ namespace cli {
 
         
         dataframe_feed.process_dataframes();
+        print_journal(signals, dataframe_feed);
         return 0;
     }
 

@@ -5,3 +5,5 @@ Redefine the Target: Stop predicting price direction. Instead, predict specific 
 (e.g., "Will the high be >1.5 standard deviations above the open?"). Since the model excels at hitting intraday extremes 
 (as seen in the earlier 94% extreme accuracy), restructuring it into a mean-reversion volatility harvester using tight 
 limit orders is your most viable path forward.
+
+https://github.com/datasets/s-and-p-500-companies
