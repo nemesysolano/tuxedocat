@@ -47,11 +47,6 @@ namespace broker {
                 Order & order = it->second;
                 const Bar & bar = market_event->bars.at(symbol);
                 
-                // For OCO entry orders, a fill occurs only when the bar's opening
-                // price lands inside the trigger range for that side:
-                //   LONG:  stop_loss < open < take_profit
-                //   SHORT: take_profit < open < stop_loss
-                // The strict comparisons exclude exact boundary hits.
                 if(
                     (
                         order.direction() == SignalDirection::LONG && 

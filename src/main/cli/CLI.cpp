@@ -1,5 +1,7 @@
 #include "CLI.h"
 #include <print>
+#include <format>
+#include <chrono>
 #include "utils/log.h"
 #include <vector>
 #include <filesystem>
@@ -26,7 +28,7 @@ namespace cli {
 
     unique_ptr<Strategy> strategy_factory(const string & name) {
         if(name == PLAY_EXTREME_PRICE_STRATEGY) {
-            return make_unique<SmallCaps>(false);
+            return make_unique<SmallCaps>();
         }
 
         return nullptr;
@@ -36,12 +38,12 @@ namespace cli {
         const vector<Signal> & signals,
         const DataFrameFeed & dataframe_feed
     ) {
-        unordered_map<string, map<sys_seconds, pair<Bar, reference_wrapper<const Signal>>>> journal;
+        unordered_map<string, map<std::chrono::sys_seconds, pair<Bar, reference_wrapper<const Signal>>>> journal;
 
         // Grouping signals by symbol into `journal` map.
         for(const Signal & signal: signals) {
             const DataFrame & dataframe = dataframe_feed.dataframe(signal.symbol()).value();
-            const sys_seconds timestamp = signal.timestamp();
+            const std::chrono::sys_seconds timestamp = signal.timestamp();
 
             if(!dataframe.timestamps().contains(signal.timestamp())) {
                 continue;
@@ -49,9 +51,9 @@ namespace cli {
 
             const string & symbol = signal.symbol();
             if(!journal.contains(symbol)) {
-                journal.emplace(symbol, map<sys_seconds, pair<Bar, reference_wrapper<const Signal>>>());
+                journal.emplace(symbol, map<std::chrono::sys_seconds, pair<Bar, reference_wrapper<const Signal>>>());
             }
-            map<sys_seconds, pair<Bar, reference_wrapper<const Signal>>> & entries = journal.at(signal.symbol());
+            map<std::chrono::sys_seconds, pair<Bar, reference_wrapper<const Signal>>> & entries = journal.at(signal.symbol());
 
             entries.emplace(timestamp, pair<Bar, reference_wrapper<const Signal>>(
                 Bar(
@@ -68,11 +70,16 @@ namespace cli {
         }
 
         // Output `journal` into standard output as json format.
-        println("symbol,timestamp,open,high,low,close,volume,z,signal,window_size");
+        std::println("symbol,timestamp,open,high,low,close,volume,υ,s,signal,window_size");
         for (const auto & [symbol, entries] : journal) {
+            bool first = true;
             for(const auto & [timestamp, pair]: entries) {
-                println(
-                    "{},{},{},{},{},{},{},{},{},{}",
+                if(first) {
+                    first = false;
+                    continue;
+                }
+                std::println(
+                    "{},{},{},{},{},{},{},{},{},{},{}",
                     symbol,
                     timestamp,
                     pair.first.open_price(),
@@ -80,8 +87,9 @@ namespace cli {
                     pair.first.low_price(),
                     pair.first.close_price(),
                     pair.first.volume(),
-                    pair.second.get().z(),
-                    to_underlying(pair.second.get().direction()),
+                    pair.second.get().υ(),
+                    pair.second.get().s(),
+                    std::to_underlying(pair.second.get().direction()),
                     pair.second.get().window_size()
                 );                
             }
@@ -102,7 +110,7 @@ namespace cli {
         string strategy_name(argv[PLAY_STRATEGY_ARG]);
         unique_ptr<Strategy> strategy(strategy_factory(strategy_name));
         if(strategy == nullptr) {
-            log_error_message(format("'{}' is not a valid strategy name.", strategy_name));
+            log_error_message(std::format("'{}' is not a valid strategy name.", strategy_name));
             return -2;                
         }
 
@@ -116,7 +124,7 @@ namespace cli {
         }
         
         if(files.size() == 0) {
-            log_error_message(format("'{}' is not a valid directory or is empty.", path));
+            log_error_message(std::format("'{}' is not a valid directory or is empty.", path));
             return -3;            
         }
         vector<Signal> signals;
@@ -124,7 +132,7 @@ namespace cli {
         auto market_event_handler_test_impl = [&strategy, &signals](
             unique_ptr<MarketEvent> market_event,
             const DataFrameFeed & dataframe_feed,
-            const unordered_map<string, size_t> & records_loaded
+            const unordered_map<string, std::size_t> & records_loaded
         ) {
             (void)dataframe_feed;
             (void)records_loaded;
@@ -145,7 +153,7 @@ namespace cli {
 
         auto dataframe_feed_result = DataFrameFeed::Create(files, market_event_handler_test_impl);
         if(!dataframe_feed_result.has_value()) {
-            log_error_message(format("No valid csv file in '{}'", path));
+            log_error_message(std::format("No valid csv file in '{}'", path));
             return -4;              
         }
 

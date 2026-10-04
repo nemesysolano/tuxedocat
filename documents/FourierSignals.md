@@ -81,13 +81,6 @@ $$u(x, t) = \frac{1}{2π} \int_{-\infty}^{\infty} \hat{u}(ξ, t) e^{i ξ x} dξ$
 
 For simpler cases (like when $F=0$), this integral can often be resolved into a convolution between the initial conditions and a Gaussian kernel (the fundamental solution of the system).
 
-## General Second-Order Linear Inhomogeneus Partial Differential Equation
-
-Let $N$ be defined as in `Gaussian-Bracket-Filter.md`, $F(x,t) = \frac{x - μ(t)}{μ(t)}$. If we solve $\frac{1}{2π} \int_{-\infty}^{\infty} |A\hat{u}(ξ, t) e^{i ξ x}|^2 dξ=1$ integral equation for $A$ then
-the resulting probability function is:
-
-By defining the dimensionless price state as $y(x,t) = \frac{x - μ(t)}{μ(t)}$ and transforming from the Fourier (momentum) space back to the physical price domain, the resulting probability functions are mathematically expressed as follows.
-
 ## Distance Probability
 
 Let $N$ defined as in `Gaussian-Bracket-Filter.md`, $F(x,t) = \frac{x - μ(t)}{μ(t)}$. If we solve $\frac{1}{2π} \int_{-\infty}^{\infty} |K\hat{u}(ξ, t) e^{i ξ x}|^2 dξ$ integral equation for $K$. Using Plancherel's theorem, the normalization constant $K$ that forces the system into a valid 100% probability space can be extracted directly from the frequency (momentum) domain $ξ$ without needing to integrate across physical prices:
@@ -106,25 +99,24 @@ The cumulative probability $F_K(X,t)$ is computed by integrating the PDF from th
 
 $$F_K(X, t) = \int_{x_{\min}(t)}^{X} ρ(x, t) dx = \frac{\vert{}A\vert{}^2}{μ(t)} \int_{x_{\min}(t)}^{X} \left\vert{} \frac{1}{2π} \int_{-\infty}^{\infty} \hat{u}(ξ, t) \exp\left(i ξ \frac{x - μ(t)}{μ(t)}\right) dξ \right\vert{}^2 dx$$
 
-
-$$F_K(X, t) = \frac{1}{2} \left[ \text{erf}\left( \frac{X - \mu(t)}{\sigma(t)\sqrt{2}} \right) - \text{erf}\left( \frac{x_{\min}(t) - \mu(t)}{\sigma(t)\sqrt{2}} \right) \right]$$
+$$F_K(X, t) = \frac{1}{2} \left[ \text{erf}\left( \frac{X - μ(t)}{σ(t)\sqrt{2}} \right) - \text{erf}\left( \frac{x_{\min}(t) - μ(t)}{σ(t)\sqrt{2}} \right) \right]$$
 
 ---
 
-We abstracted the known past as μ(t) to illustrate the model's flexibility. This ensures that any valid equilibrium metric can be plugged into the state function F, making z(t) simply one instance of a broader baseline.
+We abstracted the known past as μ(t) to illustrate the model's flexibility. This ensures that any valid equilibrium metric can be plugged into the state function F, making υ(t) simply one instance of a broader baseline.
 
 ### Implementation in the Trading Engine
 
 By evaluating $F_K(X, t)$, the engine maps momentum-space acceleration directly to price-level structural risk:
 
-* **Long Filter:** If a buy signal fires at price $X$ and $F_K(X,t) \ge 0.95$, there is a 95% mathematical probability that the asset will trade below this level, and the long signal should be heavily discounted or discarded.
+* **Long Filter:** If a buy signal fires at price $X$ and $F_K(X,t) ≥ 0.95$, there is a 95% mathematical probability that the asset will trade below this level, and the long signal should be heavily discounted or discarded.
 
 
-* **Short Filter:** If a sell signal fires at price $X$ and $1 - F_K(X,t) \ge 0.95$, there is a 95% probability the asset will trade above this level, meaning the short signal must be heavily discounted or discarded.
+* **Short Filter:** If a sell signal fires at price $X$ and $1 - F_K(X,t) ≥ 0.95$, there is a 95% probability the asset will trade above this level, meaning the short signal must be heavily discounted or discarded.
 
 To construct the initial wavefunction $u(x,0)$ from a discrete price series, you must map observable market data to the two fundamental components of a quantum wave: **probability amplitude** (the spread of prices) and **phase** (the directional momentum).
 
-Since the physical probability density is $\rho(x) = \vert{}u(x)\vert{}^2$, any candidate for the real part of $u(x,0)$ should essentially be the square root of an empirical or statistical price distribution.
+Since the physical probability density is $ρ(x) = \vert{}u(x)\vert{}^2$, any candidate for the real part of $u(x,0)$ should essentially be the square root of an empirical or statistical price distribution.
 
 Here are the most robust candidates for building $u(x,0)$ directly from your C++ price series data:
 ### Choosing $u(t)$
@@ -139,12 +131,12 @@ $$u(x, 0) = ( \frac{1}{2π σ^2(t)} )^{1/4} e^ { - \frac{(x - μ(t))^2}{4σ^2(t)
 
 
 * **Data Mapping:**
-  - Set $μ(t) = z(t)$ (the bracketed moving average).
+  - Set $μ(t) = υ(t)$ (the bracketed moving average).
   - Set $σ^2(t) = \frac{[\ln(x_{\max}(t) / x_{\min}(t))]^2}{4\ln 2}$ (your time-dependent bracket variance).
 * **Why it works:** It perfectly seeds the Free Particle and Harmonic Oscillator solutions. It is mathematically smooth, guarantees $A=1$ normalization out of the gate, and instantly adapts to expanding/contracting volatility.
 * **F_K(X, t)**:
 
-$$F_K(X, t) = \frac{1}{2} \left[ \text{erf}\left( \frac{X - \mu(t)}{\sigma(t)\sqrt{2}} \right) - \text{erf}\left( \frac{x_{\min}(t) - \mu(t)}{\sigma(t)\sqrt{2}} \right) \right]$$
+$$F_K(X, t) = \frac{1}{2} \left[ \text{erf}\left( \frac{X - μ(t)}{σ(t)\sqrt{2}} \right) - \text{erf}\left( \frac{x_{\min}(t) - μ(t)}{σ(t)\sqrt{2}} \right) \right]$$
 
 #### 2. The Empirical Volume Profile (Liquidity as Probability)
 
@@ -169,7 +161,7 @@ $$\text{VP}(x) = \sum_{j=0}^{N-1} I_j(x) \left( \frac{V_{t-j}}{\text{High}_{t-j}
 where $I_j(x)$ is defined as
 
 $$I_j(x) = \begin{cases}
-1, & \text{if } \mathrm{Low}_{t-j} \le x \le \mathrm{High}_{t-j}, \\
+1, & \text{if } \mathrm{Low}_{t-j} ≤ x ≤ \mathrm{High}_{t-j}, \\
 0, & \text{otherwise}.
 \end{cases}$$
 
@@ -191,7 +183,7 @@ $$F_K(X, t) = \frac{1}{2N} \sum_{j=0}^{N-1} \left[ \text{erf}\left( \frac{X - x_
 
 where
 
-$$h=1.06⋅\hat σ⋅N^{−1/5}$$
+$$h = 1.06 ⋅ σ ⋅ N^{-1/5}$$
 
 #### 4. Encoding Momentum: The Complex Phase Factor
 
@@ -210,25 +202,25 @@ $$F_K(X, t) = \frac{1}{2N} \sum_{j=0}^{N-1} \left[ \text{erf}\left( \frac{X - (x
 
 where
 
-$$H(t) = h \sqrt{1 + \left(\frac{\hbar t}{2}\right)^2}$$
-$$h=1.06⋅\hat σ⋅N^{−1/5}$$
+$$H(t) = h \sqrt{1 + \left(\frac{ħ t}{2}\right)^2}$$
+$$h = 1.06 ⋅ σ ⋅ N^{-1/5}$$
 
 ---
-$R(x)$ represents the strictly real **probability amplitude** of the initial wavefunction before any directional momentum ($p_0$) is applied. Because the physical probability density is $\rho(x) = \vert{}R(x)\vert{}^2$, the formula for $R(x)$ is always the square root of your chosen initial probability distribution.
+$R(x)$ represents the strictly real **probability amplitude** of the initial wavefunction before any directional momentum ($p_0$) is applied. Because the physical probability density is $ρ(x) = \vert{}R(x)\vert{}^2$, the formula for $R(x)$ is always the square root of your chosen initial probability distribution.
 
 Based on the quantitative architecture established for your C++ engine, $R(x)$ takes one of three specific functional forms depending on the model you select:
 
 **1. The Bracket-Implied Gaussian Wave Packet**
 
-If you assume the asset's baseline price distribution is normally distributed around the deterministic anchor $\mu(t)$ (such as the bracketed moving average $z(t)$), $R(x)$ is the square root of a normal distribution with time-dependent variance $\sigma^2(t)$:
+If you assume the asset's baseline price distribution is normally distributed around the deterministic anchor $μ(t)$ (such as the bracketed moving average $υ(t)$), $R(x)$ is the square root of a normal distribution with time-dependent variance $σ^2(t)$:
 
-$$R(x) = \left( \frac{1}{2\pi \sigma^2(t)} \right)^{1/4} \exp\left( - \frac{(x - \mu(t))^2}{4\sigma^2(t)} \right)$$
+$$R(x) = \left( \frac{1}{2π σ^2(t)} \right)^{1/4} \exp\left( - \frac{(x - μ(t))^2}{4σ^2(t)} \right)$$
 
 **2. Kernel Density Estimation (KDE)**
 
 If you build a multi-modal probability distribution from the individual closing prices $x_{t-j}$ of your $N$-bar lookback window, $R(x)$ is the normalized sum of miniature Gaussian wave packets (kernels) smoothed by bandwidth $h$:
 
-$$R(x) = \frac{1}{\left(h^2 2\pi\right)^{1/4}} \sqrt{ \frac{1}{N} \sum_{j=0}^{N-1} \exp\left( - \frac{(x - x_{t-j})^2}{2h^2} \right) }$$
+$$R(x) = \frac{1}{\left(h^2 2π\right)^{1/4}} \sqrt{ \frac{1}{N} \sum_{j=0}^{N-1} \exp\left( - \frac{(x - x_{t-j})^2}{2h^2} \right) }$$
 
 **3. The Empirical Volume Profile**
 
@@ -238,5 +230,29 @@ $$R(x) = \frac{1}{\sqrt{\sum_{j=0}^{N-1} V_{t-j}}} \sqrt{\text{VP}(x)}$$
 
 By substituting any of these three formulas into $u(x, 0) = R(x) e^{i p_0 x}$, you perfectly encode both the asset's structural risk (via $R(x)$) and its trending speed (via $p_0$) for the Schrödinger time-evolution calculations.
 
+### Physics Constraints
 
+#### Coefficients $A, B, C, \text{ and } D$
 
+1. **$A$ (Inertia Scaling Bounds: $ε ≤ A ≤ A_{\max}$, where $ε > 0$):** Coefficient $A$ controls the second-order temporal acceleration. Because $A$ dictates how sluggishly or rapidly price acceleration waves propagate, it must be bounded by reasonable physical limits based on your time step $dt$. Allowing $A$ to take erratic, massive values will cause the simulated wave speeds to decouple completely from realistic market microstructure, while allowing it to hit zero causes mathematical singularities.
+2. **$B$ (Temporal Damping: $0 ≤ B ≤ B_{\max}$):** Coefficient $B$ governs the first-order temporal derivative. It must remain non-negative to ensure the system dissipates energy rather than artificially amplifying price momentum into infinity.
+3. **$C$ (Spatial Diffusion: $C_{\min} ≤ C ≤ 0$):** Coefficient $C$ controls the spatial second derivative. It must remain negative to enforce proper forward-time probability dispersion (diffusion) rather than unstable backward-time explosions.
+4. **$D$ (Convective Drift: $-v_{\max} ≤ D ≤ v_{\max}$):** Coefficient $D$ controls the convective drift term, which dictates how fast the probability wave translates across the price grid. It must be bounded by the asset's maximum historical speed limits.
+
+---
+
+To calculate the maximum convective drift boundary $v_{\max}$, you must define the extreme physical limit of how fast the asset's price can move in a single time step 
+($dt$) without breaking the continuous flow assumption of your PDE. Because your engine dynamically bounds the risk using an N-bar lookback window, $v_\text{max}$
+​should not be a static hardcoded number. It must be dynamically computed at every time step t using the historical price data of that exact window.
+
+$$v_{\max} = \frac{x_{\max}(t) - x_{\min}(t)}{μ(t)}$$
+
+#### Spectral Stability: $\text{Re}(r_{1,2}(σ)) ≤ 0$
+
+The $\text{Re}(r_{1,2}(σ)) ≤ 0$ constraint ensures system stability. To efficiently check if the real parts of both characteristic roots $r_{1,2}(σ)$ remain negative or zero across the entire infinite frequency domain ($σ \in \mathbb{R}$), we do not need to iterate over a discretized array of $σ$ values.
+
+It can be proven algebraically that whenever $A > 0$ and $B ≥ 0$, we can use the $O(1)$ proxy condition:
+
+$$A D^2 ≤ -B^2 C$$
+
+to assert the absolute stability of the probability wave. If this constraint fails, the engine aborts and defaults to 'Idle'.

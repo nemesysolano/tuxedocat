@@ -11,14 +11,14 @@ or when a price is an extreme, a caller must define a boundary policy (for
 example, omit that observation or use a wider search range).
 
 The current `SmallCaps` strategy uses a carry-forward policy: when a
-causal bracket does not exist, it emits the most recent valid $z(t)$ and an
+causal bracket does not exist, it emits the most recent valid $υ(t)$ and an
 idle signal. This can produce flat segments in the output during runs of new
 highs or new lows; those segments are boundary-policy output, not additional
 filter observations.
 
 In the implementation, the bracket search is causal: $x_{\max}(t)$ is the
 nearest prior bar high above the current bar high, and $x_{\min}(t)$ is the
-nearest prior bar low below the current bar low. The prices used in $z(t)$
+nearest prior bar low below the current bar low. The prices used in $υ(t)$
 are the corresponding bar closes.
 
 ## Time-Dependent Variance
@@ -73,11 +73,11 @@ provided all raw weights in the window are finite and positive. The raw weight $
 
 The implementation omits a lagged bar when its bracket, variance, or close is
 invalid, then renormalizes the remaining valid weights. If no valid weights
-remain, $z(t)$ is invalid and the strategy applies the carry-forward policy
+remain, $υ(t)$ is invalid and the strategy applies the carry-forward policy
 described above.
 
-## Bracketed Moving Average $z(t)$
+## Bracketed Moving Average $υ(t)$
 
 $$
-z(t) = \sum^{N-1}_{i=0} x(t-i) \hat w(t-i)
+υ(t) = \sum^{N-1}_{i=0} x(t-i) \hat w(t-i)
 $$ 

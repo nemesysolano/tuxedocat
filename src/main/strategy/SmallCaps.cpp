@@ -3,6 +3,7 @@
 #include "stats/filters.h"
 #include <cmath>
 #include "timeseries/timeseries.h"
+#include "utils/log.h"
 
 using namespace std;
 using namespace data;
@@ -11,10 +12,6 @@ using namespace filters;
 using namespace timeseries;
 
 namespace strategy {
-    SmallCaps::SmallCaps(bool output_signal): Strategy(), output_signal_(output_signal){
-
-    }
-
     inline bool is_valid_number(double number) {
         return isfinite(number);
     }
@@ -34,45 +31,70 @@ namespace strategy {
     you do not need to artificially truncate the span or look ahead. The current vector tip is your overnight limbo anchor point.    
     */
     void SmallCaps::add_signal(const string & symbol, vector<Signal> & signals){
-        if(this->bars_.contains(symbol) && this->bars_.at(symbol).size() > MIN_BARS_SIZE) {
+        if(this->bars_.contains(symbol) && this->bars_.at(symbol).size() > filters::MIN_KAMA_BARS) {
             const auto & bars = this->bars_.at(symbol);
             const span<const Bar> bars_span(bars);
             auto bar_iterator = bars.rbegin();
+            const Bar & bar_t = * (bar_iterator++);
             const Bar & bar_t_1 = * (bar_iterator++);
             const Bar & bar_t_2 = * (bar_iterator++);
-            const Bar & bar_t_3 = * (bar_iterator++);
 
-            indexed_result result = gaussian_bracketed_average(bars_span);
-            double z = result.second;
-            const size_t window_size = result.first;
+            auto & context = contexts[symbol];
+            indexed_result kaufman_result = kaufman_moving_average(bars_span, context); // gaussian_bracketed_average(bars_span); 
+            indexed_result gaussian_result = gaussian_bracketed_average(bars_span);
+            double υ = (kaufman_result.second + gaussian_result.second)/2;
+            size_t window_size = gaussian_result.first;
+            double s = ([&window_size, &bars_span, &υ]() {
+                if(is_valid_number(υ)) {
+                    double sum = 0;
+                    auto it = bars_span.rbegin();
 
-            if(is_valid_number(z)) {
-                SignalDirection direction = SignalDirection::IDLE;                
-                const double speed = (bar_t_1.close_price() - bar_t_2.close_price()) / bar_t_2.close_price();
-                const double v_current  = bar_t_1.close_price() - bar_t_2.close_price();
-                const double v_previous = bar_t_2.close_price() - bar_t_3.close_price();
-                const double acceleration = v_current - v_previous;
-                const double long_pierching_depth = std::abs(z != 0.0 ? ((bar_t_1.low_price() - z) / z) : 0.0) * 100.0;
-                const double short_piercing_depth = std::abs(z != 0.0 ? ((bar_t_1.high_price() - z) / z) : 0.0) * 100.0;
-                if (
-                    bar_t_1.close_price() > z && bar_t_1.low_price() > bar_t_2.low_price() 
-                    && speed > 0 && acceleration > 0
-                    && long_pierching_depth < 0.25
-                ) {
-                    direction = SignalDirection::LONG;
-                } else if (
-                    bar_t_1.close_price() < z && bar_t_1.high_price() < bar_t_2.high_price() 
-                    && speed < 0 && acceleration < 0
-                    && short_piercing_depth < 0.25                    
+                    for(size_t i = 0; i < window_size; i++) {
+                        sum += (it->close_price() - υ)*(it->close_price() - υ);
+                    }
+                    return sqrt(sum/(MIN_FILTER_BARS-1));
+                }
+                return -1.0;
+            })();
+            
+            SignalDirection direction = SignalDirection::IDLE; 
+
+            if(is_valid_number(υ)) {
+                               
+                const double speed = bar_t.close_price() - bar_t_1.close_price();
+                const double v_current  = bar_t.close_price() - bar_t_1.close_price();
+                const double v_previous = bar_t_1.close_price() - bar_t_2.close_price();
+                const double acceleration = v_current / (v_previous + 1e-6);
+                const double upper_band = υ + 2*s;                
+                const double upper_piercing = bar_t.high_price() + υ != 0.0
+                    ? std::abs(2 * (bar_t.high_price() - upper_band) / (bar_t.high_price() + upper_band)) * 100.0
+                    : 0.0;
+                const double lower_band = υ - 2*s;
+                const double lower_piercing = υ != 0.0
+                    ? std::abs(2*(bar_t.low_price() - lower_band) / (bar_t.low_price() + lower_band)) * 100.0
+                    : 0.0;
+
+                if (bar_t.close_price() < υ*0.995 
+                    && acceleration < 1 && speed > 0
+                    && upper_piercing < 10
                 ) {
                     direction = SignalDirection::SHORT;
+                } else if (bar_t.close_price() > υ*.995
+                    && acceleration < 1 && speed < 0
+                    && lower_piercing < 10
+                ) {
+                    direction = SignalDirection::LONG;
                 }
+                
                 // Stamp the signal with the finalized session's timestamp
-                signals.emplace_back(Signal(bar_t_1.timestamp(), symbol, direction, z, window_size));
-
+                signals.emplace_back(Signal(bar_t.timestamp(), symbol, direction, υ, s, window_size));
+                this->υ_ = υ;
+                this->s_ = s;
             } else {
-                signals.emplace_back(Signal(bar_t_1.timestamp(), symbol, SignalDirection::IDLE, z, window_size));
+                signals.emplace_back(Signal(bar_t.timestamp(), symbol, direction, this->υ_, this->s_, window_size));
             }
+
+            context.last_direction() = direction;
         }
     }
 }

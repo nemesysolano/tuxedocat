@@ -1,18 +1,6 @@
 {
     "configurations": [
         {
-            "name": "Linux",
-            "includePath": [
-                "${workspaceFolder}/**",
-                "/usr/include/eigen3"
-            ],
-            "defines": [],
-            "compilerPath": "/usr/lib/llvm-21/bin/clang++",
-            "cStandard": "c17",
-            "cppStandard": "c++23",
-            "intelliSenseMode": "linux-clang-x64"
-        },
-        {
             "name": "macOS",
             "includePath": [
                 "${workspaceFolder}/**",
@@ -24,6 +12,18 @@
             "cStandard": "c17",
             "cppStandard": "c++23",
             "intelliSenseMode": "macos-clang-arm64"
+        },
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/include/eigen3"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/clang++",
+            "cStandard": "c17",
+            "cppStandard": "c++23",
+            "intelliSenseMode": "linux-clang-x64"
         }
     ],
     "version": 4

@@ -2,20 +2,25 @@
 #define __EXTREME_PRICE_H__
 #include "Strategy.h"
 #include "data/Bar.h"
+#include "stats/filters.h"
+#include <string>
+#include <unordered_map>
 
 using namespace std;
 using namespace data;
 using namespace events;
+using namespace filters;
 
 namespace strategy {
     class SmallCaps: public Strategy {
-        protected:
-            static constexpr size_t MIN_BARS_SIZE = 14;
-            bool output_signal_;
+        private:
+            unordered_map<string, KauffmanMovingAverageContext> contexts;
+            double υ_; // Previous υ_
+            double s_; // Previous s_
         public:
-            SmallCaps(bool output_signal);
-            inline SmallCaps(): SmallCaps(true){}
+            inline SmallCaps(): Strategy(), contexts({}), υ_(0), s_(0) {}
             void add_signal(const string & symbol, vector<Signal> & signals) override;
+
     };
 }
 

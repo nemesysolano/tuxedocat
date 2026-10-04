@@ -7,6 +7,8 @@
 using namespace std;
 using namespace data;
 namespace filters {
+    const size_t MIN_FILTER_BARS = 15;
+    const size_t MIN_KAMA_BARS = MIN_FILTER_BARS;
     const indexed_result invalid_result(0, numeric_limits<double>::quiet_NaN());
 
     namespace {
@@ -160,6 +162,7 @@ namespace filters {
 
     optional<indexed_result> inverse_variance_weight(span<const Bar> series, size_t lag){
         const auto window_size_result = filter_window_size(series);
+
         if (!window_size_result.has_value() || lag >= *window_size_result) {
             return {};
         }
@@ -224,5 +227,67 @@ namespace filters {
         }
 
         return indexed_result{window_size, weighted_average};
+    }
+
+    indexed_result kaufman_moving_average(span<const Bar> series, KauffmanMovingAverageContext & context) {
+        const auto window_size_result = filter_window_size(series);
+        if (!window_size_result.has_value()) {
+            return invalid_result;
+        }
+        const size_t window_size = *window_size_result;
+
+        if (series.size() < MIN_KAMA_BARS) {
+            return invalid_result;
+        }
+
+        const size_t first_index = series.size() - MIN_KAMA_BARS;
+        const double current_price = series.back().close_price();
+        if (!isfinite(current_price)) {
+            return invalid_result;
+        }
+
+        if (std::isnan(context.k_t_1())) {
+            double initial_sum = 0.0;
+            for (size_t index = first_index; index < series.size(); ++index) {
+                const double price = series[index].close_price();
+                if (!isfinite(price)) {
+                    return invalid_result;
+                }
+                initial_sum += price;
+            }
+            const double kama = initial_sum / MIN_KAMA_BARS;
+            context.k_t_1() = kama;
+            return pair<size_t, double>(window_size, kama);
+        }
+
+        const double first_price = series[first_index].close_price();
+        if (!isfinite(first_price)) {
+            return invalid_result;
+        }
+        const double momentum = abs(current_price - first_price);
+        double volatility = 0.0;
+        for (size_t index = first_index + 1; index < series.size(); ++index) {
+            const double price = series[index].close_price();
+            const double previous_price = series[index - 1].close_price();
+            if (!isfinite(price) || !isfinite(previous_price)) {
+                return invalid_result;
+            }
+            volatility += abs(price - previous_price);
+        }
+
+        const double efficiency_ratio = volatility == 0.0
+            ? 0.0
+            : min(momentum / volatility, 1.0);
+        const double scaled_sc = efficiency_ratio *
+            (context.fast_sc() - context.slow_sc()) + context.slow_sc();
+        const double smoothing_constant = scaled_sc * scaled_sc;
+        const double kama = context.k_t_1() +
+            smoothing_constant * (current_price - context.k_t_1());
+        if (!isfinite(kama)) {
+            return invalid_result;
+        }
+
+        context.k_t_1() = kama;
+        return pair<size_t, double>(window_size, kama);
     }
 }
