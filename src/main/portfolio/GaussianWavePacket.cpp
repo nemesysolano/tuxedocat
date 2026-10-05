@@ -60,18 +60,18 @@ namespace portfolio {
                     vector<DifferentialEquation> & equations = this->equations_.at(signal.symbol());
                     equations.emplace_back(derivatives, F);                        
 
-                    if (equations.size() >= MIN_FILTER_BARS) {
+                    if (equations.size() > MIN_FILTER_BARS) {
                         const span<const DifferentialEquation> equations_subset(equations);
                         const auto recent_equations = equations_subset.last(MIN_FILTER_BARS);
                         auto solution = solve_transform_system(recent_equations);
 
                         if(solution.has_value()) {
                             auto & coeff = solution.value();
-                            double A = coeff.A, B = coeff.B, C = coeff.C, D = coeff.D;
-                            if (bars.size() > MIN_FILTER_BARS) {
+                            if(coeff.r_squared > 0.95) {
+                                double A = coeff.A, B = coeff.B, C = coeff.C, D = coeff.D;
                                 const span<const Bar> bars_span(bars);
                                 const span<const Bar> series = bars_span.subspan(
-                                    bars_span.size() - MIN_FILTER_BARS - 1,
+                                    bars_span.size() - (MIN_FILTER_BARS + 1),
                                     MIN_FILTER_BARS
                                 );
                                 const auto lower_low = nearest_lower_low(series);
@@ -99,7 +99,7 @@ namespace portfolio {
                                         }                                        
                                     }
                                 }
-                            }
+                            }                            
                         }
                     }
                 }

@@ -60,9 +60,9 @@ namespace strategy {
             if(is_valid_number(μ)) {                               
                 const double speed = bar_t.close_price() - bar_t_1.close_price();
 
-                if (/*acceleration < 1 &&*/ speed > 0) {
+                if (speed > 0) {
                     direction = SignalDirection::SHORT;
-                } else if (/*acceleration < 1 &&*/ speed < 0) {
+                } else if (speed < 0 ) {
                     direction = SignalDirection::LONG;
                 }
                 

@@ -37,13 +37,15 @@ namespace stats {
                 double A_,
                 double B_,
                 double C_,
-                double D_
-            ): A(A_), B(B_), C(C_), D(D_) {}
+                double D_,
+                double r_squared_
+            ): A(A_), B(B_), C(C_), D(D_), r_squared(r_squared_) {}
 
             const double A;
             const double B;
             const double C;
             const double D;
+            const double r_squared;
     };
 
     class DifferentialEquation {

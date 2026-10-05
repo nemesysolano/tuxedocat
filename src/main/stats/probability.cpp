@@ -65,11 +65,23 @@ namespace stats {
             return unexpected(TuxedoError::ERR_LINEAR_REGRESSION_FAILED);
         }
 
+        const Eigen::VectorXd residuals = values - system * solution;
+        const double residual_sum_squares = residuals.squaredNorm();
+        const double values_mean = values.mean();
+        const double total_sum_squares = (values.array() - values_mean).square().sum();
+        const double r_squared = total_sum_squares == 0.0
+            ? 1.0
+            : 1.0 - residual_sum_squares / total_sum_squares;
+        if (!isfinite(r_squared)) {
+            return unexpected(TuxedoError::ERR_LINEAR_REGRESSION_FAILED);
+        }
+
         return TransformCoefficients(
             solution(0),
             solution(1),
             solution(2),
-            solution(3)
+            solution(3),
+            r_squared
         );
     }
 
