@@ -9,7 +9,11 @@ using namespace events;
 using namespace strategy;
 
 namespace portfolio {
-    
+    class OnlyLong: public Portfolio {
+        public:
+            using Portfolio::Portfolio;
+            vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;
+    };
 }
 
 #endif

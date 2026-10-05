@@ -13,11 +13,14 @@
 #include <functional>
 #include <cmath>
 #include <iomanip>
+#include "portfolio/OnlyLong.h"
+#include "portfolio/GaussianWavePacket.h"
 
 using namespace std;
 using namespace strategy;
 using namespace feed;
 using namespace timeseries;
+using namespace portfolio;
 
 namespace cli {
     const int PLAY_MIN_ARGC = 4;
@@ -25,6 +28,29 @@ namespace cli {
     const int PLAY_DIRECTORY_ARG = 3;
 
     const string PLAY_EXTREME_PRICE_STRATEGY("small-caps");
+
+    template<typename MapA, typename MapB>
+    void assert_equals(const MapA & a, const MapB & b) {
+        assert(a.size() == b.size());
+        for (const auto & [symbol, bars_a] : a) {
+            const auto bars_b_it = b.find(symbol);
+            assert(bars_b_it != b.end());
+
+            const vector<Bar> & bars_b = bars_b_it->second;
+            assert(bars_a.size() == bars_b.size());
+            for (size_t index = 0; index < bars_a.size(); ++index) {
+                const Bar & bar_a = bars_a[index];
+                const Bar & bar_b = bars_b[index];
+                assert(bar_a.timestamp() == bar_b.timestamp());
+                assert(bar_a.symbol() == bar_b.symbol());
+                assert(bar_a.open_price() == bar_b.open_price());
+                assert(bar_a.high_price() == bar_b.high_price());
+                assert(bar_a.low_price() == bar_b.low_price());
+                assert(bar_a.close_price() == bar_b.close_price());
+                assert(bar_a.volume() == bar_b.volume());
+            }
+        }
+    }
 
     unique_ptr<Strategy> strategy_factory(const string & name) {
         if(name == PLAY_EXTREME_PRICE_STRATEGY) {
@@ -87,7 +113,7 @@ namespace cli {
                     pair.first.low_price(),
                     pair.first.close_price(),
                     pair.first.volume(),
-                    pair.second.get().υ(),
+                    pair.second.get().μ(),
                     pair.second.get().s(),
                     std::to_underlying(pair.second.get().direction()),
                     pair.second.get().window_size()
@@ -127,28 +153,30 @@ namespace cli {
             log_error_message(std::format("'{}' is not a valid directory or is empty.", path));
             return -3;            
         }
+        
         vector<Signal> signals;
-
-        auto market_event_handler_test_impl = [&strategy, &signals](
+        GaussianWavePacket portfolio;
+        
+        auto market_event_handler_test_impl = [&strategy, &signals, &portfolio](
             unique_ptr<MarketEvent> market_event,
             const DataFrameFeed & dataframe_feed,
             const unordered_map<string, std::size_t> & records_loaded
         ) {
-            (void)dataframe_feed;
-            (void)records_loaded;
+            unique_ptr<Event> portfolio_response = portfolio.process_event(std::move(market_event));
+            unique_ptr<Event> strategy_response(strategy->process_event(std::move(portfolio_response)));
 
-            unique_ptr<Event> event(strategy->process_event(std::move(market_event)));
-            if (!event || event->event_type != EventType::SIGNAL) {
+            if (!strategy_response || strategy_response->event_type != EventType::SIGNAL) {
                 log_error_message("Market event did not produce a valid signal event.");
                 return;
             }
 #ifdef __DEBUG__
-            const SignalEvent & signal_event = dynamic_cast<const SignalEvent &>(*event.get());            
+            const SignalEvent & signal_event = dynamic_cast<const SignalEvent &>(*strategy_response.get());            
 #else
-            const SignalEvent & signal_event = static_cast<const SignalEvent &>(*event.get());
+            const SignalEvent & signal_event = static_cast<const SignalEvent &>(*strategy_response.get());
 #endif
             assert(signal_event.event_type == EventType::SIGNAL);
-            signals.append_range(signal_event.signals());
+
+            signals.append_range(portfolio.process_signals(signal_event.signals()));
         };
 
         auto dataframe_feed_result = DataFrameFeed::Create(files, market_event_handler_test_impl);
@@ -159,8 +187,10 @@ namespace cli {
 
         auto & dataframe_feed = dataframe_feed_result.value();
 
-        
         dataframe_feed.process_dataframes();
+#ifdef __DEBUG__
+        assert_equals(portfolio.bars(), strategy->bars());
+#endif        
         print_journal(signals, dataframe_feed);
         return 0;
     }

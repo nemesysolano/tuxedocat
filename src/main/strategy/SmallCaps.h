@@ -15,10 +15,10 @@ namespace strategy {
     class SmallCaps: public Strategy {
         private:
             unordered_map<string, KauffmanMovingAverageContext> contexts;
-            double υ_; // Previous υ_
+            double μ_; // Previous μ_
             double s_; // Previous s_
         public:
-            inline SmallCaps(): Strategy(), contexts({}), υ_(0), s_(0) {}
+            inline SmallCaps(): Strategy(), contexts({}), μ_(0), s_(0) {}
             void add_signal(const string & symbol, vector<Signal> & signals) override;
 
     };

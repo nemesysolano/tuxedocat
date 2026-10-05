@@ -7,16 +7,33 @@ using namespace timeseries;
 
 namespace portfolio {
     void Portfolio::process_market_event(const MarketEvent & event){
-        
+        for (const auto & [symbol, bar] : event.bars) {
+            if(!bars_.contains(symbol)) {
+                bars_.emplace(symbol, vector<Bar>());
+                bar_timestamps_.emplace(symbol, set<sys_seconds>());
+            }
+
+            vector<Bar> & bars = bars_.at(symbol);
+            set<sys_seconds> & bar_timestamps = bar_timestamps_.at(symbol);
+
+            bars.emplace_back(bar);
+            bar_timestamps.insert(bar.timestamp());
+        }
     }
 
+    vector<Signal> Portfolio::process_signals(const vector<events::Signal> & signals) {
+        return vector<Signal>(signals);
+    }
+
+    vector<Order> Portfolio::to_orders(const vector<Signal> & signals) {
+        return vector<Order>();
+    }
 
     unique_ptr<Event>  Portfolio::process_signal_event(const SignalEvent & event){
         if(event.signals().size() == 0) {
             return make_unique<FetchEvent>();
-        } else {
-            vector<Order> orders;
-            return make_unique<OrderEvent>(std::move(orders));
+        } else {            
+            return make_unique<OrderEvent>(to_orders(process_signals(event.signals())));
         }
     }
 

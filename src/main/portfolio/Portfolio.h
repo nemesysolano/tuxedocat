@@ -23,7 +23,7 @@ namespace portfolio {
 
 
     class Portfolio: public EventProcessor {
-        private:
+        protected:
             unordered_map<string, Position> positions_;
             double cash_;
             double equity_;
@@ -37,6 +37,9 @@ namespace portfolio {
         public:
             inline Portfolio(): positions_({}), cash_(0), equity_(0), commissions_(0), signal_count_(0), fill_count_(0), market_count_(0), bars_({}),  bar_timestamps_({}){}           
             virtual void process_market_event(const MarketEvent & event);
+            virtual vector<Order> to_orders(const vector<Signal> & signals);
+            inline vector<Order> to_orders(const vector<Signal> && signals) {const auto & ref = signals; return to_orders(ref);}
+            virtual vector<events::Signal> process_signals(const vector<events::Signal> & signals);
             virtual unique_ptr<Event>  process_signal_event(const SignalEvent & event);
             virtual unique_ptr<FetchEvent>  process_fill_event(const FillEvent & event);
             unique_ptr<Event> process_event(unique_ptr<Event> event);
@@ -46,6 +49,7 @@ namespace portfolio {
             inline double cash_value() const { return cash_; }
             inline double equity_value() const { return equity_; }
             inline double commissions_value() const { return commissions_; }
+            inline const unordered_map<string, vector<Bar>> & bars() { return bars_; }
             
     };
 }

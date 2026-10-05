@@ -22,7 +22,10 @@ namespace portfolio {
         auto signal_to_order = portfolio.process_event(make_unique<SignalEvent>(vector<Signal>{Signal(
             sys_seconds_now(), 
             APPL, 
-            SignalDirection::LONG
+            SignalDirection::LONG,
+            0,
+            0,
+            0
         )}));
         assert(signal_to_order->event_type == EventType::ORDER);
 

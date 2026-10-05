@@ -20,22 +20,22 @@ namespace events {
             sys_seconds timestamp_;
             string symbol_;
             SignalDirection direction_;
-            double υ_;
+            double μ_;
             double s_;
             size_t window_size_;            
         public:
             Signal(
-                sys_seconds timestamp, const string & symbol, SignalDirection direction, double z, double s, size_t window_size
-            ): timestamp_(timestamp), symbol_(symbol), direction_(direction), υ_(z), s_(s), window_size_(window_size) {}
+                sys_seconds timestamp, const string & symbol, SignalDirection direction, double μ, double s, size_t window_size
+            ): timestamp_(timestamp), symbol_(symbol), direction_(direction), μ_(μ), s_(s), window_size_(window_size) {}
 
             Signal(
-                sys_seconds timestamp, const string & symbol, SignalDirection direction, double z, size_t window_size
-            ): Signal(timestamp, symbol, direction, z, 0, window_size) {}
+                sys_seconds timestamp, const string & symbol, SignalDirection direction, double μ, size_t window_size
+            ): Signal(timestamp, symbol, direction, μ, 0, window_size) {}
 
             sys_seconds timestamp() const { return timestamp_; }
             const string & symbol() const { return symbol_; }
             SignalDirection direction() const { return direction_; }
-            double υ() const { return υ_; }
+            double μ() const { return μ_; }
             size_t window_size() const { return window_size_; }
             double s() const { return s_; }
     };

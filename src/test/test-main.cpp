@@ -6,6 +6,7 @@
 #include <cmath>
 #include "data/slice.h"
 #include "distributions-tests.h"
+#include "probability-tests.h"
 #include "filters-tests.h"
 #include "slice-tests.h"
 #include "timeseries-dataframe-tests.h"
@@ -30,6 +31,8 @@ int main(int argc, char* argv[]) {
     evaluate_test();
     evaluate_reversed_test();
     standard_cdf_test();
+    gaussian_wave_packet_derivatives_test();
+    solve_transform_system_test();
     kaufman_moving_average_test();
     evaluate_horizontally_test();
     evaluate_horizontally_reversed_test();    

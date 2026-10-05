@@ -1,53 +1,89 @@
-To calculate the maximum convective drift boundary $v_{\max}$, you must define the extreme physical limit of how fast the asset's price can move in a single time step ($dt$) without breaking the continuous flow assumption of your PDE.
+## CDFs ##
+## The Bracket-Implied Gaussian Wave Packet
+$$u(x, 0) = ( \frac{1}{2π σ^2(t)} )^{1/4} e^ { - \frac{(x - μ(t))^2}{4σ^2(t)}}$$
 
-Because your engine dynamically bounds the risk using an $N$-bar lookback window, $v_{\max}$ should not be a static hardcoded number. It must be dynamically computed at every time step $t$ using the historical price data of that exact window.
+$$F_K(X, t) = \frac{1}{2} \left[ \text{erf}\left( \frac{X - μ(t)}{σ(t)\sqrt{2}} \right) - \text{erf}\left( \frac{x_{\min}(t) - μ(t)}{σ(t)\sqrt{2}} \right) \right]$$
 
-### 1. The Empirical Maximum Rate of Change (Recommended)
+### Kernel Density
+$$F_K(X, t) = \frac{1}{2N} \sum_{j=0}^{N-1} \left[ \text{erf}\left( \frac{X - x_{t-j}}{h\sqrt{2}} \right) - \text{erf}\left( \frac{x_{\min}(t) - x_{t-j}}{h\sqrt{2}} \right) \right]$$
 
-The most robust approach is to scan the $N$-bar lookback window and find the largest absolute bar-to-bar price velocity that actually occurred.
+### Encoding Momentum**
 
-Since you previously defined momentum $p_0$ as the fractional rate of change ($\frac{\text{Close}_t - \text{Close}_{t-1}}{\text{Close}_{t-1}}$), $v_{\max}$ should operate in the same dimensionless percentage units:
+$$F_K(X, t) = \frac{1}{2N} \sum_{j=0}^{N-1} \left[ \text{erf}\left( \frac{X - (x_{j} + vt)}{H(t)\sqrt{2}} \right) - \text{erf}\left( \frac{x_{\min} - (x_{j} + vt)}{H(t)\sqrt{2}} \right) \right]$$
 
-$$v_{\max} = \max_{j=0}^{N-1} \left( \left\vert{} \frac{\text{Close}_{t-j} - \text{Close}_{t-j-1}}{\text{Close}_{t-j-1}} \right\vert{} \right) \cdot S$$
+## Derivatives ##
 
-* **The Safety Multiplier ($S$):** You multiply the empirical maximum by a scalar (typically $S = 1.5$ or $S = 2.0$) to allow the optimizer slightly more breathing room than the strict historical maximum, accommodating sudden but valid volatility expansions before tripping the circuit breaker.
+### The Bracket-Implied Gaussian Wave Packet Derivatives
+To calculate the spatial and temporal derivatives for **The Bracket-Implied Gaussian Wave Packet**, let us first write out the wave packet function from `FourierSignals_2.md`:
 
-### 2. The Bracket-Implied Structural Limit
+$$u(x, t) = \left( \frac{1}{2\pi σ(t)^2} \right)^{1/4} \exp\left( - \frac{(x - μ(t))^2}{4σ(t)^2} \right)$$
 
-If you want to tie the velocity limit directly to your quantum framework's causal brackets ($x_{\min}$ and $x_{\max}$), you can define $v_{\max}$ as the maximum possible distance a wave could travel while remaining inside the structural boundary in a single bar.
+For notational clarity, let:
 
-$$v_{\max} = \frac{x_{\max}(t) - x_{\min}(t)}{\mu(t)}$$
+* Amplitude factor: $C(t) = (2\pi σ(t)^2)^{-1/4}$
+* Exponent: $E(x, t) = -\frac{(x - μ(t))^2}{4σ(t)^2}$
+* Thus, $u(x, t) = C(t) e^{E(x, t)}$
 
-This approach mandates that no single bar's convective drift can exceed the total height of the established market structure. If the regression attempts to fit a drift $D$ larger than the entire bracket width, the momentum is fundamentally non-physical and the engine aborts.
+---
 
-### 3. The Statistical Volatility Bound (3-Sigma)
+#### 1. First Spatial Derivative ($\frac{\delta u}{\delta x}$)
 
-If you assume price velocities follow a rough normal distribution within the local window, you can bound the drift velocity using the time-dependent standard deviation $\sigma(t)$ established by your brackets.
+Since the amplitude factor $C(t)$ depends only on time $t$, it acts as a constant with respect to spatial coordinate $x$. Applying the chain rule to the exponential term:
 
-A 3-standard-deviation move covers 99.7% of expected normal price action. Therefore, anything exceeding $3\sigma$ is an anomalous shock rather than continuous wave drift:
+$$\frac{\delta u}{\delta x} = C(t) \cdot e^{E(x, t)} \cdot \frac{\delta}{\delta x}\left[ -\frac{(x - μ(t))^2}{4σ(t)^2} \right]$$
 
-$$v_{\max} = 3 \cdot \sigma(t)$$
+$$\frac{\delta u}{\delta x} = u(x, t) \left( -\frac{2(x - μ(t))}{4σ(t)^2} \right) = -\frac{x - μ(t)}{2σ(t)^2} \, u(x, t)$$
 
-### C++ Implementation Strategy
+Substituting $u(x, t)$ back in:
 
-In a production engine, you can compute $v_{\max}$ using the **Empirical Maximum Rate of Change** algorithm in $O(N)$ time right before you initialize your optimizer boundaries.
 
-```cpp
-double calculate_v_max(const std::vector<double>& closes, double safety_multiplier = 1.5) {
-    double max_velocity = 0.0;
-    
-    // Scan the N-bar window for the highest absolute bar-to-bar return
-    for (size_t i = 1; i < closes.size(); ++i) {
-        double velocity = std::abs((closes[i] - closes[i-1]) / closes[i-1]);
-        if (velocity > max_velocity) {
-            max_velocity = velocity;
-        }
-    }
-    
-    // Apply the safety buffer to establish the hard regression boundary
-    return max_velocity * safety_multiplier;
-}
+$$\frac{\delta u}{\delta x} = -\frac{x - μ(t)}{2σ(t)^2} \left( \frac{1}{2\pi σ(t)^2} \right)^{1/4} \exp\left( - \frac{(x - μ(t))^2}{4σ(t)^2} \right)$$
 
-```
+---
 
-You then feed this dynamically computed `v_max` directly into your constraint matrix (`bounds.D_max = v_max` and `bounds.D_min = -v_max`) for the constrained least squares solver.
+#### 2. Second Spatial Derivative ($\frac{\delta^2 u}{\delta x^2}$)
+
+Differentiating $\frac{\delta u}{\delta x}$ with respect to $x$ using the product rule:
+
+$$\frac{\delta^2 u}{\delta x^2} = \frac{\delta}{\delta x} \left[ -\frac{x - μ(t)}{2σ(t)^2} \, u(x, t) \right]$$
+
+$$\frac{\delta^2 u}{\delta x^2} = -\frac{1}{2σ(t)^2} \, u(x, t) - \frac{x - μ(t)}{2σ(t)^2} \left( -\frac{x - μ(t)}{2σ(t)^2} \, u(x, t) \right)$$
+
+$$\frac{\delta^2 u}{\delta x^2} = \left[ \frac{(x - μ(t))^2 - 2σ(t)^2}{4σ(t)^4} \right] u(x, t)$$
+
+---
+
+#### 3. First Temporal Derivative ($\frac{\delta u}{\delta t}$)
+
+Both the pre-factor $C(t)$, the equilibrium anchor $μ(t)$, and the volatility spread $σ(t)$ depend on time $t$. Using the product rule on $u(x, t) = C(t) e^{E(x, t)}$:
+
+$$\frac{\delta u}{\delta t} = \frac{dC}{dt} e^{E} + C(t) e^{E} \frac{\partial E}{\partial t}$$
+
+* **Pre-factor derivative:**
+
+$$\frac{dC}{dt} = \frac{d}{dt} \left[ (2\pi)^{-1/4} σ(t)^{-1/2} \right] = -\frac{1}{2} (2\pi)^{-1/4} σ(t)^{-3/2} \frac{dσ}{dt} = -\frac{1}{2σ}\frac{dσ}{dt} C(t)$$
+
+
+* **Exponent derivative w.r.t $t$:**
+
+$$\frac{\partial E}{\partial t} = \frac{\partial}{\partial t} \left[ -\frac{(x - μ(t))^2}{4σ(t)^2} \right] = -\frac{2(x - μ(t))(-\frac{dμ}{dt})(4σ^2) - (x - μ(t))^2(8σ \frac{dσ}{dt})}{16σ^4}$$
+
+
+$$\frac{\partial E}{\partial t} = \frac{(x - μ(t))\frac{dμ}{dt}}{2σ(t)^2} + \frac{(x - μ(t))^2 \frac{dσ}{dt}}{2σ(t)^3}$$
+
+
+
+Combining them:
+
+
+$$\frac{\delta u}{\delta t} = u(x, t) \left[ \frac{(x - μ(t))\frac{dμ}{dt} + \frac{(x - μ(t))^2}{σ(t)}\frac{dσ}{dt} - σ(t)\frac{dσ}{dt}}{2σ(t)^2} \right]$$
+
+---
+
+#### 4. Second Temporal Derivative ($\frac{\delta^2 u}{\delta t^2}$)
+
+Differentiating $\frac{\delta u}{\delta t}$ with respect to $t$ requires applying the product and chain rules across the coupled temporal trajectories of $μ(t)$, $σ(t)$, $\frac{dμ}{dt}$, and $\frac{dσ}{dt}$.
+
+In practical implementations within your C++ trading engine, computing the full analytical second temporal derivative analytically can be computationally heavy. Instead, because $u(x, t)$ is evaluated at discrete time steps $dt$, second temporal derivatives are typically discretized using finite differences:
+
+$$\frac{\delta^2 u}{\delta t^2} \approx \frac{u(x, t) - 2u(x, t-dt) + u(x, t-2dt)}{dt^2}$$

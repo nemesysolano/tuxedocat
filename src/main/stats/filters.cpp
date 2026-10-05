@@ -11,91 +11,89 @@ namespace filters {
     const size_t MIN_KAMA_BARS = MIN_FILTER_BARS;
     const indexed_result invalid_result(0, numeric_limits<double>::quiet_NaN());
 
-    namespace {
-        size_t window_size_from_distances(size_t first, size_t second) {
-            const size_t average_distance =
-                first / 2 + second / 2 + (first % 2 + second % 2) / 2;
-            return min(average_distance, size_t{7}) + 1;
+    size_t window_size_from_distances(size_t first, size_t second) {
+        const size_t average_distance =
+            first / 2 + second / 2 + (first % 2 + second % 2) / 2;
+        return min(average_distance, size_t{7}) + 1;
+    }
+
+    struct weighted_sample {
+        size_t lag;
+        double raw_weight;
+        double price;
+    };
+
+    optional<size_t> filter_window_size(span<const Bar> series) {
+        const auto higher_high_result = nearest_higher_high(series);
+        const auto lower_low_result = nearest_lower_low(series);
+        if (!higher_high_result.has_value() || !lower_low_result.has_value()) {
+            return {};
         }
 
-        struct weighted_sample {
-            size_t lag;
-            double raw_weight;
-            double price;
-        };
+        const size_t window_size = window_size_from_distances(
+            higher_high_result->first,
+            lower_low_result->first
+        );
+        if (window_size > series.size()) {
+            return {};
+        }
+        return window_size;
+    }
 
-        optional<size_t> filter_window_size(span<const Bar> series) {
-            const auto higher_high_result = nearest_higher_high(series);
-            const auto lower_low_result = nearest_lower_low(series);
-            if (!higher_high_result.has_value() || !lower_low_result.has_value()) {
+    vector<weighted_sample> valid_samples(span<const Bar> series, size_t window_size) {
+        vector<weighted_sample> samples;
+        samples.reserve(window_size);
+
+        for (size_t lag = 0; lag < window_size; ++lag) {
+            const size_t bar_index = series.size() - 1 - lag;
+            const span<const Bar> prefix(series.data(), bar_index + 1);
+            const auto variance_result = time_dependent_variance(prefix);
+            if (!variance_result.has_value()) {
+                continue;
+            }
+
+            const double variance = variance_result->second;
+            const double price = series[bar_index].close_price();
+            if (!isfinite(variance) || variance <= 0.0 ||
+                !isfinite(price) || price <= 0.0) {
+                continue;
+            }
+
+            const double raw_weight = 1.0 / variance;
+            const double lagged_weight = static_cast<double>(lag + 1) * raw_weight;
+            if (!isfinite(raw_weight) || raw_weight <= 0.0 ||
+                !isfinite(lagged_weight)) {
+                continue;
+            }
+            samples.push_back({lag, raw_weight, price});
+        }
+        return samples;
+    }
+
+    optional<double> normalization_denominator(const vector<weighted_sample> & samples) {
+        double weight_sum = 0.0;
+        for (const auto & sample : samples) {
+            weight_sum += static_cast<double>(sample.lag + 1) * sample.raw_weight;
+            if (!isfinite(weight_sum)) {
                 return {};
             }
-
-            const size_t window_size = window_size_from_distances(
-                higher_high_result->first,
-                lower_low_result->first
-            );
-            if (window_size > series.size()) {
-                return {};
-            }
-            return window_size;
         }
-
-        vector<weighted_sample> valid_samples(span<const Bar> series, size_t window_size) {
-            vector<weighted_sample> samples;
-            samples.reserve(window_size);
-
-            for (size_t lag = 0; lag < window_size; ++lag) {
-                const size_t bar_index = series.size() - 1 - lag;
-                const span<const Bar> prefix(series.data(), bar_index + 1);
-                const auto variance_result = time_dependent_variance(prefix);
-                if (!variance_result.has_value()) {
-                    continue;
-                }
-
-                const double variance = variance_result->second;
-                const double price = series[bar_index].close_price();
-                if (!isfinite(variance) || variance <= 0.0 ||
-                    !isfinite(price) || price <= 0.0) {
-                    continue;
-                }
-
-                const double raw_weight = 1.0 / variance;
-                const double lagged_weight = static_cast<double>(lag + 1) * raw_weight;
-                if (!isfinite(raw_weight) || raw_weight <= 0.0 ||
-                    !isfinite(lagged_weight)) {
-                    continue;
-                }
-                samples.push_back({lag, raw_weight, price});
-            }
-            return samples;
+        if (weight_sum <= 0.0) {
+            return {};
         }
+        return weight_sum;
+    }
 
-        optional<double> normalization_denominator(const vector<weighted_sample> & samples) {
-            double weight_sum = 0.0;
-            for (const auto & sample : samples) {
-                weight_sum += static_cast<double>(sample.lag + 1) * sample.raw_weight;
-                if (!isfinite(weight_sum)) {
-                    return {};
-                }
-            }
-            if (weight_sum <= 0.0) {
-                return {};
-            }
-            return weight_sum;
+    optional<double> normalized_weight(
+        const weighted_sample & sample,
+        double denominator
+    ) {
+        const double weight =
+            (static_cast<double>(sample.lag + 1) * sample.raw_weight) / denominator;
+        if (!isfinite(weight) || weight <= 0.0) {
+            return {};
         }
-
-        optional<double> normalized_weight(
-            const weighted_sample & sample,
-            double denominator
-        ) {
-            const double weight =
-                (static_cast<double>(sample.lag + 1) * sample.raw_weight) / denominator;
-            if (!isfinite(weight) || weight <= 0.0) {
-                return {};
-            }
-            return weight;
-        }
+        return weight;
     }
 
     optional<indexed_result> nearest_higher_high(span<const Bar> series){
@@ -230,12 +228,6 @@ namespace filters {
     }
 
     indexed_result kaufman_moving_average(span<const Bar> series, KauffmanMovingAverageContext & context) {
-        const auto window_size_result = filter_window_size(series);
-        if (!window_size_result.has_value()) {
-            return invalid_result;
-        }
-        const size_t window_size = *window_size_result;
-
         if (series.size() < MIN_KAMA_BARS) {
             return invalid_result;
         }
@@ -248,16 +240,19 @@ namespace filters {
 
         if (std::isnan(context.k_t_1())) {
             double initial_sum = 0.0;
-            for (size_t index = first_index; index < series.size(); ++index) {
+            for (size_t index = 0; index < series.size(); ++index) {
                 const double price = series[index].close_price();
                 if (!isfinite(price)) {
                     return invalid_result;
                 }
                 initial_sum += price;
+                if (!isfinite(initial_sum)) {
+                    return invalid_result;
+                }
             }
-            const double kama = initial_sum / MIN_KAMA_BARS;
+            const double kama = initial_sum / series.size();
             context.k_t_1() = kama;
-            return pair<size_t, double>(window_size, kama);
+            return pair<size_t, double>(series.size(), kama);
         }
 
         const double first_price = series[first_index].close_price();
@@ -288,6 +283,6 @@ namespace filters {
         }
 
         context.k_t_1() = kama;
-        return pair<size_t, double>(window_size, kama);
+        return pair<size_t, double>(series.size(), kama);
     }
 }
