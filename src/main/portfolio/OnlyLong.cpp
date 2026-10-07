@@ -16,7 +16,7 @@ namespace portfolio {
                 signal.symbol(),
                 (signal.direction() == SignalDirection::LONG || signal.direction() == SignalDirection::IDLE) ? signal.direction() : SignalDirection::LONG,
                 signal.μ(),
-                signal.s(),
+                signal.σ(),
                 signal.window_size()
             ));
         }

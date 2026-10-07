@@ -1,5 +1,5 @@
-#ifndef __EXTREME_PRICE_H__
-#define __EXTREME_PRICE_H__
+#ifndef __NORMALIZED_Z_STRATEGY_H__
+#define __NORMALIZED_Z_STRATEGY_H__
 #include "Strategy.h"
 #include "data/Bar.h"
 #include "stats/filters.h"
@@ -12,13 +12,13 @@ using namespace events;
 using namespace filters;
 
 namespace strategy {
-    class SmallCaps: public Strategy {
+    class NormalizedZStrategy: public Strategy {
         private:
             unordered_map<string, KauffmanMovingAverageContext> contexts;
             double μ_; // Previous μ_
-            double s_; // Previous s_
+            double σ_; // Previous s_
         public:
-            inline SmallCaps(): Strategy(), contexts({}), μ_(0), s_(0) {}
+            inline NormalizedZStrategy(): Strategy(), contexts({}), μ_(0), σ_(0) {}
             void add_signal(const string & symbol, vector<Signal> & signals) override;
 
     };

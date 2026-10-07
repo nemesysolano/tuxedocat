@@ -59,6 +59,14 @@ void gaussian_wave_packet_derivatives_test() {
     assert(std::abs(derivatives.u_dt_2 - expected_u_dt_2) < 1e-8);
     assert(std::abs(derivatives.u_dx_1 - expected_u_dx_1) < 1e-8);
     assert(std::abs(derivatives.u_dx_2 - expected_u_dx_2) < 1e-6);
+    assert(std::abs(derivatives.u_dx_1_squared - derivatives.u_dx_1 * derivatives.u_dx_1) < 1e-12);
+    assert(std::abs(derivatives.u_times_u_dx_1 - u * derivatives.u_dx_1) < 1e-12);
+    assert(std::abs(derivatives.u_cubed - u * u * u) < 1e-12);
+    assert(std::abs(derivatives.u_squared - u * u) < 1e-12);
+    assert(std::abs(derivatives.u_dx_1_over_u - derivatives.u_dx_1 / u) < 1e-12);
+    assert(std::abs(derivatives.u_dx_2_over_u - derivatives.u_dx_2 / u) < 1e-12);
+    assert(std::abs(derivatives.log_u_squared_cos_u - std::log(u * u) * std::cos(u)) < 1e-12);
+    assert(std::abs(derivatives.abs_u_sin_squared_u - std::abs(u) * std::sin(u) * std::sin(u)) < 1e-12);
 
     log_trace_with_message("[PASSED]");
 }

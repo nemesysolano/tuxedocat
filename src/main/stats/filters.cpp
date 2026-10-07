@@ -7,8 +7,6 @@
 using namespace std;
 using namespace data;
 namespace filters {
-    const size_t MIN_FILTER_BARS = 15;
-    const size_t MIN_KAMA_BARS = MIN_FILTER_BARS;
     const indexed_result invalid_result(0, numeric_limits<double>::quiet_NaN());
 
     size_t window_size_from_distances(size_t first, size_t second) {
@@ -228,11 +226,11 @@ namespace filters {
     }
 
     indexed_result kaufman_moving_average(span<const Bar> series, KauffmanMovingAverageContext & context) {
-        if (series.size() < MIN_KAMA_BARS) {
+        if (series.size() < MIN_FILTER_BARS) {
             return invalid_result;
         }
 
-        const size_t first_index = series.size() - MIN_KAMA_BARS;
+        const size_t first_index = series.size() - MIN_FILTER_BARS;
         const double current_price = series.back().close_price();
         if (!isfinite(current_price)) {
             return invalid_result;

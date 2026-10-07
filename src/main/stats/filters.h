@@ -7,13 +7,11 @@
 #include "data/Result.h"
 #include "data/Bar.h"
 #include "events/SignalEvent.h"
-
 using namespace std;
 using namespace data;
 
 namespace filters {
-    extern const size_t MIN_FILTER_BARS;
-    extern const size_t MIN_KAMA_BARS;
+    constexpr size_t MIN_FILTER_BARS = 28;
 
     optional<indexed_result> nearest_higher_high(span<const Bar> series); // $x_{\max}(t)$
     optional<indexed_result> nearest_lower_low(span<const Bar> series); // $x_{\min}(t)$

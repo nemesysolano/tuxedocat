@@ -6,7 +6,7 @@
 #include <vector>
 #include <filesystem>
 #include "Files.h"
-#include "strategy/SmallCaps.h"
+#include "strategy/NormalizedZStrategy.h"
 #include "feed/DataFrameFeed.h"
 #include "timeseries/timeseries.h"
 #include <cassert>
@@ -54,7 +54,7 @@ namespace cli {
 
     unique_ptr<Strategy> strategy_factory(const string & name) {
         if(name == PLAY_EXTREME_PRICE_STRATEGY) {
-            return make_unique<SmallCaps>();
+            return make_unique<NormalizedZStrategy>();
         }
 
         return nullptr;
@@ -114,7 +114,7 @@ namespace cli {
                     pair.first.close_price(),
                     pair.first.volume(),
                     pair.second.get().μ(),
-                    pair.second.get().s(),
+                    pair.second.get().σ(),
                     std::to_underlying(pair.second.get().direction()),
                     pair.second.get().window_size()
                 );                

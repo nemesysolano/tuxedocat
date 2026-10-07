@@ -1,5 +1,5 @@
 #include <print>
-#include "SmallCaps.h"
+#include "NormalizedZStrategy.h"
 #include "stats/filters.h"
 #include <cmath>
 #include "timeseries/timeseries.h"
@@ -30,19 +30,18 @@ namespace strategy {
     Because every bar in my historical feed is already a finalized session, 
     you do not need to artificially truncate the span or look ahead. The current vector tip is your overnight limbo anchor point.    
     */
-    void SmallCaps::add_signal(const string & symbol, vector<Signal> & signals){
-        if(this->bars_.contains(symbol) && this->bars_.at(symbol).size() > filters::MIN_KAMA_BARS) {
+    void NormalizedZStrategy::add_signal(const string & symbol, vector<Signal> & signals){
+        if(this->bars_.contains(symbol) && this->bars_.at(symbol).size() > filters::MIN_FILTER_BARS) {
             const auto & bars = this->bars_.at(symbol);
             const span<const Bar> bars_span(bars);
             auto bar_iterator = bars.rbegin();
-            const Bar & bar_t = * (bar_iterator++);
-            const Bar & bar_t_1 = * (bar_iterator++);
-
+            const Bar & bar_t = * bar_iterator;
+            
             auto & context = contexts[symbol];
             indexed_result gaussian_result = gaussian_bracketed_average(bars_span);
             double μ = gaussian_result.second;
             size_t window_size = gaussian_result.first;
-            double s = ([&window_size, &bars_span, &μ]() {
+            double σ = ([&window_size, &bars_span, &μ]() {
                 if(is_valid_number(μ)) {
                     double sum = 0;
                     auto it = bars_span.rbegin();
@@ -58,20 +57,11 @@ namespace strategy {
             SignalDirection direction = SignalDirection::IDLE; 
 
             if(is_valid_number(μ)) {                               
-                const double speed = bar_t.close_price() - bar_t_1.close_price();
-
-                if (speed > 0) {
-                    direction = SignalDirection::SHORT;
-                } else if (speed < 0 ) {
-                    direction = SignalDirection::LONG;
-                }
-                
-                // Stamp the signal with the finalized session's timestamp
-                signals.emplace_back(Signal(bar_t.timestamp(), symbol, direction, μ, s, window_size));
+                signals.emplace_back(Signal(bar_t.timestamp(), symbol, direction, μ, σ, window_size));
                 this->μ_ = μ;
-                this->s_ = s;
+                this->σ_ = σ;
             } else {
-                signals.emplace_back(Signal(bar_t.timestamp(), symbol, direction, this->μ_, this->s_, window_size));
+                signals.emplace_back(Signal(bar_t.timestamp(), symbol, direction, this->μ_, this->σ_, window_size));
             }
 
             context.last_direction() = direction;

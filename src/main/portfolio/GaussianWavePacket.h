@@ -1,29 +1,39 @@
 #ifndef __FOURIER_RISK_H__
 #define __FOURIER_RISK_H__
 #include "Portfolio.h"
+#include "stats/filters.h"
 #include "stats/probability.h"
-
+#include "data/slice.h"
+#include "stats/filters.h"
+#include <chrono>
+#include <deque>
 #include <unordered_map>
 
 using namespace std;
 using namespace events;
 using namespace stats;
+using namespace slice;
 
 namespace portfolio {
+    static const size_t LAST_ROW_INDEX = filters::MIN_FILTER_BARS-1;
+
     class GaussianWavePacket: public Portfolio {
         private:
+            size_t add_row_to_system(const Signal & signal);
 
-            unordered_map<string, double> σ_t_1_; // $σ(t-1)$
-            unordered_map<string, double> μ_t_1_; // $μ(t-1)$
-            unordered_map<string, double> σ_t_2_; // $σ(t-2)$
-            unordered_map<string, double> μ_t_2_; // $μ(t-2)$
-            unordered_map<string, double> σ_t_3_; // $σ(t-3)$
-            unordered_map<string, double> μ_t_3_; // $μ(t-3)$            
-            unordered_map<string, vector<DifferentialEquation>> equations_;
-        public:
-            inline GaussianWavePacket(): Portfolio(), σ_t_1_(), μ_t_1_(), σ_t_2_(), μ_t_2_(), σ_t_3_(), μ_t_3_(), equations_() {}
+        protected:
+            unordered_map<string, vector<AugmentedNonLinearWavePacketEquation>> equations_;
+            unordered_map<string, MutableSlice2D> X_;
+            unordered_map<string, MutableSlice2D> f_;
+            unordered_map<string, deque<pair<sys_seconds, double>>> u_history_;
+            unordered_map<string, size_t> initialized_rows_;
+            Eigen::Matrix<double, filters::MIN_FILTER_BARS, stats::COEFFICIENTS_COUNT> eigen_X;
+            Eigen::Matrix<double, filters::MIN_FILTER_BARS, 1> eigen_y;            
+
+        public:            
+            inline GaussianWavePacket(): Portfolio(), equations_(), X_({}), f_({}), u_history_(), initialized_rows_({}) {}
             vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;
-            inline const unordered_map<string, vector<DifferentialEquation>> & spatial_derivatives() const { return equations_; }
+
     };
 }
 
