@@ -4,6 +4,7 @@
 #include <cmath>
 #include "timeseries/timeseries.h"
 #include "utils/log.h"
+#include <cmath>
 
 using namespace std;
 using namespace data;
@@ -32,39 +33,52 @@ namespace strategy {
     */
     void NormalizedZStrategy::add_signal(const string & symbol, vector<Signal> & signals){
         if(this->bars_.contains(symbol) && this->bars_.at(symbol).size() > filters::MIN_FILTER_BARS) {
-            const auto & bars = this->bars_.at(symbol);
-            const span<const Bar> bars_span(bars);
-            auto bar_iterator = bars.rbegin();
-            const Bar & bar_t = * bar_iterator;
-            
-            auto & context = contexts[symbol];
-            indexed_result gaussian_result = gaussian_bracketed_average(bars_span);
-            double μ = gaussian_result.second;
-            size_t window_size = gaussian_result.first;
-            double σ = ([&window_size, &bars_span, &μ]() {
-                if(is_valid_number(μ)) {
-                    double sum = 0;
-                    auto it = bars_span.rbegin();
+            const auto & series = this->bars_.at(symbol);            
+            size_t window_size = 0;
+            const span<const Bar> bars_span_1 = span<const Bar>(series).subspan(
+                series.size() - filters::MIN_FILTER_BARS - 1,
+                filters::MIN_FILTER_BARS
+            );
+            auto lower_low = nearest_lower_low(bars_span_1);
+            auto higher_high = nearest_higher_high(bars_span_1);
+            const double x_min = lower_low.has_value() ? lower_low->second : 0.0;
+            const double x_max = higher_high.has_value() ? higher_high->second : 0.0;
+            sys_seconds timestamp = series.back().timestamp();
 
-                    for(size_t i = 0; i < window_size; i++) {
-                        sum += (it->close_price() - μ)*(it->close_price() - μ);
-                    }
-                    return sqrt(sum/(MIN_FILTER_BARS-1));
+            this->direction_ = SignalDirection::IDLE;
+            if(lower_low.has_value() && higher_high.has_value() && max(lower_low.value().first, higher_high.value().first) > MIN_AVERAGE_BARS) {
+                window_size = max(lower_low.value().first, higher_high.value().first);
+                auto prev = bars_span_1.begin();
+                auto next = prev + 1;
+                auto end = bars_span_1.end();
+                vector<double> log_returns;
+
+                while(next != end) {
+                    log_returns.emplace_back(log(next->close_price()/prev->close_price()));
+                    prev++;
+                    next++;
                 }
-                return -1.0;
-            })();
-            
-            SignalDirection direction = SignalDirection::IDLE; 
 
-            if(is_valid_number(μ)) {                               
-                signals.emplace_back(Signal(bar_t.timestamp(), symbol, direction, μ, σ, window_size));
-                this->μ_ = μ;
-                this->σ_ = σ;
-            } else {
-                signals.emplace_back(Signal(bar_t.timestamp(), symbol, direction, this->μ_, this->σ_, window_size));
-            }
+                auto moments_result = simple_moving_moments(log_returns);
+                if(moments_result.has_value()) {
+                    const auto & moments = moments_result.value();
+                    auto iterator = series.rbegin();
+                    double last = (*iterator).close_price(); iterator ++;
+                    double second_to_last = (*iterator).close_price(); iterator++;
+                    double third_to_last = (*iterator).close_price(); iterator++;
+                    double fourth_to_last = (*iterator).close_price();
+                    double acceleration = log(log(second_to_last / third_to_last) / log(third_to_last / fourth_to_last));
 
-            context.last_direction() = direction;
+                    this->μ_ = moments.μ;
+                    this->σ_ = moments.σ;      
+                    this->r_ = log(last / second_to_last);
+                    this->direction_ = acceleration > 0 ? SignalDirection::LONG : SignalDirection::SHORT;
+                }
+
+            }            
+             
+            signals.emplace_back(Signal(timestamp, symbol, this->direction_, this->μ_, this->σ_, this->r_, window_size, 0, x_min, x_max));
         }
     }
+
 }

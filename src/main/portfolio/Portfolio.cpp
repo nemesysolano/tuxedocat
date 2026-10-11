@@ -22,6 +22,7 @@ namespace portfolio {
     }
 
     vector<Signal> Portfolio::process_signals(const vector<events::Signal> & signals) {
+        log_debug_message("process_signals");
         return vector<Signal>(signals);
     }
 

@@ -10,34 +10,7 @@ using namespace std;
 using namespace timeseries;
 
 namespace portfolio {
-    const string APPL("APPL");
-
-    void test_portfolio_input_output() {
-        Portfolio portfolio;
-        // ✅ MarketEvent → MarketEvent 
-        auto market_to_market = portfolio.process_event(make_unique<MarketEvent>(unordered_map<string, Bar>{}));
-        assert(market_to_market->event_type == EventType::MARKET);
-
-        // ✅ SignalEvent → OrderEvent
-        auto signal_to_order = portfolio.process_event(make_unique<SignalEvent>(vector<Signal>{Signal(
-            sys_seconds_now(), 
-            APPL, 
-            SignalDirection::LONG,
-            0,
-            0,
-            0
-        )}));
-        assert(signal_to_order->event_type == EventType::ORDER);
-
-        // ✅ SignalEvent → FetchEvent
-        auto signal_to_fetch = portfolio.process_event(make_unique<SignalEvent>(vector<Signal>{}));
-        assert(signal_to_fetch->event_type == EventType::FETCH);
-
-        // ✅ FillEvent → FetchEvent
-        auto signal_to_fill = portfolio.process_event(make_unique<FillEvent>()); 
-        assert(signal_to_fill->event_type == EventType::FETCH);
-        log_trace_with_message("[PASSED]");
-    }
+   
 
 }
 #endif

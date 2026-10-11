@@ -76,33 +76,24 @@ if __name__ == "__main__":
     # Place all signal markers at the bar close while preserving the existing long/short colors.
     long_signals = curve['Close'].where(curve['signal'] == 1, np.nan)
     short_signals = curve['Close'].where(curve['signal'] == -1, np.nan)
-    upper_band = curve['υ'] + 2 * curve['s']
-    lower_band = curve['υ'] - 2 * curve['s']
 
-    # Plot υ and its two-standard-deviation bands on the candle price axis.
-    plots_to_add = [
-        mpf.make_addplot(upper_band, type='line', color='darkorange', linestyle='--', secondary_y=False, alpha=0.7, width=1),
-        mpf.make_addplot(lower_band, type='line', color='darkorange', linestyle='--', secondary_y=False, alpha=0.7, width=1),
-        mpf.make_addplot(curve['υ'], type='line', color='gray', secondary_y=False, alpha=0.6, width=1)
-    ]
+    entry_points = []
 
-    # Conditionally add the scatter plots only if there is at least one valid signal
+    # Add entry markers only when the input contains those signal directions.
     if long_signals.notna().any():
-        print("we have long signals")
-        plots_to_add.append(mpf.make_addplot(long_signals, type='scatter', markersize=50, marker='o', color='blue'))
+        entry_points.append(mpf.make_addplot(long_signals, type='scatter', markersize=50, marker='o', color='blue'))
         
     if short_signals.notna().any():
-        print("we have short signals")
-        plots_to_add.append(mpf.make_addplot(short_signals, type='scatter', markersize=50, marker='o', color='red'))
+        entry_points.append(mpf.make_addplot(short_signals, type='scatter', markersize=50, marker='o', color='red'))
 
     metrics = evaluate_signal_accuracy(sys.argv[1])
 
-    # Render the candlestick chart with the entry markers and υ bands.
+    # Render candlesticks with entry points only.
     mpf.plot(
         curve,
         type='candle',
-        addplot=plots_to_add,
-        title='Candlestick, υ ± 2s Bands, and Entry Signals',
+        addplot=entry_points or None,
+        title='Candlestick and Entry Points',
         style='yahoo',
         ylabel='Price'
     )

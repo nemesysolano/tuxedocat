@@ -2,7 +2,7 @@
 #ifndef FILTERS_TESTS_H
 #define FILTERS_TESTS_H
 
-void kaufman_moving_average_test();
-
+namespace stats {
+}
 #endif
 #endif

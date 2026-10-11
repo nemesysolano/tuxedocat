@@ -8,11 +8,9 @@
 #include "timeseries/timeseries.h"
 #include <iostream>
 #include <cassert>
-#include "stats/ols.h"
 #include "utils/log.h"
 
 using namespace std;
-using namespace ols;
 using namespace feed;
 using namespace events;
 using namespace timeseries;
@@ -44,8 +42,8 @@ namespace feed {
 
     void test_bars_loaded_accurately(const string & program_directory) {
         vector<string> data_file_paths_(data_file_paths(program_directory));
-
-        auto market_event_handler_test_impl =  [](unique_ptr<MarketEvent> market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded) {
+        auto quite_close = [](double a, double b, double alpha) {return abs(a-b)< alpha;};
+        auto market_event_handler_test_impl =  [&quite_close](unique_ptr<MarketEvent> market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded) {
             const unordered_map<string,Bar> &  bars = market_event->bars;
 
             for (const auto & [symbol, bar] : bars) {

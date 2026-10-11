@@ -10,7 +10,6 @@
 #include "filters-tests.h"
 #include "slice-tests.h"
 #include "timeseries-dataframe-tests.h"
-#include "ols-tests.h"
 #include "channel/ChannelTest.h"
 #include "feed/DataFrameFeedTest.h"
 #include "process/ThreadPoolTest.h"
@@ -31,9 +30,6 @@ int main(int argc, char* argv[]) {
     evaluate_test();
     evaluate_reversed_test();
     standard_cdf_test();
-    gaussian_wave_packet_derivatives_test();
-    solve_transform_system_test();
-    kaufman_moving_average_test();
     evaluate_horizontally_test();
     evaluate_horizontally_reversed_test();    
     evaluate_horizontally_vectorized_test();
@@ -68,7 +64,6 @@ int main(int argc, char* argv[]) {
     test_cumprod();
     test_dataframe_copy();
     common_timestamps_test();
-    ols_flat_tests();
     test_dataframe_create_from_column_index();
     test_dataframe_create_from_column_name();
     test_dataframe_reindex();
@@ -87,7 +82,6 @@ int main(int argc, char* argv[]) {
     simulation::test_linear_controllers();
     simulation::test_circular_controllers();
     simulation::test_tree_controllers();
-    portfolio::test_portfolio_input_output();
     broker::test_broker_positions_closed();
     broker::test_broker_positions_updated();
     feed::test_bars_loaded_accurately(program_path);

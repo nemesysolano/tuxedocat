@@ -4,7 +4,41 @@
 using namespace std;
 
 namespace cli {
+    namespace {
+        bool matches_filter(const string & name, const string & filter) {
+            size_t name_index = 0;
+            size_t filter_index = 0;
+            size_t wildcard_index = string::npos;
+            size_t retry_name_index = 0;
+
+            while (name_index < name.size()) {
+                if (filter_index < filter.size() &&
+                    (filter[filter_index] == '?' || filter[filter_index] == name[name_index])) {
+                    ++name_index;
+                    ++filter_index;
+                } else if (filter_index < filter.size() && filter[filter_index] == '*') {
+                    wildcard_index = filter_index++;
+                    retry_name_index = name_index;
+                } else if (wildcard_index != string::npos) {
+                    filter_index = wildcard_index + 1;
+                    name_index = ++retry_name_index;
+                } else {
+                    return false;
+                }
+            }
+
+            while (filter_index < filter.size() && filter[filter_index] == '*') {
+                ++filter_index;
+            }
+            return filter_index == filter.size();
+        }
+    }
+
     vector<string> Files::listing(const string & directory) {
+        return listing(directory, "*");
+    }
+
+    vector<string> Files::listing(const string & directory, const string & filter) {
         const filesystem::path dir_path = filesystem::absolute(directory);
 
         if (!filesystem::exists(dir_path) || !filesystem::is_directory(dir_path)) {
@@ -13,7 +47,7 @@ namespace cli {
 
         vector<string> data_file_paths_;
         for (const auto & entry : filesystem::directory_iterator(dir_path)) {
-            if (entry.is_regular_file()) {
+            if (entry.is_regular_file() && matches_filter(entry.path().filename().string(), filter)) {
                 data_file_paths_.push_back(filesystem::absolute(entry.path()).string());
             }
         }

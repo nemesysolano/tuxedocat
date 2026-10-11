@@ -24,6 +24,12 @@ void standard_cdf_test() {
     assert(distributions::normal::standard_cdf(-10.0) < 0.000001);
     std::cout << "Test Case 4 Passed: Extreme values" << std::endl;
 
+    // Location and scale must be applied in the same units as the observation.
+    assert(approx_equal(distributions::normal::cdf(100.0, 100.0, 10.0), 0.5));
+    assert(approx_equal(distributions::normal::cdf(110.0, 100.0, 10.0), 0.841344746));
+    assert(approx_equal(distributions::normal::cdf(90.0, 100.0, 10.0), 0.158655254));
+    std::cout << "Test Case 5 Passed: Location-scale CDF" << std::endl;
+
     std::cout << "All standard_cdf_test cases passed!" << std::endl << std::endl;
 }
 #endif

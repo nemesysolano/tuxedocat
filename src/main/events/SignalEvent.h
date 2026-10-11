@@ -22,15 +22,24 @@ namespace events {
             SignalDirection direction_;
             double μ_;
             double σ_;
-            size_t window_size_;            
+            double r_;
+            size_t window_size_;
+            double p_;
+            double x_min_;
+            double x_max_;
         public:
             Signal(
-                sys_seconds timestamp, const string & symbol, SignalDirection direction, double μ, double s, size_t window_size
-            ): timestamp_(timestamp), symbol_(symbol), direction_(direction), μ_(μ), σ_(s), window_size_(window_size) {}
+                sys_seconds timestamp, const string & symbol, SignalDirection direction, double μ, double σ, double r, size_t window_size, double p, double x_min, double x_max
+            ): timestamp_(timestamp), symbol_(symbol), direction_(direction), μ_(μ), σ_(σ), r_(r), window_size_(window_size), p_(p), x_min_(x_min), x_max_(x_max) {}
 
             Signal(
-                sys_seconds timestamp, const string & symbol, SignalDirection direction, double μ, size_t window_size
-            ): Signal(timestamp, symbol, direction, μ, 0, window_size) {}
+                sys_seconds timestamp, const string & symbol, SignalDirection direction, double μ, double σ, double r, size_t window_size, double p
+            ): Signal(timestamp, symbol, direction, μ, σ, r, window_size, p, 0, 0) {}
+
+            Signal(
+                sys_seconds timestamp, const string & symbol, SignalDirection direction, double μ, double σ, double r, size_t window_size
+            ): Signal(timestamp, symbol, direction, μ, σ, r, window_size, 0, 0, 0) {}
+
 
             sys_seconds timestamp() const { return timestamp_; }
             const string & symbol() const { return symbol_; }
@@ -38,6 +47,10 @@ namespace events {
             double μ() const { return μ_; }
             size_t window_size() const { return window_size_; }
             double σ() const { return σ_; }
+            double p() const { return p_; }
+            double r() const { return r_; }
+            double x_min() const { return x_min_; }
+            double x_max() const { return x_max_; }
     };
 
     class SignalEvent: public Event {    
@@ -50,6 +63,7 @@ namespace events {
                 return make_unique<SignalEvent>(signals_);
             }
             inline const vector<Signal> & signals() const { return signals_;}
+
     };
 }
 
