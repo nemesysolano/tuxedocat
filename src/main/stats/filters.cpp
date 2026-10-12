@@ -21,7 +21,7 @@ namespace filters {
             const double higher_price = bar_t.high_price();
 
             if (isfinite(higher_price) && higher_price > current_price) {
-                return pair<size_t, double>{distance, log(higher_price / current_price)};
+                return pair<size_t, double>{distance, /*log(higher_price / current_price)*/ higher_price};
             }
         }
 
@@ -42,7 +42,7 @@ namespace filters {
             const double lower_price = bar_t.low_price();
 
             if (isfinite(lower_price) && lower_price > 0.0 && lower_price < current_price) {
-                return pair<size_t, double>{distance, log(lower_price / current_price)};
+                return pair<size_t, double>{distance, /*log(lower_price / current_price)*/ lower_price};
             }
         }
 

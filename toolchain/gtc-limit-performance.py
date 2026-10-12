@@ -62,29 +62,31 @@ def evaluate_binary_symbol(
         if pd.isna(window_size) or int(window_size) < min_window:
             continue
 
-        x_min = float(df['x_min'].iloc[t]) if pd.notna(df['x_min'].iloc[t]) else -0.01
-        x_max = float(df['x_max'].iloc[t]) if pd.notna(df['x_max'].iloc[t]) else 0.01
-        
         signal_close = float(df['close'].iloc[t])
         signal_high = float(df['high'].iloc[t])
         signal_low = float(df['low'].iloc[t])
         
+        # x_min and x_max are bare prices (nearest higher high / lower low)
+        x_min_val = float(df['x_min'].iloc[t]) if pd.notna(df['x_min'].iloc[t]) else 0.0
+        x_max_val = float(df['x_max'].iloc[t]) if pd.notna(df['x_max'].iloc[t]) else 0.0
+        
+        # Fallbacks in case the C++ engine outputs 0.0
+        x_min = x_min_val if x_min_val > 0 else signal_low * 0.99
+        x_max = x_max_val if x_max_val > 0 else signal_high * 1.01
+
         next_bar = df.iloc[t + 1]
         next_open = float(next_bar['open'])
         if next_open <= 0:
             continue
 
         # --- GTC LIMIT ORDER STRATEGY IMPLEMENTATION ---
-        # Define conditional entry threshold based on previous close and limit offset
         if signal == 1:
             limit_entry_price = signal_close * (1.0 + limit_offset_pct)
-            # If the market gaps completely past our desired entry limit at the open, skip execution
             if next_open > limit_entry_price:
                 skipped_by_gap += 1
                 continue
         else:
             limit_entry_price = signal_close * (1.0 - limit_offset_pct)
-            # If the market gaps down past our limit entry, skip execution
             if next_open < limit_entry_price:
                 skipped_by_gap += 1
                 continue
@@ -98,10 +100,12 @@ def evaluate_binary_symbol(
         wager = capital * wager_pct
         win = False
 
-        # One-Touch Evaluation utilizing structural bounds anchored from signal bar
         if signal == 1:
             long_evals += 1
-            target_barrier = signal_high * np.exp(x_max * barrier_mult)
+            # Calculate the log distance from signal_high to the bare price x_max
+            target_price = max(x_max, signal_high * 1.0001)
+            log_dist = np.log(target_price / signal_high)
+            target_barrier = signal_high * np.exp(log_dist * barrier_mult)
             
             if horizon_bars['high'].max() >= target_barrier:
                 win = True
@@ -109,7 +113,10 @@ def evaluate_binary_symbol(
                 
         elif signal == -1:
             short_evals += 1
-            target_barrier = signal_low * np.exp(x_min * barrier_mult)
+            # Calculate the log distance from signal_low to the bare price x_min
+            target_price = min(x_min, signal_low * 0.9999)
+            log_dist = np.log(target_price / signal_low)
+            target_barrier = signal_low * np.exp(log_dist * barrier_mult)
             
             if horizon_bars['low'].min() <= target_barrier:
                 win = True
@@ -163,13 +170,11 @@ def parse_args():
     parser.add_argument('--wager-pct', type=float, default=0.03, help='Fraction of current capital wagered per trade.')
     parser.add_argument('--initial-capital', type=float, default=1000.0, help='Initial account capital.')
     parser.add_argument('--barrier-mult', type=float, default=1.0, help='Multiplier applied to structural target.')
-    parser.add_argument('--limit-offset', type=float, default=0.002, help='GTC limit order offset percentage from previous close (e.g. 0.002 for 0.2%%).')
+    parser.add_argument('--limit-offset', type=float, default=0.002, help='GTC limit order offset percentage from previous close (e.g. 0.002 for 0.2%).')
     return parser.parse_args()
 
 
-## Implements GTC Limit Strategy.
-
-if __name__ == '__main__': ## python3 1-touch-trading-performance.py documents/results documents/1-touch-gtc-performance.csv --limit-offset 0.002 --barrier-mult 1.0
+if __name__ == '__main__': 
     args = parse_args()
     csv_files = sorted(glob.glob(f"{args.input_folder}/*.csv"))
     if not csv_files:
