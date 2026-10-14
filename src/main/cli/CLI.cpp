@@ -15,6 +15,8 @@
 #include <iomanip>
 #include "portfolio/OnlyLong.h"
 #include "portfolio/AugmentedNonLinearWavePacket.h"
+#include "portfolio/DynamicGaussianEnvelope.h"
+#include "portfolio/GeneralizedHyperbolicWave.h"
 #include <fstream>
 #include "process/ThreadPool.h"
 

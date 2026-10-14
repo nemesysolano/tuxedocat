@@ -14,8 +14,13 @@ using namespace events;
 using namespace stats;
 using namespace slice;
 
-namespace portfolio {
+namespace portfolio {    
     static const size_t LAST_ROW_INDEX = filters::MIN_FILTER_BARS-1;
+    constexpr double ε = 9e-6;
+    constexpr int GAUSSIAN_WAVE_UNSOLVABLE = -1;
+    constexpr int GAUSSIAN_WAVE_NEEDS_MORE_DATA = 0;
+    constexpr int GAUSSIAN_WAVE_SOLVED = 1;
+
     constexpr size_t COEFFICIENTS_COUNT = 12;
     constexpr size_t LONG_LOOKBACK_WINDOW = 360;
     class AugmentedNonLinearWavePacketCoeff {
@@ -173,23 +178,6 @@ namespace portfolio {
                 eigen_y(Eigen::Matrix<double, filters::MIN_FILTER_BARS, 1>::Zero()),
                 eigen_coefficients_(Eigen::Matrix<double, COEFFICIENTS_COUNT, 1>::Zero()),
                 coeff_() {}
-    };
-
-
-    class DynamicGaussianEnvelope: public AugmentedNonLinearWavePacket {
-        public:       
-            using AugmentedNonLinearWavePacket::AugmentedNonLinearWavePacket;             
-            vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;
-    };
-
-    class GeneralizedHyperbolicWave: public AugmentedNonLinearWavePacket {
-        protected:
-            int min_lookback_;
-            unordered_map<string, vector<double>> r_;
-        public:                    
-            inline GeneralizedHyperbolicWave(int min_lookback): AugmentedNonLinearWavePacket(), min_lookback_(min_lookback), r_(unordered_map<string, vector<double>>()) {}
-            inline GeneralizedHyperbolicWave(): GeneralizedHyperbolicWave(LONG_LOOKBACK_WINDOW){}
-            vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;
     };
 
     AugmentedNonLinearWaveTerms gaussian_terms(Signal signal);
