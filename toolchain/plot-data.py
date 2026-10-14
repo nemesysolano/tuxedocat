@@ -73,29 +73,48 @@ if __name__ == "__main__":
     curve = curve.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close'})
 
     # Create coordinate series for markers.
-    # Place all signal markers at the bar close while preserving the existing long/short colors.
     long_signals = curve['Close'].where(curve['signal'] == 1, np.nan)
     short_signals = curve['Close'].where(curve['signal'] == -1, np.nan)
 
     entry_points = []
 
-    # Add entry markers only when the input contains those signal directions.
+    # Add entry markers
     if long_signals.notna().any():
-        entry_points.append(mpf.make_addplot(long_signals, type='scatter', markersize=50, marker='o', color='blue'))
+        entry_points.append(mpf.make_addplot(long_signals, type='scatter', markersize=60, marker='o', color='blue'))
         
     if short_signals.notna().any():
-        entry_points.append(mpf.make_addplot(short_signals, type='scatter', markersize=50, marker='o', color='red'))
+        entry_points.append(mpf.make_addplot(short_signals, type='scatter', markersize=60, marker='o', color='red'))
 
     metrics = evaluate_signal_accuracy(sys.argv[1])
 
-    # Render candlesticks with entry points only.
-    mpf.plot(
+    # Render candlesticks with entry points only and capture the figure and axes.
+    fig, axes = mpf.plot(
         curve,
         type='candle',
         addplot=entry_points or None,
         title='Candlestick and Entry Points',
         style='yahoo',
-        ylabel='Price'
+        ylabel='Price',
+        returnfig=True
     )
-
     
+    ax = axes[0] # The main price axis
+    
+    # Calculate a dynamic offset to prevent the text from clipping the scatter marker (size 60)
+    price_range = curve['High'].max() - curve['Low'].min()
+    offset = price_range * 0.015 
+    
+    # Iterate and add the window_size text annotations exactly right above/below
+    for idx, (timestamp, row) in enumerate(curve.iterrows()):
+        signal = row.get('signal')
+        window = row.get('window_size')
+        
+        if pd.notna(signal) and signal in [1, -1] and pd.notna(window):
+            if signal == 1:
+                # Long entry marker is on Close. Place text right above it.
+                ax.text(idx, row['Close'] + offset, str(int(window)), color='black', ha='center', va='bottom', fontsize=9, fontweight='bold')
+            elif signal == -1:
+                # Short entry marker is on Close. Place text right beneath it.
+                ax.text(idx, row['Close'] - offset, str(int(window)), color='black', ha='center', va='top', fontsize=9, fontweight='bold')
+                
+    mpf.show()
