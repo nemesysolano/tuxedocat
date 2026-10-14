@@ -5,7 +5,6 @@
 #include "stats/probability.h"
 #include "data/slice.h"
 #include "stats/filters.h"
-#include "GeneralizedHyperbolicShape.h"
 #include <chrono>
 #include <deque>
 #include <unordered_map>
@@ -67,6 +66,94 @@ namespace portfolio {
     };
 
 
+    class AugmentedNonLinearWaveTerms {
+        public:
+            const double u;
+            const double u_δx;
+            const double u_δx2;
+            const double u_δx_power_2;
+            const double u_times_u_δx;
+            const double u_power_3;
+            const double u_power_2;
+            const double u_denominator;
+            const double u_δx_over_u;
+            const double u_δx2_over_u;
+            const double log_u_power_2_times_cos_u;
+            const double u_norm_times_cos_u;
+            const double z;            
+
+            inline AugmentedNonLinearWaveTerms(
+                double u_,
+                double u_δx_,
+                double u_δx2_,
+                double u_δx_power_2_,
+                double u_times_u_δx_,
+                double u_power_3_,
+                double u_power_2_,
+                double u_denominator_,
+                double u_δx_over_u_,
+                double u_δx2_over_u_,
+                double log_u_power_2_times_cos_u_,
+                double u_norm_times_cos_u_,
+                double z_
+            ):
+                u(u_),
+                u_δx(u_δx_),
+                u_δx2(u_δx2_),
+                u_δx_power_2(u_δx_power_2_),
+                u_times_u_δx(u_times_u_δx_),
+                u_power_3(u_power_3_),
+                u_power_2(u_power_2_),
+                u_denominator(u_denominator_),
+                u_δx_over_u(u_δx_over_u_),
+                u_δx2_over_u(u_δx2_over_u_),
+                log_u_power_2_times_cos_u(log_u_power_2_times_cos_u_),
+                u_norm_times_cos_u(u_norm_times_cos_u_),
+                z(z_) {}
+
+    };
+
+    class GeneralizedHyperbolicWaveTerms: public  AugmentedNonLinearWaveTerms{
+        public:
+            inline GeneralizedHyperbolicWaveTerms(
+                double u_,
+                double u_δx_,
+                double u_δx2_,
+                double u_δx_power_2_,
+                double u_times_u_δx_,
+                double u_power_3_,
+                double u_power_2_,
+                double u_denominator_,
+                double u_δx_over_u_,
+                double u_δx2_over_u_,
+                double log_u_power_2_times_cos_u_,
+                double u_norm_times_cos_u_,
+                double z_,
+                double c_,
+                double α_,
+                double β_
+            ) : AugmentedNonLinearWaveTerms(
+                u_,
+                u_δx_,
+                u_δx2_,
+                u_δx_power_2_,
+                u_times_u_δx_,
+                u_power_3_,
+                u_power_2_,
+                u_denominator_,
+                u_δx_over_u_,
+                u_δx2_over_u_,
+                log_u_power_2_times_cos_u_,
+                u_norm_times_cos_u_,
+                z_                
+            ), c(c_), α(α_), β(β_){}
+            double c;
+            double α;
+            double β;
+
+    };
+
+
     class AugmentedNonLinearWavePacket: public Portfolio {
         protected:
             unordered_map<string, deque<pair<sys_seconds, double>>> u_history_;
@@ -75,7 +162,7 @@ namespace portfolio {
             Eigen::Matrix<double, filters::MIN_FILTER_BARS, 1> eigen_y;            
             Eigen::Matrix<double, COEFFICIENTS_COUNT, 1> eigen_coefficients_;
             AugmentedNonLinearWavePacketCoeff coeff_;
-            int solve_system(const Signal & signal);
+            int solve_system(const Signal & signal, const AugmentedNonLinearWaveTerms & terms);
 
         public:            
             inline AugmentedNonLinearWavePacket():
@@ -98,15 +185,15 @@ namespace portfolio {
     class GeneralizedHyperbolicWave: public AugmentedNonLinearWavePacket {
         protected:
             int min_lookback_;
-            GeneralizedHyperbolicShape shape_;
-            
+            unordered_map<string, vector<double>> r_;
         public:                    
-            inline GeneralizedHyperbolicWave(int min_lookback): AugmentedNonLinearWavePacket(), min_lookback_(min_lookback), shape_(min_lookback) {}
+            inline GeneralizedHyperbolicWave(int min_lookback): AugmentedNonLinearWavePacket(), min_lookback_(min_lookback), r_(unordered_map<string, vector<double>>()) {}
             inline GeneralizedHyperbolicWave(): GeneralizedHyperbolicWave(LONG_LOOKBACK_WINDOW){}
             vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;
     };
 
-
+    AugmentedNonLinearWaveTerms gaussian_terms(Signal signal);
+    optional<GeneralizedHyperbolicWaveTerms> hyperbolic_terms(Signal signal, const vector<double> & r_);
 }
 
 #endif

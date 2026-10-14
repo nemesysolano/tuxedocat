@@ -13,6 +13,7 @@ using namespace std;
 namespace stats {
     constexpr double SQRT2 = 1.41421356237;
     
+    
 
 }
 #endif

@@ -141,7 +141,7 @@ namespace cli {
         }
         
         unique_ptr<Strategy> strategy(strategy_factory(strategy_name));
-        DynamicGaussianEnvelope portfolio;
+        GeneralizedHyperbolicWave portfolio; // DynamicGaussianEnvelope 
         vector<Signal> signals;        
         vector<string> files({input_file});
 

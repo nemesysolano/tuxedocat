@@ -7,14 +7,20 @@ CFLAGS := -Wall -Wextra -Wno-deprecated-declarations -DEIGEN_USE_BLAS -std=c++23
 ifeq ($(shell uname -s), Darwin)
     CC := clang++
     CFLAGS += -stdlib=libc++ -I/opt/homebrew/include/eigen3 -I/opt/homebrew/include
+    BOOST_INCLUDE_DIRS ?= /opt/homebrew/include /usr/local/include
 else ifeq ($(shell uname -s), SunOS) 
     # Use native GCC 14 on Solaris (automatically handles its own headers and libstdc++)
     CC := /usr/gcc/14/bin/g++
     CFLAGS += -I/usr/local/include/eigen3 -Icontrib/mdspan/include/mdspan
+    BOOST_INCLUDE_DIRS ?= /usr/local/include /usr/include
 else
     CC := c++
     CFLAGS += -I/usr/include/eigen3
+    BOOST_INCLUDE_DIRS ?= /usr/include /usr/local/include
 endif
+
+# Boost.Math is header-only; no Boost library needs to be linked.
+CFLAGS += $(addprefix -I,$(BOOST_INCLUDE_DIRS))
 
 SRC_DIR := src
 OBJ_DIR := obj

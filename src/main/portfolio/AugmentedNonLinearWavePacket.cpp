@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include "utils/log.h"
 #include <cassert>
+#include <boost/math/special_functions/bessel.hpp>
 
 using namespace std;
 using namespace events;
@@ -40,9 +41,9 @@ namespace portfolio {
         for(const Signal & signal: signals) {
             const string & symbol = signal.symbol();
             initialized_rows_.try_emplace(symbol, 0);
-
-            // Do not move this function above previous if statement.
-            if(solve_system(signal) == GAUSSIAN_WAVE_SOLVED && coeff_.valid() && coeff_.r_squared > 0.95) {
+            AugmentedNonLinearWaveTerms terms = gaussian_terms(signal);
+            
+            if(solve_system(signal, terms) == GAUSSIAN_WAVE_SOLVED && coeff_.valid() && coeff_.r_squared > 0.95) {
                 double p = distributions::normal::cdf(signal.r(), signal.μ(), signal.σ());
                 SignalDirection direction =  signal.direction();
                 if(!((p > 0.95 && direction == SignalDirection::LONG) || (p < 0.05 && direction == SignalDirection::SHORT))) {
@@ -72,35 +73,61 @@ namespace portfolio {
 
 
     vector<Signal> GeneralizedHyperbolicWave::process_signals(const vector<Signal> & signals) {
-        vector<Signal> processed_signals(signals);
+        vector<Signal> processed_signals;
+        for(const Signal & signal: signals) {
+            const string & symbol = signal.symbol();
+
+            initialized_rows_.try_emplace(symbol, 0);
+            if(!r_.contains(symbol)) {
+                r_.emplace(symbol, vector<double>());
+            }
+
+            vector<double> & r = r_.at(symbol);
+            r.push_back(signal.r());
+
+            auto terms_result = hyperbolic_terms(signal, r);
+            
+            if(terms_result.has_value() && solve_system(signal, terms_result.value()) == GAUSSIAN_WAVE_SOLVED && coeff_.valid() && coeff_.r_squared > 0.95) {
+                const auto & terms = terms_result.value();                
+                double p = distributions::hypebolic::cdf(signal.r(), signal.σ(), signal.μ(), terms.α, terms.β, terms.c);
+                SignalDirection direction =  signal.direction();
+                if(!((p > 0.95 && direction == SignalDirection::LONG) || (p < 0.05 && direction == SignalDirection::SHORT))) {
+                    direction = SignalDirection::IDLE;
+                    p = 0;
+                }
+
+                processed_signals.emplace_back(Signal(
+                    signal.timestamp(),
+                    signal.symbol(),
+                    direction,
+                    direction == SignalDirection::IDLE ? 0 : signal.μ(),
+                    direction == SignalDirection::IDLE ? 0 : signal.σ(),
+                    direction == SignalDirection::IDLE ? 0 : signal.r(),
+                    direction == SignalDirection::IDLE ? 0 : signal.window_size(),
+                    p,                    
+                    direction == SignalDirection::IDLE ? 0 : signal.x_min(),
+                    direction == SignalDirection::IDLE ? 0 : signal.x_max()
+                ));
+            } else {
+                processed_signals.emplace_back(signal);
+            }            
+        }
+
         return processed_signals;
     }    
 
-    int  AugmentedNonLinearWavePacket::solve_system(const Signal & signal) {
+    int  AugmentedNonLinearWavePacket::solve_system(const Signal & signal, const AugmentedNonLinearWaveTerms & terms) {
         const double μ = signal.μ();
         const double σ = signal.σ();
-        const double log_return = signal.r();
+        const double r = signal.r();
         
-        if (!isfinite(log_return) || !isfinite(μ) || !isfinite(σ) || σ <= 0.0) {
+        if (!isfinite(r) || !isfinite(μ) || !isfinite(σ) || σ <= 0.0) {
             return GAUSSIAN_WAVE_UNSOLVABLE;
         }
-        
-        const double x = log_return;
-        const double z = (x - μ) / σ;
-        const double u = exp(-0.5 * z * z) / (σ * sqrt(2.0 * numbers::pi));
-        const double u_δx = -(z / σ) * u; // \frac{δ u}{δ x}
-        const double u_δx2 = ((z * z - 1.0) / (σ * σ)) * u; // \frac{δ^2 u}{δ x^2}
-        const double u_δx_power_2 = u_δx * u_δx; // (\frac{δ u}{δ x})^2
-        const double u_times_u_δx = u * u_δx; // u \frac{δ u}{δ x}
-        const double u_power_3 = u * u * u; // u^3
-        const double u_power_2 = u * u; // u^2
-        const double u_denominator = max(u, ε);
-        const double u_δx_over_u = u_δx / u_denominator; // \frac{\frac{δ u}{δ x}}{u}
-        const double u_δx2_over_u = u_δx2 / u_denominator; // \frac{\frac{δ^2 u}{δ x^2}}{u}
-        const double log_u_power_2_times_cos_u =2.0 * (-log(σ * sqrt(2.0 * numbers::pi)) - 0.5 * z * z) * cos(u); // \ln(u^2) \cos(u)
-        const double u_norm_times_cos_u = abs(u) * sin(u) * sin(u); // \Vert{}u\Vert{} (\sin(u))^2
+     
         double u_δt2 = 0.0; // \frac{δ^2 u}{δ t^2}
         double u_δt = 0.0; // \frac{δ u}{δ t}
+
         const double dt = 1.0;
         size_t & initialized_rows = initialized_rows_.at(signal.symbol());
         const size_t row_index = min(initialized_rows, LAST_ROW_INDEX);
@@ -108,19 +135,19 @@ namespace portfolio {
         
         auto & history = u_history_[signal.symbol()];
         if (!history.empty()) {
-            u_δt = (u - history.back().second) / dt;
+            u_δt = (terms.u - history.back().second) / dt;
         }
 
         if (history.size() >= 2) {
-            u_δt2 = (u - 2.0 * history.back().second + history.front().second) / (dt * dt);
+            u_δt2 = (terms.u - 2.0 * history.back().second + history.front().second) / (dt * dt);
         }
 
-        if (isfinite(u) && isfinite(u_δx) && isfinite(u_δx2) &&
-            isfinite(u_δx_power_2) && isfinite(u_times_u_δx) &&
-            isfinite(u_power_3) && isfinite(u_power_2) &&
-            isfinite(u_δx_over_u) && isfinite(u_δx2_over_u) &&
-            isfinite(log_u_power_2_times_cos_u) &&
-            isfinite(u_norm_times_cos_u) && isfinite(u_δt) && isfinite(u_δt2)) {
+        if (isfinite(terms.u) && isfinite(terms.u_δx) && isfinite(terms.u_δx2) &&
+            isfinite(terms.u_δx_power_2) && isfinite(terms.u_times_u_δx) &&
+            isfinite(terms.u_power_3) && isfinite(terms.u_power_2) &&
+            isfinite(terms.u_δx_over_u) && isfinite(terms.u_δx2_over_u) &&
+            isfinite(terms.log_u_power_2_times_cos_u) &&
+            isfinite(terms.u_norm_times_cos_u) && isfinite(u_δt) && isfinite(u_δt2)) {
             
             if (initialized_rows == filters::MIN_FILTER_BARS) {
                 for (size_t row = 1; row <= LAST_ROW_INDEX; ++row) {
@@ -131,17 +158,17 @@ namespace portfolio {
 
             eigen_X(row_index, A_TERM) = u_δt2;
             eigen_X(row_index, B_TERM) = u_δt;
-            eigen_X(row_index, C_TERM) = u_δx2;
-            eigen_X(row_index, D_TERM) = u_δx;
-            eigen_X(row_index, E_TERM) = u_δx_power_2;
-            eigen_X(row_index, G_TERM) = u_times_u_δx;
-            eigen_X(row_index, K_TERM) = u_power_3;
-            eigen_X(row_index, P_TERM) = u_power_2;
-            eigen_X(row_index, M_TERM) = u_δx_over_u;
-            eigen_X(row_index, Q_TERM) = u_δx2_over_u;
-            eigen_X(row_index, L_TERM) = log_u_power_2_times_cos_u;
-            eigen_X(row_index, S_TERM) = u_norm_times_cos_u;
-            eigen_y(row_index) = z;
+            eigen_X(row_index, C_TERM) = terms.u_δx2;
+            eigen_X(row_index, D_TERM) = terms.u_δx;
+            eigen_X(row_index, E_TERM) = terms.u_δx_power_2;
+            eigen_X(row_index, G_TERM) = terms.u_times_u_δx;
+            eigen_X(row_index, K_TERM) = terms.u_power_3;
+            eigen_X(row_index, P_TERM) = terms.u_power_2;
+            eigen_X(row_index, M_TERM) = terms.u_δx_over_u;
+            eigen_X(row_index, Q_TERM) = terms.u_δx2_over_u;
+            eigen_X(row_index, L_TERM) = terms.log_u_power_2_times_cos_u;
+            eigen_X(row_index, S_TERM) = terms.u_norm_times_cos_u;
+            eigen_y(row_index) = terms.z;
 
             if (initialized_rows < filters::MIN_FILTER_BARS) {
                 ++initialized_rows;
@@ -172,9 +199,135 @@ namespace portfolio {
         if (history.size() == 2) {
             history.pop_front();
         }
-        history.emplace_back(signal.timestamp(), u);
+        history.emplace_back(signal.timestamp(), terms.u);
 
         return result;
     }
 
+    optional<GeneralizedHyperbolicWaveTerms> hyperbolic_terms(Signal signal, const vector<double> & r_) {
+        const double σ = signal.σ();
+        if (r_.size() < LONG_LOOKBACK_WINDOW || !isfinite(σ) || σ <= 0.0) {
+            return nullopt;
+        }
+
+        size_t N = r_.size();
+        double S = 0;
+        double K = 0;
+        for(const double & r: r_)     {
+            double diff = (r - signal.μ());
+            double diff_3 = pow(diff, 3);
+            S += diff_3;
+            K += diff_3 * diff;
+        }
+
+        double σ_3 = pow(signal.σ(), 3);
+        double σ_4 = σ_3 * signal.σ();
+
+        S = S / (N * σ_3);
+        K = K / (N * σ_4) - 3;        
+        if (!isfinite(S) || !isfinite(K) || K <= 0.0) {
+            return nullopt;
+        }
+
+        constexpr double λ = -0.5;
+        const double β = (3.0 * S) / (σ * sqrt(K));
+        const double α = sqrt(β * β + 3.0 / (K * σ * σ));
+        const double α_squared_minus_β_squared = α * α - β * β;
+        if (!isfinite(α) || !isfinite(β) || !isfinite(α_squared_minus_β_squared) || α_squared_minus_β_squared <= 0.0) {
+            return nullopt;
+        }
+        
+        const double bessel_argument = σ * sqrt(α_squared_minus_β_squared);
+        const double bessel_value = boost::math::cyl_bessel_k(λ, bessel_argument);
+        const double c = pow(α_squared_minus_β_squared, λ / 2.0) / (sqrt(2.0 * numbers::pi) * pow(α, λ - 0.5) * pow(σ, λ) *bessel_value);
+        if (!isfinite(bessel_value) || bessel_value <= 0.0 || !isfinite(c) || c <= 0.0) {
+            return nullopt;
+        }
+
+        // u(r,t) = c \cdot \left( σ(t)^2 + (r - μ(t))^2 \right)^{\frac{λ- 1/2}{2}} K_{λ- 1/2}\left( α \sqrt{σ(t)^2 + (r - μ(t))^2} \right) e^{β(r - μ(t))}
+        const double μ = signal.μ();
+        const double r = signal.r();
+        const double z = (r - μ) / σ;
+        const double delta = r - μ;
+        const double radius_squared = σ * σ + delta * delta;
+        const double radius = sqrt(radius_squared);
+        const double ν = λ - 0.5;
+        const double density_bessel_argument = α * radius;
+        const double density_bessel_value = boost::math::cyl_bessel_k(ν, density_bessel_argument);
+        const double first_derivative_bessel_value = boost::math::cyl_bessel_k(ν - 1.0, density_bessel_argument);
+        const double second_derivative_bessel_value = boost::math::cyl_bessel_k(ν - 2.0, density_bessel_argument);
+        const double exponential = exp(β * delta);
+        const double radial_power = pow(radius, ν);
+        const double u = c * radial_power * density_bessel_value * exponential;
+        if (!isfinite(density_bessel_value) || density_bessel_value <= 0.0 ||
+            !isfinite(first_derivative_bessel_value) || first_derivative_bessel_value <= 0.0 ||
+            !isfinite(second_derivative_bessel_value) || second_derivative_bessel_value <= 0.0 ||
+            !isfinite(exponential) || !isfinite(radial_power) || !isfinite(u) || u < 0.0) {
+            return nullopt;
+        }
+        const double radial_factor = radial_power * exponential;
+        const double u_δx = c * radial_factor *
+            (β * density_bessel_value - α * delta / radius * first_derivative_bessel_value);
+        const double u_δx2 = c * radial_factor *
+            (β * β * density_bessel_value -
+             (2.0 * β * α * delta / radius + α / radius) * first_derivative_bessel_value +
+             α * α * delta * delta / radius_squared * second_derivative_bessel_value);
+        const double log_u = log(c) + ν * log(radius) + log(density_bessel_value) + β * delta;
+        const double u_δx_power_2 = u_δx * u_δx; // (\frac{δ u}{δ x})^2
+        const double u_times_u_δx = u * u_δx; // u \frac{δ u}{δ x}
+        const double u_power_3 = u * u * u; // u^3
+        const double u_power_2 = u * u; // u^2
+        const double u_denominator = max(u, ε);
+        const double u_δx_over_u = u_δx / u_denominator; // \frac{\frac{δ u}{δ x}}{u}
+        const double u_δx2_over_u = u_δx2 / u_denominator; // \frac{\frac{δ^2 u}{δ x^2}}{u}
+        const double log_u_power_2_times_cos_u = 2.0 * log_u * cos(u); // \ln(u^2) \cos(u)
+        const double u_norm_times_cos_u = abs(u) * sin(u) * sin(u); // \Vert{}u\Vert{} (\sin(u))^2
+        if (!isfinite(u_δx) || !isfinite(u_δx2) || !isfinite(u_δx_power_2) ||
+            !isfinite(u_times_u_δx) || !isfinite(u_power_3) || !isfinite(u_power_2) ||
+            !isfinite(u_δx_over_u) || !isfinite(u_δx2_over_u) ||
+            !isfinite(log_u_power_2_times_cos_u) || !isfinite(u_norm_times_cos_u)) {
+            return nullopt;
+        }
+
+        return GeneralizedHyperbolicWaveTerms(
+            u, u_δx, u_δx2, u_δx_power_2, u_times_u_δx, u_power_3, u_power_2, u_denominator, u_δx_over_u, u_δx2_over_u, log_u_power_2_times_cos_u, u_norm_times_cos_u, z, c, α, β
+        );
+    }
+
+
+    AugmentedNonLinearWaveTerms gaussian_terms(Signal signal) {
+        const double μ = signal.μ();
+        const double σ = signal.σ();
+        const double r = signal.r();        
+        const double z = (r - μ) / σ;
+        const double u = exp(-0.5 * z * z) / (σ * sqrt(2.0 * numbers::pi));
+        const double u_δx = -(z / σ) * u; // \frac{δ u}{δ x}
+        const double u_δx2 = ((z * z - 1.0) / (σ * σ)) * u; // \frac{δ^2 u}{δ x^2}
+        const double u_δx_power_2 = u_δx * u_δx; // (\frac{δ u}{δ x})^2
+        const double u_times_u_δx = u * u_δx; // u \frac{δ u}{δ x}
+        const double u_power_3 = u * u * u; // u^3
+        const double u_power_2 = u * u; // u^2
+        const double u_denominator = max(u, ε);
+        const double u_δx_over_u = u_δx / u_denominator; // \frac{\frac{δ u}{δ x}}{u}
+        const double u_δx2_over_u = u_δx2 / u_denominator; // \frac{\frac{δ^2 u}{δ x^2}}{u}
+        const double log_u_power_2_times_cos_u =2.0 * (-log(σ * sqrt(2.0 * numbers::pi)) - 0.5 * z * z) * cos(u); // \ln(u^2) \cos(u)
+        const double u_norm_times_cos_u = abs(u) * sin(u) * sin(u); // \Vert{}u\Vert{} (\sin(u))^2
+
+        return AugmentedNonLinearWaveTerms(
+            u,
+            u_δx,
+            u_δx2,
+            u_δx_power_2,
+            u_times_u_δx,
+            u_power_3,
+            u_power_2,
+            u_denominator,
+            u_δx_over_u,
+            u_δx2_over_u,
+            log_u_power_2_times_cos_u,
+            u_norm_times_cos_u,
+            z
+        );
+
+    }
 }
