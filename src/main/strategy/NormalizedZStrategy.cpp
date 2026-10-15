@@ -68,11 +68,20 @@ namespace strategy {
                     double third_to_last = (*iterator).close_price(); iterator++;
                     double fourth_to_last = (*iterator).close_price();
                     double acceleration = log(log(second_to_last / third_to_last) / log(third_to_last / fourth_to_last));
+                    double delta = exp(this->σ_);
 
                     this->μ_ = moments.μ;
                     this->σ_ = moments.σ;      
                     this->r_ = log(last / second_to_last);
                     this->direction_ = acceleration > 0 ? SignalDirection::LONG : SignalDirection::SHORT;
+                    
+                    if(acceleration > 0 && (last + delta) / x_max > 1 && this->μ_ > 0) {
+                        this->direction_ = SignalDirection::LONG;
+                    } else if (acceleration < 0 && (last - delta) / x_min < 1 && this->μ_ < 0){
+                        this->direction_ = SignalDirection::SHORT;
+                    } else {
+                        this->direction_ = SignalDirection::IDLE;
+                    }
                 }
 
             }            

@@ -121,14 +121,15 @@ namespace portfolio {
 
     optional<GeneralizedHyperbolicWaveTerms> hyperbolic_terms(Signal signal, const vector<double> & r_) {
         const double σ = signal.σ();
-        if (r_.size() < LONG_LOOKBACK_WINDOW || !isfinite(σ) || σ <= 0.0) {
+        if (r_.size() < LONG_LOOKBACK_WINDOW+1 || !isfinite(σ) || σ <= 0.0) {
             return nullopt;
         }
 
-        size_t N = r_.size();
+        constexpr size_t N = LONG_LOOKBACK_WINDOW;
         double S = 0;
         double K = 0;
-        for(const double & r: r_)     {
+        for (size_t i = r_.size(); i > r_.size() - LONG_LOOKBACK_WINDOW; --i) {
+            const double & r = r_[i - 1];
             double diff = (r - signal.μ());
             double diff_3 = pow(diff, 3);
             S += diff_3;
