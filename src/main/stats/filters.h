@@ -13,6 +13,7 @@ using namespace data;
 namespace filters {
     constexpr size_t MIN_FILTER_BARS = 28;
     constexpr size_t MIN_AVERAGE_BARS = 5;
+    
     class Moments {
         public:
             inline Moments(double μ_, double σ_) :μ(μ_), σ(σ_) {}
@@ -20,8 +21,17 @@ namespace filters {
             const double σ; // Standard Deviation
     };    
     
-    optional<indexed_result> nearest_higher_high(span<const Bar> series); // $x_{\max}(t)$
-    optional<indexed_result> nearest_lower_low(span<const Bar> series);
+    class Extreme {
+        public:
+            const size_t index;
+            const double price;
+            const double log_return;
+
+            inline Extreme(size_t index_, double price_, double log_return_): index(index_), price(price_), log_return(log_return_) {}
+    };    
+    
+    optional<Extreme> nearest_higher_high(span<const Bar> series); // $x_{\max}(t)$
+    optional<Extreme> nearest_lower_low(span<const Bar> series);
     expected<Moments, TuxedoError> simple_moving_moments(span<const double> series);
 }
 

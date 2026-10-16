@@ -7,7 +7,7 @@
 using namespace std;
 using namespace data;
 namespace filters {
-    optional<indexed_result> nearest_higher_high(span<const Bar> series){
+    optional<Extreme> nearest_higher_high(span<const Bar> series){
         if (series.size() < 2) {
             return {};
         }
@@ -21,14 +21,14 @@ namespace filters {
             const double higher_price = bar_t.high_price();
 
             if (isfinite(higher_price) && higher_price > current_price) {
-                return pair<size_t, double>{distance, /*log(higher_price / current_price)*/ higher_price};
+                return Extreme(distance, higher_price, log(higher_price / current_price));
             }
         }
 
         return {};
     }
     
-    optional<indexed_result> nearest_lower_low(span<const Bar> series){
+    optional<Extreme> nearest_lower_low(span<const Bar> series){
         if (series.size() < 2) {
             return {};
         }
@@ -42,7 +42,7 @@ namespace filters {
             const double lower_price = bar_t.low_price();
 
             if (isfinite(lower_price) && lower_price > 0.0 && lower_price < current_price) {
-                return pair<size_t, double>{distance, /*log(lower_price / current_price)*/ lower_price};
+                return Extreme{distance, lower_price, log(lower_price / current_price)};
             }
         }
 
