@@ -28,15 +28,20 @@ using namespace portfolio;
 using namespace process;
 
 namespace cli {
-    const int PLAY_MIN_ARGC = 5;
+    const int PLAY_MIN_ARGC = 6;
     const int PLAY_STRATEGY_ARG = 2;
-    const int PLAY_INPUT_DIRECTORY_ARG = 3;
-    const int PLAY_OUTPUT_DIRECTORY_ARG = 4;    
-    const string PLAY_SMALL_CAPS_STRATEGY("small-caps");
-    const set<string> strategies_names({PLAY_SMALL_CAPS_STRATEGY});
+    const int PLAY_PORTFOLIO_ARG = 3;
+    const int PLAY_INPUT_DIRECTORY_ARG = 4;
+    const int PLAY_OUTPUT_DIRECTORY_ARG = 5;    
+    
+    const string PLAY_SMALL_CAPS_STRATEGY("normalized-z");
+    const string PLAY_GAUSSIAN_FILTER("gaussian");
+    const string PLAY_HYPERBOLIC_FILTER("hyperbolic");
 
-    template<typename MapA, typename MapB>
-    void assert_equals(const MapA & a, const MapB & b) {
+    const set<string> strategies_names({PLAY_SMALL_CAPS_STRATEGY});
+    const set<string> portfolio_names({PLAY_GAUSSIAN_FILTER, PLAY_HYPERBOLIC_FILTER});
+
+    template<typename MapA, typename MapB>void assert_equals(const MapA & a, const MapB & b) {
         assert(a.size() == b.size());
         for (const auto & [symbol, bars_a] : a) {
             const auto bars_b_it = b.find(symbol);
@@ -63,6 +68,15 @@ namespace cli {
             return make_unique<NormalizedZStrategy>();
         }
 
+        return nullptr;
+    }
+
+    unique_ptr<Portfolio> portfolio_factory(const string & name){
+        if(name == PLAY_GAUSSIAN_FILTER) {
+            return make_unique<DynamicGaussianEnvelope>();
+        } else if (name == PLAY_HYPERBOLIC_FILTER) {
+            return make_unique<GeneralizedHyperbolicWave>();
+        }
         return nullptr;
     }
 
@@ -134,7 +148,7 @@ namespace cli {
         }
     }
 
-    bool play(const string & input_file, const string & strategy_name, const string & output_directory) {
+    bool play(const string & input_file, const string & strategy_name, const string & portfolio_name, const string & output_directory) {
         const string output_file = (filesystem::path(output_directory) / filesystem::path(input_file).filename()).string();
         ofstream out(output_file);
         
@@ -143,7 +157,7 @@ namespace cli {
         }
         
         unique_ptr<Strategy> strategy(strategy_factory(strategy_name));
-        GeneralizedHyperbolicWave portfolio; // DynamicGaussianEnvelope 
+        unique_ptr<Portfolio> portfolio(portfolio_factory(portfolio_name));
         vector<Signal> signals;        
         vector<string> files({input_file});
 
@@ -152,7 +166,7 @@ namespace cli {
             const DataFrameFeed & dataframe_feed,
             const unordered_map<string, std::size_t> & records_loaded
         ) {
-            unique_ptr<Event> portfolio_response = portfolio.process_event(std::move(market_event));
+            unique_ptr<Event> portfolio_response = portfolio->process_event(std::move(market_event));
             unique_ptr<Event> strategy_response(strategy->process_event(std::move(portfolio_response)));
 
             if (!strategy_response || strategy_response->event_type != EventType::SIGNAL) {
@@ -161,7 +175,7 @@ namespace cli {
             }
             const SignalEvent & signal_event = static_cast<const SignalEvent &>(*strategy_response.get());
             assert(signal_event.event_type == EventType::SIGNAL);
-            signals.append_range(portfolio.process_signals(signal_event.signals()));
+            signals.append_range(portfolio->process_signals(signal_event.signals()));
         };
 
         auto dataframe_feed_result = DataFrameFeed::Create(files, market_event_handler_test_impl);
@@ -187,7 +201,7 @@ namespace cli {
         string program_name(argv[0]);
 
         if(argc < PLAY_MIN_ARGC) {
-            log_error_message("Not enough argument. Use `tuxedocat play <strategy> <input-directory> <output-directory>`.");
+            log_error_message("Not enough argument. Use `tuxedocat play <strategy> <portfolio> <input-directory> <output-directory>`.");
             return -1;
         }
 
@@ -195,6 +209,12 @@ namespace cli {
         if(!strategies_names.contains(strategy_name)) {
             log_error_message(std::format("'{}' is not a valid strategy name.", strategy_name));
             return -2;                
+        }
+
+        string portfolio_name(argv[PLAY_PORTFOLIO_ARG]);
+        if(!portfolio_names.contains(portfolio_name)) {
+            log_error_message(std::format("'{}' is not a valid portfolio name.", portfolio_name));
+            return -3;
         }
 
         string input_directory(argv[PLAY_INPUT_DIRECTORY_ARG]);
@@ -223,8 +243,8 @@ namespace cli {
         futures.reserve(files.size());
         for(const string & input_file: files) {
             futures.emplace_back(threa_pool.enqueue(
-                [input_file, strategy_name, output_directory]() {
-                    return play(input_file, strategy_name, output_directory);
+                [input_file, strategy_name, portfolio_name, output_directory]() {
+                    return play(input_file, strategy_name, portfolio_name, output_directory);
                 }
             ));
         }
