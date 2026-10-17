@@ -2,7 +2,7 @@
 #define __DYNAMIC_GAUSSIAN_ENVELOPE_H__
 #include "AugmentedNonLinearWavePacket.h"
 
-namespace portfolio {
+namespace filter {
 
     class DynamicGaussianEnvelope: public AugmentedNonLinearWavePacket {
         public:       

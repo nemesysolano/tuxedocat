@@ -6,16 +6,16 @@
 #include <vector>
 #include <filesystem>
 #include "Files.h"
-#include "strategy/NormalizedZStrategy.h"
+#include "signal/NormalizedZGenerator.h"
 #include "feed/DataFrameFeed.h"
 #include "timeseries/timeseries.h"
 #include <cassert>
 #include <functional>
 #include <cmath>
 #include <iomanip>
-#include "portfolio/AugmentedNonLinearWavePacket.h"
-#include "portfolio/DynamicGaussianEnvelope.h"
-#include "portfolio/GeneralizedHyperbolicWave.h"
+#include "filter/AugmentedNonLinearWavePacket.h"
+#include "filter/DynamicGaussianEnvelope.h"
+#include "filter/GeneralizedHyperbolicWave.h"
 #include <fstream>
 #include "process/ThreadPool.h"
 
@@ -23,7 +23,7 @@ using namespace std;
 using namespace strategy;
 using namespace feed;
 using namespace timeseries;
-using namespace portfolio;
+using namespace filter;
 using namespace process;
 
 namespace cli {
@@ -62,15 +62,15 @@ namespace cli {
         }
     }
 
-    unique_ptr<Strategy> strategy_factory(const string & name) {
+    unique_ptr<Generator> strategy_factory(const string & name) {
         if(name == PLAY_SMALL_CAPS_STRATEGY) {
-            return make_unique<NormalizedZStrategy>();
+            return make_unique<NormalizedZGenerator>();
         }
 
         return nullptr;
     }
 
-    unique_ptr<Portfolio> portfolio_factory(const string & name){
+    unique_ptr<Filter> portfolio_factory(const string & name){
         if(name == PLAY_GAUSSIAN_FILTER) {
             return make_unique<DynamicGaussianEnvelope>();
         } else if (name == PLAY_HYPERBOLIC_FILTER) {
@@ -155,8 +155,8 @@ namespace cli {
             return false;
         }
         
-        unique_ptr<Strategy> strategy(strategy_factory(strategy_name));
-        unique_ptr<Portfolio> portfolio(portfolio_factory(portfolio_name));
+        unique_ptr<Generator> strategy(strategy_factory(strategy_name));
+        unique_ptr<Filter> portfolio(portfolio_factory(portfolio_name));
         vector<Signal> signals;        
         vector<string> files({input_file});
 

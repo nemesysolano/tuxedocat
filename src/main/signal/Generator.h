@@ -1,5 +1,5 @@
-#ifndef __STRATEGY_H__
-#define __STRATEGY_H__
+#ifndef __GENERATOR_H__
+#define __GENERATOR_H__
 #include <map>  
 #include <vector>
 #include <string>
@@ -13,7 +13,7 @@ using namespace data;
 using namespace events;
 
 namespace strategy {
-    class Strategy: public EventProcessor {
+    class Generator: public EventProcessor {
         protected:
             map<string, vector<Bar>> bars_;
 #ifdef __TEST_MAIN__
@@ -24,7 +24,7 @@ namespace strategy {
             Strategy(): bars_({}), signal_events_({}) {};
             inline const vector<SignalEvent> & signal_events() {return signal_events_;}
 #else
-            Strategy(): bars_({}) {};
+            Generator(): bars_({}) {};
 #endif
             virtual void add_signal(const string & symbol, vector<Signal> & signals) = 0;
             virtual unique_ptr<SignalEvent> process_market(const MarketEvent & market_event);

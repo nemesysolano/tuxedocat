@@ -1,6 +1,6 @@
 #ifndef __FOURIER_RISK_H__
 #define __FOURIER_RISK_H__
-#include "Portfolio.h"
+#include "Filter.h"
 #include "stats/averages.h"
 #include "stats/probability.h"
 #include "data/slice.h"
@@ -13,7 +13,7 @@ using namespace events;
 using namespace stats;
 using namespace slice;
 
-namespace portfolio {    
+namespace filter {    
     static const size_t LAST_ROW_INDEX = stats::MIN_FILTER_BARS-1;
     constexpr double ε = 9e-6;
     constexpr int GAUSSIAN_WAVE_UNSOLVABLE = -1;
@@ -158,7 +158,7 @@ namespace portfolio {
     };
 
 
-    class AugmentedNonLinearWavePacket: public Portfolio {
+    class AugmentedNonLinearWavePacket: public Filter {
         protected:
             unordered_map<string, deque<pair<sys_seconds, double>>> u_history_;
             unordered_map<string, size_t> initialized_rows_;
@@ -170,7 +170,7 @@ namespace portfolio {
 
         public:            
             inline AugmentedNonLinearWavePacket():
-                Portfolio(),
+                Filter(),
                 u_history_(),
                 initialized_rows_(),
                 eigen_X(Eigen::Matrix<double, stats::MIN_FILTER_BARS, COEFFICIENTS_COUNT>::Zero()),

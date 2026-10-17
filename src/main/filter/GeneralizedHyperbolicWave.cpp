@@ -1,7 +1,7 @@
 #include "GeneralizedHyperbolicWave.h"
 #include "stats/distributions.h"
 
-namespace portfolio {
+namespace filter {
      vector<Signal> GeneralizedHyperbolicWave::process_signals(const vector<Signal> & signals) {
         vector<Signal> processed_signals;
         for(const Signal & signal: signals) {

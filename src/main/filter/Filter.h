@@ -19,10 +19,10 @@ using namespace std;
 using namespace events;
 using namespace data;
 
-namespace portfolio {
+namespace filter {
 
 
-    class Portfolio: public EventProcessor {
+    class Filter: public EventProcessor {
         protected:
             unordered_map<string, Position> positions_;
             double cash_;
@@ -35,7 +35,7 @@ namespace portfolio {
             unordered_map<string, set<sys_seconds>> bar_timestamps_;
             
         public:
-            inline Portfolio(): positions_({}), cash_(0), equity_(0), commissions_(0), signal_count_(0), fill_count_(0), market_count_(0), bars_({}),  bar_timestamps_({}){}           
+            inline Filter(): positions_({}), cash_(0), equity_(0), commissions_(0), signal_count_(0), fill_count_(0), market_count_(0), bars_({}),  bar_timestamps_({}){}           
             virtual void process_market_event(const MarketEvent & event);
             virtual vector<Order> to_orders(const vector<Signal> & signals);
             inline vector<Order> to_orders(const vector<Signal> && signals) {const auto & ref = signals; return to_orders(ref);}

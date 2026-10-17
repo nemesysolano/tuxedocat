@@ -1,5 +1,5 @@
 #include <print>
-#include "NormalizedZStrategy.h"
+#include "NormalizedZGenerator.h"
 #include "stats/averages.h"
 #include <cmath>
 #include "timeseries/timeseries.h"
@@ -31,7 +31,7 @@ namespace strategy {
     Because every bar in my historical feed is already a finalized session, 
     you do not need to artificially truncate the span or look ahead. The current vector tip is your overnight limbo anchor point.    
     */
-    void NormalizedZStrategy::add_signal(const string & symbol, vector<Signal> & signals){
+    void NormalizedZGenerator::add_signal(const string & symbol, vector<Signal> & signals){
         if(this->bars_.contains(symbol) && this->bars_.at(symbol).size() > MIN_FILTER_BARS) {
             const auto & series = this->bars_.at(symbol);            
             size_t window_size = 0;

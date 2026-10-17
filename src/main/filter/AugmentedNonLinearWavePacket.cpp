@@ -30,7 +30,7 @@ using namespace stats;
 #define L_TERM 10
 #define S_TERM 11
 
-namespace portfolio {
+namespace filter {
     int  AugmentedNonLinearWavePacket::solve_system(const Signal & signal, const AugmentedNonLinearWaveTerms & terms) {
         const double μ = signal.μ();
         const double σ = signal.σ();

@@ -2,7 +2,7 @@
 #define __GENERALIZED_HYPERBOLIC_WAVE_H__
 #include "AugmentedNonLinearWavePacket.h"
 
-namespace portfolio {
+namespace filter {
     class GeneralizedHyperbolicWave: public AugmentedNonLinearWavePacket {
         protected:
             int min_lookback_;

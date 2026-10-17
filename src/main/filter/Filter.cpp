@@ -1,12 +1,12 @@
-#include "Portfolio.h"
+#include "Filter.h"
 #include "utils/log.h"
 
 using namespace std;
 using namespace events;
 using namespace timeseries;
 
-namespace portfolio {
-    void Portfolio::process_market_event(const MarketEvent & event){
+namespace filter {
+    void Filter::process_market_event(const MarketEvent & event){
         for (const auto & [symbol, bar] : event.bars) {
             if(!bars_.contains(symbol)) {
                 bars_.emplace(symbol, vector<Bar>());
@@ -21,15 +21,15 @@ namespace portfolio {
         }
     }
 
-    vector<Signal> Portfolio::process_signals(const vector<events::Signal> & signals) {
+    vector<Signal> Filter::process_signals(const vector<events::Signal> & signals) {
         return vector<Signal>(signals);
     }
 
-    vector<Order> Portfolio::to_orders(const vector<Signal> & signals) {
+    vector<Order> Filter::to_orders(const vector<Signal> & signals) {
         return vector<Order>();
     }
 
-    unique_ptr<Event>  Portfolio::process_signal_event(const SignalEvent & event){
+    unique_ptr<Event>  Filter::process_signal_event(const SignalEvent & event){
         if(event.signals().size() == 0) {
             return make_unique<FetchEvent>();
         } else {            
@@ -37,11 +37,11 @@ namespace portfolio {
         }
     }
 
-    unique_ptr<FetchEvent>  Portfolio::process_fill_event(const FillEvent & event){
+    unique_ptr<FetchEvent>  Filter::process_fill_event(const FillEvent & event){
         return make_unique<FetchEvent>();
     }
 
-    unique_ptr<Event> Portfolio::Portfolio::process_event(unique_ptr<Event> event) { //TODO replace return type with `optional<unique_ptr<Event>>`
+    unique_ptr<Event> Filter::Filter::process_event(unique_ptr<Event> event) { //TODO replace return type with `optional<unique_ptr<Event>>`
         const Event & event_ref = *event.get();
 
         switch(event->event_type) {
