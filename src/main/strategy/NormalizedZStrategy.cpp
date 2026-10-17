@@ -1,6 +1,6 @@
 #include <print>
 #include "NormalizedZStrategy.h"
-#include "stats/filters.h"
+#include "stats/averages.h"
 #include <cmath>
 #include "timeseries/timeseries.h"
 #include "utils/log.h"
@@ -9,7 +9,7 @@
 using namespace std;
 using namespace data;
 using namespace events;
-using namespace filters;
+using namespace stats;
 using namespace timeseries;
 
 namespace strategy {
@@ -32,12 +32,12 @@ namespace strategy {
     you do not need to artificially truncate the span or look ahead. The current vector tip is your overnight limbo anchor point.    
     */
     void NormalizedZStrategy::add_signal(const string & symbol, vector<Signal> & signals){
-        if(this->bars_.contains(symbol) && this->bars_.at(symbol).size() > filters::MIN_FILTER_BARS) {
+        if(this->bars_.contains(symbol) && this->bars_.at(symbol).size() > MIN_FILTER_BARS) {
             const auto & series = this->bars_.at(symbol);            
             size_t window_size = 0;
             const span<const Bar> bars_span_1 = span<const Bar>(series).subspan(
-                series.size() - filters::MIN_FILTER_BARS - 1,
-                filters::MIN_FILTER_BARS
+                series.size() - MIN_FILTER_BARS - 1,
+                MIN_FILTER_BARS
             );
             auto lower_low = nearest_lower_low(bars_span_1);
             auto higher_high = nearest_higher_high(bars_span_1);

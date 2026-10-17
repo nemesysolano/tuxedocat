@@ -1,10 +1,9 @@
 #ifndef __FOURIER_RISK_H__
 #define __FOURIER_RISK_H__
 #include "Portfolio.h"
-#include "stats/filters.h"
+#include "stats/averages.h"
 #include "stats/probability.h"
 #include "data/slice.h"
-#include "stats/filters.h"
 #include <chrono>
 #include <deque>
 #include <unordered_map>
@@ -15,7 +14,7 @@ using namespace stats;
 using namespace slice;
 
 namespace portfolio {    
-    static const size_t LAST_ROW_INDEX = filters::MIN_FILTER_BARS-1;
+    static const size_t LAST_ROW_INDEX = stats::MIN_FILTER_BARS-1;
     constexpr double ε = 9e-6;
     constexpr int GAUSSIAN_WAVE_UNSOLVABLE = -1;
     constexpr int GAUSSIAN_WAVE_NEEDS_MORE_DATA = 0;
@@ -163,8 +162,8 @@ namespace portfolio {
         protected:
             unordered_map<string, deque<pair<sys_seconds, double>>> u_history_;
             unordered_map<string, size_t> initialized_rows_;
-            Eigen::Matrix<double, filters::MIN_FILTER_BARS, COEFFICIENTS_COUNT> eigen_X;
-            Eigen::Matrix<double, filters::MIN_FILTER_BARS, 1> eigen_y;            
+            Eigen::Matrix<double, stats::MIN_FILTER_BARS, COEFFICIENTS_COUNT> eigen_X;
+            Eigen::Matrix<double, stats::MIN_FILTER_BARS, 1> eigen_y;            
             Eigen::Matrix<double, COEFFICIENTS_COUNT, 1> eigen_coefficients_;
             AugmentedNonLinearWavePacketCoeff coeff_;
             int solve_system(const Signal & signal, const AugmentedNonLinearWaveTerms & terms);
@@ -174,8 +173,8 @@ namespace portfolio {
                 Portfolio(),
                 u_history_(),
                 initialized_rows_(),
-                eigen_X(Eigen::Matrix<double, filters::MIN_FILTER_BARS, COEFFICIENTS_COUNT>::Zero()),
-                eigen_y(Eigen::Matrix<double, filters::MIN_FILTER_BARS, 1>::Zero()),
+                eigen_X(Eigen::Matrix<double, stats::MIN_FILTER_BARS, COEFFICIENTS_COUNT>::Zero()),
+                eigen_y(Eigen::Matrix<double, stats::MIN_FILTER_BARS, 1>::Zero()),
                 eigen_coefficients_(Eigen::Matrix<double, COEFFICIENTS_COUNT, 1>::Zero()),
                 coeff_() {}
     };

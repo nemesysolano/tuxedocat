@@ -1,6 +1,6 @@
 #include "AugmentedNonLinearWavePacket.h"
 #include "stats/distributions.h"
-#include "stats/filters.h"
+#include "stats/averages.h"
 #include "stats/probability.h"
 #include <Eigen/QR>
 #include <algorithm>
@@ -14,7 +14,7 @@
 
 using namespace std;
 using namespace events;
-using namespace filters;
+using namespace stats;
 
 
 #define A_TERM 0
@@ -64,7 +64,7 @@ namespace portfolio {
             isfinite(terms.log_u_power_2_times_cos_u) &&
             isfinite(terms.u_norm_times_cos_u) && isfinite(u_δt) && isfinite(u_δt2)) {
             
-            if (initialized_rows == filters::MIN_FILTER_BARS) {
+            if (initialized_rows == MIN_FILTER_BARS) {
                 for (size_t row = 1; row <= LAST_ROW_INDEX; ++row) {
                     eigen_X.row(row - 1) = eigen_X.row(row);
                     eigen_y(row - 1) = eigen_y(row);
@@ -85,15 +85,15 @@ namespace portfolio {
             eigen_X(row_index, S_TERM) = terms.u_norm_times_cos_u;
             eigen_y(row_index) = terms.z;
 
-            if (initialized_rows < filters::MIN_FILTER_BARS) {
+            if (initialized_rows < MIN_FILTER_BARS) {
                 ++initialized_rows;
 
-            } else if (initialized_rows == filters::MIN_FILTER_BARS) {
+            } else if (initialized_rows == MIN_FILTER_BARS) {
                 this->eigen_coefficients_ = std::move(eigen_X.colPivHouseholderQr().solve(eigen_y));
                 result = this->eigen_coefficients_.allFinite() ? GAUSSIAN_WAVE_SOLVED : GAUSSIAN_WAVE_UNSOLVABLE;
                 
                 if(result == GAUSSIAN_WAVE_SOLVED) {
-                    const Eigen::Matrix<double, filters::MIN_FILTER_BARS, 1> residuals = eigen_y - eigen_X * this->eigen_coefficients_;
+                    const Eigen::Matrix<double, MIN_FILTER_BARS, 1> residuals = eigen_y - eigen_X * this->eigen_coefficients_;
                     const double res = residuals.squaredNorm();
                     const double total = (eigen_y.array() - eigen_y.mean()).square().sum();
                     

@@ -1,5 +1,5 @@
-#ifndef __FILTERS_H__
-#define __FILTERS_H__
+#ifndef __AVERAGES_H__
+#define __AVERAGES_H__
 #include "timeseries/timeseries.h"
 #include <optional>
 #include <span>
@@ -10,7 +10,7 @@
 using namespace std;
 using namespace data;
 
-namespace filters {
+namespace stats {
     constexpr size_t MIN_FILTER_BARS = 28;
     constexpr size_t MIN_AVERAGE_BARS = 5;
     

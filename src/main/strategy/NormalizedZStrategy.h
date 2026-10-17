@@ -2,14 +2,14 @@
 #define __NORMALIZED_Z_STRATEGY_H__
 #include "Strategy.h"
 #include "data/Bar.h"
-#include "stats/filters.h"
+#include "stats/averages.h"
 #include <string>
 #include <unordered_map>
 
 using namespace std;
 using namespace data;
 using namespace events;
-using namespace filters;
+using namespace stats;
 
 namespace strategy {
     class NormalizedZStrategy: public Strategy {

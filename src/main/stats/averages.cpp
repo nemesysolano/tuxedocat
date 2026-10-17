@@ -1,4 +1,4 @@
-#include "filters.h"
+#include "averages.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -6,7 +6,7 @@
 
 using namespace std;
 using namespace data;
-namespace filters {
+namespace stats {
     optional<Extreme> nearest_higher_high(span<const Bar> series){
         if (series.size() < 2) {
             return {};
