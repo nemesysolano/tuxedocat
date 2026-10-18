@@ -3,12 +3,9 @@
 #include <string>
 #include <unordered_map>
 #include "events/SignalEvent.h"
-#include "events/FillEvent.h"
-#include "events/LogEvent.h"
 #include "events/MarketEvent.h"
 #include "data/SignalDirection.h"
 #include "events/OrderEvent.h"
-#include "events/FetchEvent.h"
 #include <mutex>
 #include <set>
 #include "data/Position.h"

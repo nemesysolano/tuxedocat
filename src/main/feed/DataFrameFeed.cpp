@@ -1,5 +1,4 @@
 #include "DataFrameFeed.h"
-#include "events/KillEvent.h"
 #include "events/MarketEvent.h"
 #include "utils/log.h"
 #include <functional>
