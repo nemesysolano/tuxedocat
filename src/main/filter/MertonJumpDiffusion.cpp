@@ -27,13 +27,11 @@ namespace filter {
                 MertonJumpDiffusionTerms& terms = terms_result.value();                                                
                 double p = distributions::merton::cdf(signal.r(), terms.m, terms.s, terms.λ, terms.γ, terms.δ);
                 SignalDirection direction =  signal.direction();
-                log_debug_message(format("{}", p));
+
                 if(!((p > 0.95 && direction == SignalDirection::LONG) || (p < 0.05 && direction == SignalDirection::SHORT))) {
                     direction = SignalDirection::IDLE;
                     p = 0;
-                } else {
-                    log_trace_with_message(format("{}, {}", coeff_.r_squared, p));
-                }
+                } 
 
                 processed_signals.emplace_back(Signal(
                     signal.timestamp(),

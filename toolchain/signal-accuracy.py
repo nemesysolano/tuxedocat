@@ -10,11 +10,13 @@ import pandas as pd
 def evaluate_single_file(filepath):
     try:
         df = pd.read_csv(filepath)
+    except pd.errors.EmptyDataError:
+        return None
     except Exception as e:
         return {"error": f"Failed to read {filepath}: {str(e)}"}
 
     if df.empty:
-        return {"error": f"Empty file: {filepath}"}
+        return None
 
     # Standardize column casing and mapping
     df.columns = [str(c).strip().lower() for c in df.columns]
@@ -106,6 +108,8 @@ def process_signal_accuracy(input_folder, output_file):
 
     valid_records = []
     for result in summaries:
+        if result is None:
+            continue
         if 'error' in result:
             print(result['error'])
         else:

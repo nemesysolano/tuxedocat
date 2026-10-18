@@ -137,6 +137,63 @@ namespace distributions::merton {
                 return 0;
             }
 
+            int df(const InputType & x, JacobianType & jacobian) const {
+                const double m = std::clamp(x[0], -1e4, 1e4) * return_scale_;
+                const double s = std::exp(std::clamp(x[1], -13.8, 6.9)) * return_scale_;
+                const double λ = std::exp(std::clamp(x[2], -13.8, 6.9));
+                const double γ = std::clamp(x[3], -1e4, 1e4) * return_scale_;
+                const double δ = std::exp(std::clamp(x[4], -13.8, 6.9)) * return_scale_;
+                const bool m_is_unclamped = x[0] >= -1e4 && x[0] <= 1e4;
+                const bool s_is_unclamped = x[1] >= -13.8 && x[1] <= 6.9;
+                const bool λ_is_unclamped = x[2] >= -13.8 && x[2] <= 6.9;
+                const bool γ_is_unclamped = x[3] >= -1e4 && x[3] <= 1e4;
+                const bool δ_is_unclamped = x[4] >= -13.8 && x[4] <= 6.9;
+                const double s_sq = s * s;
+                const double delta_sq = δ * δ;
+
+                for (std::size_t i = 0; i < frequencies_.size(); ++i) {
+                    const double u = frequencies_[i];
+                    const double u2 = u_sq_[i];
+                    const double uγ = u * γ;
+                    const double exp_term = std::exp(-0.5 * u2 * delta_sq);
+                    const double cos_uγ = std::cos(uγ);
+                    const double sin_uγ = std::sin(uγ);
+                    const double a = -0.5 * u2 * s_sq +
+                        λ * (exp_term * cos_uγ - 1.0);
+                    const double b = u * m + λ * exp_term * sin_uγ;
+                    const double magnitude = std::exp(a);
+                    const double cos_b = std::cos(b);
+                    const double sin_b = std::sin(b);
+                    const double characteristic_real = magnitude * cos_b;
+                    const double characteristic_imag = magnitude * sin_b;
+
+                    const std::array<double, 5> da{
+                        0.0,
+                        s_is_unclamped ? -u2 * s_sq : 0.0,
+                        λ_is_unclamped ? λ * (exp_term * cos_uγ - 1.0) : 0.0,
+                        γ_is_unclamped ? -λ * exp_term * u * sin_uγ * return_scale_ : 0.0,
+                        δ_is_unclamped ? -λ * u2 * delta_sq * exp_term * cos_uγ : 0.0
+                    };
+                    const std::array<double, 5> db{
+                        m_is_unclamped ? u * return_scale_ : 0.0,
+                        0.0,
+                        λ_is_unclamped ? λ * exp_term * sin_uγ : 0.0,
+                        γ_is_unclamped ? λ * exp_term * u * cos_uγ * return_scale_ : 0.0,
+                        δ_is_unclamped ? -λ * u2 * delta_sq * exp_term * sin_uγ : 0.0
+                    };
+
+                    for (Eigen::Index parameter = 0; parameter < 5; ++parameter) {
+                        jacobian(static_cast<Eigen::Index>(2 * i), parameter) =
+                            characteristic_real * da[static_cast<std::size_t>(parameter)] -
+                            characteristic_imag * db[static_cast<std::size_t>(parameter)];
+                        jacobian(static_cast<Eigen::Index>(2 * i + 1), parameter) =
+                            characteristic_imag * da[static_cast<std::size_t>(parameter)] +
+                            characteristic_real * db[static_cast<std::size_t>(parameter)];
+                    }
+                }
+                return 0;
+            }
+
         private:
             vector<double> frequencies_;
             vector<double> u_sq_;
@@ -206,13 +263,8 @@ namespace distributions::merton {
              initial_γ,
              initial_δ_log;
 
-        // Run the LM Optimizer EXACTLY ONCE using the static finite-difference method
-        Eigen::LevenbergMarquardt<MertonFitResiduals>::lmdif1(
-            residual_function, 
-            x, 
-            nullptr, 
-            1e-8
-        );
+        Eigen::LevenbergMarquardt<MertonFitResiduals> optimizer(residual_function);
+        optimizer.lmder1(x, 1e-8);
 
         return MertonJumpParameters(
             std::clamp(x[0], -1e4, 1e4) * return_scale,
@@ -269,10 +321,6 @@ namespace distributions::merton {
         // Return normalized probability (handles cases where sum of weights is slightly < 1.0 due to truncation)
         return std::clamp(probability_sum / weight_sum, 0.0, 1.0); 
     }
-
-// Add to distributions::merton namespace in distributions_3.cpp
-    // Ensure you add the declaration to distributions.h: 
-    // double pdf(double x, const double m, const double s, const double λ, const double γ, const double δ);
 
     double pdf(double x, const double m, const double s, const double λ, const double γ, const double δ) {
         if (std::isnan(x) || !std::isfinite(m) || !std::isfinite(s) || s <= 0.0 ||
