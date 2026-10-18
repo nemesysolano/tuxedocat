@@ -165,15 +165,14 @@ namespace cli {
             const DataFrameFeed & dataframe_feed,
             const unordered_map<string, std::size_t> & records_loaded
         ) {
-            unique_ptr<Event> portfolio_response = portfolio->process_event(std::move(market_event));
-            unique_ptr<Event> strategy_response(strategy->process_event(std::move(portfolio_response)));
+            portfolio->process_market_event(*market_event);
+            unique_ptr<SignalEvent> strategy_response(strategy->process_market(*market_event));
 
             if (!strategy_response || strategy_response->event_type != EventType::SIGNAL) {
                 log_error_message("Market event did not produce a valid signal event.");
                 return;
             }
             const SignalEvent & signal_event = static_cast<const SignalEvent &>(*strategy_response.get());
-            assert(signal_event.event_type == EventType::SIGNAL);
             signals.append_range(portfolio->process_signals(signal_event.signals()));
         };
 

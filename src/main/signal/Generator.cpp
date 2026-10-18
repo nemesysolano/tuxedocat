@@ -23,19 +23,7 @@ namespace strategy {
         }
 
         SignalEvent signal_event(signals);
-#ifdef __TEST_MAIN__
-        signal_events_.push_back(signal_event);
-#endif
-        //TODO: Notify `SignalEvent` to `Portfolio`
+        
         return make_unique<SignalEvent>(std::move(signal_event));
-    }
-
-    unique_ptr<Event> Generator::process_event(unique_ptr<Event> event) {
-        if(event && event->event_type == EventType::MARKET) {
-            const MarketEvent & market_event = static_cast<const MarketEvent &>(*event);
-            return process_market(market_event);
-        }
-
-        return nullptr;
     }
 }

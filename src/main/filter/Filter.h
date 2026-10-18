@@ -7,7 +7,6 @@
 #include "events/LogEvent.h"
 #include "events/MarketEvent.h"
 #include "data/SignalDirection.h"
-#include "events/EventProcessor.h"
 #include "events/OrderEvent.h"
 #include "events/FetchEvent.h"
 #include <mutex>
@@ -22,7 +21,7 @@ using namespace data;
 namespace filter {
 
 
-    class Filter: public EventProcessor {
+    class Filter {
         protected:
             unordered_map<string, Position> positions_;
             double cash_;
@@ -40,9 +39,7 @@ namespace filter {
             virtual vector<Order> to_orders(const vector<Signal> & signals);
             inline vector<Order> to_orders(const vector<Signal> && signals) {const auto & ref = signals; return to_orders(ref);}
             virtual vector<events::Signal> process_signals(const vector<events::Signal> & signals);
-            virtual unique_ptr<Event>  process_signal_event(const SignalEvent & event);
-            virtual unique_ptr<FetchEvent>  process_fill_event(const FillEvent & event);
-            unique_ptr<Event> process_event(unique_ptr<Event> event);
+            virtual unique_ptr<OrderEvent>  process_signal_event(const SignalEvent & event);
 
             inline size_t signal_count() const {return signal_count_;}
             inline size_t fill_count() const { return fill_count_;}
@@ -50,6 +47,7 @@ namespace filter {
             inline double equity_value() const { return equity_; }
             inline double commissions_value() const { return commissions_; }
             inline const unordered_map<string, vector<Bar>> & bars() { return bars_; }
+            virtual ~Filter() {}
             
     };
 }
