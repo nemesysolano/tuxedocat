@@ -16,6 +16,7 @@
 #include "filter/AugmentedNonLinearWavePacket.h"
 #include "filter/DynamicGaussianEnvelope.h"
 #include "filter/GeneralizedHyperbolicWave.h"
+#include "filter/MertonJumpDiffusion.h"
 #include <fstream>
 #include "process/ThreadPool.h"
 
@@ -36,9 +37,10 @@ namespace cli {
     const string PLAY_SMALL_CAPS_STRATEGY("normalized-z");
     const string PLAY_GAUSSIAN_FILTER("gaussian");
     const string PLAY_HYPERBOLIC_FILTER("hyperbolic");
+    const string PLAY_MERTON_JUMP("merton-jump"); 
 
     const set<string> strategies_names({PLAY_SMALL_CAPS_STRATEGY});
-    const set<string> portfolio_names({PLAY_GAUSSIAN_FILTER, PLAY_HYPERBOLIC_FILTER});
+    const set<string> portfolio_names({PLAY_GAUSSIAN_FILTER, PLAY_HYPERBOLIC_FILTER, PLAY_MERTON_JUMP});
 
     template<typename MapA, typename MapB>void assert_equals(const MapA & a, const MapB & b) {
         assert(a.size() == b.size());
@@ -75,6 +77,8 @@ namespace cli {
             return make_unique<DynamicGaussianEnvelope>();
         } else if (name == PLAY_HYPERBOLIC_FILTER) {
             return make_unique<GeneralizedHyperbolicWave>();
+        } else if (name == PLAY_MERTON_JUMP) {
+            return make_unique<MertonJumpDiffusion>();
         }
         return nullptr;
     }

@@ -117,46 +117,6 @@ namespace filter {
 
     };
 
-    class GeneralizedHyperbolicWaveTerms: public  AugmentedNonLinearWaveTerms{
-        public:
-            inline GeneralizedHyperbolicWaveTerms(
-                double u_,
-                double u_δx_,
-                double u_δx2_,
-                double u_δx_power_2_,
-                double u_times_u_δx_,
-                double u_power_3_,
-                double u_power_2_,
-                double u_denominator_,
-                double u_δx_over_u_,
-                double u_δx2_over_u_,
-                double log_u_power_2_times_cos_u_,
-                double u_norm_times_cos_u_,
-                double z_,
-                double c_,
-                double α_,
-                double β_
-            ) : AugmentedNonLinearWaveTerms(
-                u_,
-                u_δx_,
-                u_δx2_,
-                u_δx_power_2_,
-                u_times_u_δx_,
-                u_power_3_,
-                u_power_2_,
-                u_denominator_,
-                u_δx_over_u_,
-                u_δx2_over_u_,
-                log_u_power_2_times_cos_u_,
-                u_norm_times_cos_u_,
-                z_                
-            ), c(c_), α(α_), β(β_){}
-            double c;
-            double α;
-            double β;
-
-    };
-
 
     class AugmentedNonLinearWavePacket: public Filter {
         protected:
@@ -179,8 +139,7 @@ namespace filter {
                 coeff_() {}
     };
 
-    AugmentedNonLinearWaveTerms gaussian_terms(Signal signal);
-    optional<GeneralizedHyperbolicWaveTerms> hyperbolic_terms(Signal signal, const vector<double> & r_);
+    AugmentedNonLinearWaveTerms gaussian_terms(Signal signal);    
 }
 
 #endif

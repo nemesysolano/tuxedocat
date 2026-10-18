@@ -9,6 +9,7 @@ namespace filter {
             using AugmentedNonLinearWavePacket::AugmentedNonLinearWavePacket;             
             vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;
     };
+    AugmentedNonLinearWaveTerms gaussian_terms(Signal signal, span<const double> r);
 }
 
 #endif
