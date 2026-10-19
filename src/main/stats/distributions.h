@@ -47,4 +47,19 @@ namespace distributions::merton {
     expected<MertonJumpParameters,TuxedoError> estimate_parameters(span<const double> r);
 }
 
+namespace distributions::student {
+    class StudentParameters {
+        public:
+            int ν;
+            double μ;
+            double σ;
+            inline StudentParameters(int ν_, double μ_, double σ_): ν(ν_), μ(μ_), σ(σ_){}
+    };
+
+    // $$u_G(r,t) = \frac{Γ(\frac{ν(t)+1}{2})}{σ(t) \sqrt{ν(t) π} Γ(\frac{ν(t)}{2})} \left( 1 + \frac{(r - μ(t))^2}{ν(t) σ(t)^2} \right)^{-\frac{ν(t)+1}{2}}$$
+    double pdf(double r, double ν, double μ, double σ);
+    double cdf(double r, double ν, double μ, double σ);
+     expected<MertonJumpParameters,TuxedoError> estimate_parameters(int ν, double μ, double σ);
+}
+
 #endif

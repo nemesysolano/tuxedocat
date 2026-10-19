@@ -97,13 +97,13 @@ Because the Poisson weight term $\frac{e^{-λ t} (λ t)^k}{k!}$ decays toward ze
 
 While the Generalized Hyperbolic (GH) distribution is the master equation for skew and kurtosis, a localized Student's t-distribution setup is highly efficient for modeling pure fat tails without the computational overhead of Bessel functions.
 
-* **The Target ($u_G$):** The Student's t-distribution parameterized by degrees of freedom $\nu(t)$, which scales the fatness of the tails.
+* **The Target ($u_G$):** The Student's t-distribution parameterized by degrees of freedom $ν(t)$, which scales the fatness of the tails.
 
-$$u_G(r,t) = \frac{\Gamma(\frac{\nu(t)+1}{2})}{σ(t) \sqrt{\nu(t) π} \Gamma(\frac{\nu(t)}{2})} \left( 1 + \frac{(r - μ(t))^2}{\nu(t) σ(t)^2} \right)^{-\frac{\nu(t)+1}{2}}$$
+$$u_G(r,t) = \frac{Γ(\frac{ν(t)+1}{2})}{σ(t) \sqrt{ν(t) π} Γ(\frac{ν(t)}{2})} \left( 1 + \frac{(r - μ(t))^2}{ν(t) σ(t)^2} \right)^{-\frac{ν(t)+1}{2}}$$
 
 
-* **The Baseline ($u_p$):** The standard Gaussian distribution, which is the exact mathematical limit of the Student's t-distribution as $\nu \to \infty$.
-* **Strategic Edge for One-Touch Options:** As market uncertainty increases, $\nu(t)$ decreases, shifting probability mass from the center into the extremes.
+* **The Baseline ($u_p$):** The standard Gaussian distribution, which is the exact mathematical limit of the Student's t-distribution as $ν \to \infty$.
+* **Strategic Edge for One-Touch Options:** As market uncertainty increases, $ν(t)$ decreases, shifting probability mass from the center into the extremes.
 
 ### 3. Extreme Value Theory (EVT) Setup (Threshold Exceedance)
 
@@ -126,6 +126,6 @@ Financial markets do not move in uniform clock time; they move in "business time
 * **The Baseline ($u_p$):** A Gaussian distribution evaluating price over standard, uniform calendar time $t$.
 * **The Target ($u_G$):** The Variance Gamma (VG) probability density function. It evaluates price as a continuous Brownian motion evaluated on a Gamma process (a randomized time clock).
 
-$$u_G(r,t) = \int_{0}^{\infty} \frac{1}{σ \sqrt{2π g}} e^{-\frac{(r - μ - \theta g)^2}{2σ^2 g}} \cdot \frac{g^{\frac{t}{\nu} - 1} e^{-\frac{g}{\nu}}}{\nu^{\frac{t}{\nu}} \Gamma(\frac{t}{\nu})} dg$$
+$$u_G(r,t) = \int_{0}^{\infty} \frac{1}{σ \sqrt{2π g}} e^{-\frac{(r - μ - \theta g)^2}{2σ^2 g}} \cdot \frac{g^{\frac{t}{ν} - 1} e^{-\frac{g}{ν}}}{ν^{\frac{t}{ν}} Γ(\frac{t}{ν})} dg$$
 
 

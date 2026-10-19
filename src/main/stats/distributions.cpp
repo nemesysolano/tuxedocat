@@ -1,4 +1,5 @@
 #include "distributions.h"
+#include <boost/math/distributions/students_t.hpp>
 #include <boost/math/quadrature/gauss_kronrod.hpp>
 #include <boost/math/special_functions/bessel.hpp>
 #include <algorithm>
@@ -375,3 +376,62 @@ namespace distributions::merton {
         return (weights * norm_pdfs).sum() / weights.sum();
     }
 }
+
+#include <boost/math/special_functions/beta.hpp>
+
+namespace distributions::student {
+
+    // Zero-overhead Boost policy (disables internal domain error exceptions since we pre-validate)
+    using fast_policy = boost::math::policies::policy<
+        boost::math::policies::domain_error<boost::math::policies::ignore_error>,
+        boost::math::policies::overflow_error<boost::math::policies::ignore_error>,
+        boost::math::policies::underflow_error<boost::math::policies::ignore_error>
+    >;
+
+    double pdf(double r, double ν, double μ, double σ) {
+        if (std::isnan(r) || !std::isfinite(ν) || ν <= 0.0 ||
+            !std::isfinite(μ) || !std::isfinite(σ) || σ <= 0.0) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+
+        if (std::isinf(r)) {
+            return 0.0;
+        }
+
+        const double inv_σ = 1.0 / σ;
+        const double z = (r - μ) * inv_σ;
+
+        // Direct log-space evaluation using C++ standard library (<cmath>)
+        // Avoids Boost object construction, Lanczos table overhead, and intermediate overflow
+        const double half_ν = 0.5 * ν;
+        const double half_ν_plus_half = half_ν + 0.5;
+
+        const double log_norm = std::lgamma(half_ν_plus_half) - std::lgamma(half_ν)  - 0.5 * std::log(ν * std::numbers::pi);
+        const double log_kernel = -half_ν_plus_half * std::log1p((z * z) / ν);
+
+        return std::exp(log_norm + log_kernel) * inv_σ;
+    }
+
+    double cdf(double r, double ν, double μ, double σ) {
+        if (std::isnan(r) || !std::isfinite(ν) || ν <= 0.0 ||
+            !std::isfinite(μ) || !std::isfinite(σ) || σ <= 0.0) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+
+        if (std::isinf(r)) {
+            return r < 0.0 ? 0.0 : 1.0;
+        }
+
+        const double z = (r - μ) / σ;
+        if (z == 0.0) {
+            return 0.5;
+        }
+
+        // Direct regularized incomplete beta evaluation: x = ν / (ν + z^2)
+        const double x = ν / (ν + z * z);
+        const double p = 0.5 * boost::math::ibeta(0.5 * ν, 0.5, x, fast_policy{});
+
+        return z < 0.0 ? p : 1.0 - p;
+    }
+}
+

@@ -67,7 +67,7 @@ namespace stats {
         for(auto iterator = series.begin(); iterator != end; iterator++) {
             diff_sum += (*iterator - μ) * (*iterator - μ);
         }
-        double σ = sqrt(diff_sum / series.size());
+        double σ = sqrt(diff_sum / (series.size()-1));
 
         return Moments(μ, σ);
 
