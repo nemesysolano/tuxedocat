@@ -28,7 +28,9 @@ namespace filter {
                     direction == SignalDirection::IDLE ? 0 : signal.window_size(),
                     p,                    
                     direction == SignalDirection::IDLE ? 0 : signal.x_min(),
-                    direction == SignalDirection::IDLE ? 0 : signal.x_max()
+                    direction == SignalDirection::IDLE ? 0 : signal.x_max(),
+                    direction == SignalDirection::IDLE ? 0 : signal.x_log_min(),
+                    direction == SignalDirection::IDLE ? 0 : signal.x_log_max()                    
                 ));
             } else {
                 processed_signals.emplace_back(signal);
