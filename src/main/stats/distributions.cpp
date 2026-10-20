@@ -433,5 +433,9 @@ namespace distributions::student {
 
         return z < 0.0 ? p : 1.0 - p;
     }
+
+    expected<StudentParameters,TuxedoError> estimate_parameters(int ν, double μ, double σ) {
+        return StudentParameters(ν, μ, σ);
+    }
 }
 
