@@ -75,7 +75,7 @@ namespace strategy {
                     this->σ_ = moments.σ;      
                     this->r_ = log(last / second_to_last);
                     this->direction_ = acceleration > 0 ? SignalDirection::LONG : SignalDirection::SHORT;
-                    
+
                     if(acceleration > 0 && (this->μ_ + this->σ_) > x_log_max) {
                         this->direction_ = SignalDirection::LONG;
                     } else if (acceleration < 0 && (this->μ_ - this->σ_) < x_log_min){
