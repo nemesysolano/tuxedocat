@@ -111,12 +111,41 @@ For barrier options, the shape of the probability distribution near the mean ($�
 
 * **The Target ($u_G$):** The Generalized Pareto Distribution (GPD), which models the probability density of returns strictly *given that they have already exceeded a high threshold* $u$.
 
-$$u_G(r,t) = \frac{1}{\beta} \left( 1 + \xi \frac{r - u}{\beta} \right)^{-\left(\frac{1}{\xi} + 1\right)}$$
+$$u_G(r,t) = \frac{1}{β} \left( 1 + ξ \frac{r - u}{β} \right)^{-\left(\frac{1}{ξ} + 1\right)}$$
 
 
-* **The Baseline ($u_p$):** The Exponential distribution, which is the proper subcase of the GPD when the shape parameter $\xi = 0$ (implying a light-tailed exponential decay of extreme returns).
+* **The Baseline ($u_p$):** The Exponential distribution, which is the proper subcase of the GPD when the shape parameter $ξ = 0$ (implying a light-tailed exponential decay of extreme returns).
 
 $$u_p(x,t) = \frac{1}{\beta} e^{-\frac{x - u}{\beta}}$$
+
+
+---
+
+For an exceedance threshold $u$, scale parameter $\beta>0$, and shape parameter $\xi$, the Generalized Pareto CDF is
+
+$$
+F_{\mathrm{GPD}}(x)=
+\begin{cases}
+0, & x<u,\\[4pt]
+1-\left(1+\xi\frac{x-u}{\beta}\right)^{-1/\xi},
+& x\ge u,\ \xi\ne 0,\ 1+\xi\frac{x-u}{\beta}>0,\\[4pt]
+1-\exp\left(-\frac{x-u}{\beta}\right),
+& x\ge u,\ \xi=0.
+\end{cases}
+$$
+
+For $\xi<0$, the GPD has a finite upper endpoint at $x=u-\beta/\xi$; its CDF is $1$ at and beyond that endpoint.
+
+The shifted exponential CDF, which is the GPD limit as $\xi\to 0$, is
+
+$$
+F_{\mathrm{Exp}}(x)=
+\begin{cases}
+0, & x<u,\\[4pt]
+1-\exp\left(-\frac{x-u}{\beta}\right), & x\ge u.
+\end{cases}
+$$
+
 
 
 ### 4. The Variance Gamma Setup (Business Time vs. Calendar Time)
@@ -127,5 +156,4 @@ Financial markets do not move in uniform clock time; they move in "business time
 * **The Target ($u_G$):** The Variance Gamma (VG) probability density function. It evaluates price as a continuous Brownian motion evaluated on a Gamma process (a randomized time clock).
 
 $$u_G(r,t) = \int_{0}^{\infty} \frac{1}{σ \sqrt{2π g}} e^{-\frac{(r - μ - \theta g)^2}{2σ^2 g}} \cdot \frac{g^{\frac{t}{ν} - 1} e^{-\frac{g}{ν}}}{ν^{\frac{t}{ν}} Γ(\frac{t}{ν})} dg$$
-
 

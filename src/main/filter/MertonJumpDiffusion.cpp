@@ -25,7 +25,7 @@ namespace filter {
             
             if(terms_result.has_value() && solve_system(signal, terms_result.value()) == GAUSSIAN_WAVE_SOLVED && coeff_.valid() && coeff_.r_squared > 0.95) {
                 MertonJumpDiffusionTerms& terms = terms_result.value();                                                
-                double p = distributions::merton::cdf(signal.r(), terms.m, terms.s, terms.λ, terms.γ, terms.δ);
+                double p = distributions::merton::cdf(signal.r(), terms.m, terms.s, terms.λ, terms.γ, terms.δ); // General Distribution -> merton::pdf
                 SignalDirection direction =  signal.direction();
 
                 if(!((p > 0.95 && direction == SignalDirection::LONG) || (p < 0.05 && direction == SignalDirection::SHORT))) {
@@ -43,7 +43,9 @@ namespace filter {
                     direction == SignalDirection::IDLE ? 0 : signal.window_size(),
                     p,                    
                     direction == SignalDirection::IDLE ? 0 : signal.x_min(),
-                    direction == SignalDirection::IDLE ? 0 : signal.x_max()
+                    direction == SignalDirection::IDLE ? 0 : signal.x_max(),
+                    direction == SignalDirection::IDLE ? 0 : signal.x_log_min(),
+                    direction == SignalDirection::IDLE ? 0 : signal.x_log_max()                           
                 ));
             } else {
                 processed_signals.emplace_back(signal);
@@ -65,22 +67,16 @@ namespace filter {
             return nullopt;
         }
         auto const & merton_jump_parameters = merton_jump_parameters_result.value();
-
-        // 1. Calculate the standard Gaussian z-score using the CONTINUOUS baseline moments
         const double z = (signal.r() - signal.μ()) / signal.σ();
-
-        // 4. The RHS Target (u_G): Calculate the empirical Jump-Diffusion probability density
-        const double target_z = distributions::merton::pdf(
+        const double target_z = distributions::merton::pdf( // General Distribution -> merton::pdf
             signal.r(),
             merton_jump_parameters.m,
             merton_jump_parameters.s,
             merton_jump_parameters.λ,
             merton_jump_parameters.γ,
             merton_jump_parameters.δ            
-        );
-
-        
-        const double u = exp(-0.5 * z * z) / (signal.σ() * sqrt(2.0 * std::numbers::pi));
+        );        
+        const double u = exp(-0.5 * z * z) / (signal.σ() * sqrt(2.0 * std::numbers::pi)); // Particular Distribution -> normal::pdf
         const double u_δx = -(z / signal.σ()) * u; // \frac{δ u}{δ x}
         const double u_δx2 = ((z * z - 1.0) / (signal.σ() * signal.σ())) * u; // \frac{δ^2 u}{δ x^2}
         const double u_δx_power_2 = u_δx * u_δx; // (\frac{δ u}{δ x})^2
@@ -91,8 +87,7 @@ namespace filter {
         const double u_δx_over_u = u_δx / u_denominator; // \frac{\frac{δ u}{δ x}}{u}
         const double u_δx2_over_u = u_δx2 / u_denominator; // \frac{\frac{δ^2 u}{δ x^2}}{u}
         const double log_u_power_2_times_cos_u =2.0 * (-log(σ * sqrt(2.0 * std::numbers::pi)) - 0.5 * z * z) * cos(u); // \ln(u^2) \cos(u)
-        const double u_norm_times_cos_u = abs(u) * sin(u) * sin(u); // \Vert{}u\Vert{} (\sin(u))^2
-        
+        const double u_norm_times_cos_u = abs(u) * sin(u) * sin(u); // \Vert{}u\Vert{} (\sin(u))^2        
 
         return MertonJumpDiffusionTerms(
             u,

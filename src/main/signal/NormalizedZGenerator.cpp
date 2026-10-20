@@ -41,8 +41,8 @@ namespace strategy {
             );
             auto lower_low = nearest_lower_low(bars_span_1);
             auto higher_high = nearest_higher_high(bars_span_1);
-            const double x_min_log_return = lower_low.has_value() ? lower_low->log_return : 0.0;
-            const double x_max_log_return = higher_high.has_value() ? higher_high->log_return : 0.0;
+            const double x_log_min = lower_low.has_value() ? lower_low->log_return : 0.0;
+            const double x_log_max = higher_high.has_value() ? higher_high->log_return : 0.0;
             const double x_min = lower_low.has_value() ? lower_low->price : 0.0;
             const double x_max = higher_high.has_value() ? higher_high->price : 0.0;
             sys_seconds timestamp = series.back().timestamp();
@@ -75,10 +75,10 @@ namespace strategy {
                     this->σ_ = moments.σ;      
                     this->r_ = log(last / second_to_last);
                     this->direction_ = acceleration > 0 ? SignalDirection::LONG : SignalDirection::SHORT;
-                    
-                    if(acceleration > 0 && (this->μ_ + this->σ_) > x_max_log_return) {
+
+                    if(acceleration > 0 && (this->μ_ + this->σ_) > x_log_max) {
                         this->direction_ = SignalDirection::LONG;
-                    } else if (acceleration < 0 && (this->μ_ - this->σ_) < x_min_log_return){
+                    } else if (acceleration < 0 && (this->μ_ - this->σ_) < x_log_min){
                         this->direction_ = SignalDirection::SHORT;
                     } else {
                         this->direction_ = SignalDirection::IDLE;
@@ -87,7 +87,7 @@ namespace strategy {
 
             }            
              
-            signals.emplace_back(Signal(timestamp, symbol, this->direction_, this->μ_, this->σ_, this->r_, window_size, 0, x_min, x_max));
+            signals.emplace_back(Signal(timestamp, symbol, this->direction_, this->μ_, this->σ_, this->r_, window_size, 0, x_min, x_max, x_log_min, x_log_max));
         }
     }
 

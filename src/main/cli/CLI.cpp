@@ -17,6 +17,8 @@
 #include "filter/DynamicGaussianEnvelope.h"
 #include "filter/GeneralizedHyperbolicWave.h"
 #include "filter/MertonJumpDiffusion.h"
+#include "filter/ExtremeValue.h"
+
 #include <fstream>
 #include "process/ThreadPool.h"
 
@@ -38,9 +40,10 @@ namespace cli {
     const string PLAY_GAUSSIAN_FILTER("gaussian");
     const string PLAY_HYPERBOLIC_FILTER("hyperbolic");
     const string PLAY_MERTON_JUMP("merton-jump"); 
+    const string PLAY_EXTREME_VALUE("extreme-value");
 
     const set<string> strategies_names({PLAY_SMALL_CAPS_STRATEGY});
-    const set<string> portfolio_names({PLAY_GAUSSIAN_FILTER, PLAY_HYPERBOLIC_FILTER, PLAY_MERTON_JUMP});
+    const set<string> portfolio_names({PLAY_GAUSSIAN_FILTER, PLAY_HYPERBOLIC_FILTER, PLAY_MERTON_JUMP, PLAY_EXTREME_VALUE});
 
     template<typename MapA, typename MapB>void assert_equals(const MapA & a, const MapB & b) {
         assert(a.size() == b.size());
@@ -79,6 +82,8 @@ namespace cli {
             return make_unique<GeneralizedHyperbolicWave>();
         } else if (name == PLAY_MERTON_JUMP) {
             return make_unique<MertonJumpDiffusion>();
+        } else if (name == PLAY_EXTREME_VALUE) {
+            return make_unique<ExtremeValue>();
         }
         return nullptr;
     }
