@@ -57,7 +57,7 @@ namespace filter {
             vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;
     };
 
-    optional<MertonJumpDiffusionTerms> melton_jump_terms(Signal signal, const vector<double> & r);
+    optional<MertonJumpDiffusionTerms> melton_jump_terms(const Signal & signal, const vector<double> & r);
     
 }
 

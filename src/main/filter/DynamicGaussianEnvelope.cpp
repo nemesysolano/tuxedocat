@@ -30,7 +30,8 @@ namespace filter {
                     direction == SignalDirection::IDLE ? 0 : signal.x_min(),
                     direction == SignalDirection::IDLE ? 0 : signal.x_max(),
                     direction == SignalDirection::IDLE ? 0 : signal.x_log_min(),
-                    direction == SignalDirection::IDLE ? 0 : signal.x_log_max()                    
+                    direction == SignalDirection::IDLE ? 0 : signal.x_log_max()      ,
+                    signal.ν()              
                 ));
             } else {
                 processed_signals.emplace_back(signal);

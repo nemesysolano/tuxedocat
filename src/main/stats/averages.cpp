@@ -68,8 +68,8 @@ namespace stats {
             diff_sum += (*iterator - μ) * (*iterator - μ);
         }
         double σ = sqrt(diff_sum / (series.size()-1));
-
-        return Moments(μ, σ);
+        double ν = series.size()-1;
+        return Moments(μ, σ, ν);
 
     }
 

@@ -35,6 +35,7 @@ namespace strategy {
         if(this->bars_.contains(symbol) && this->bars_.at(symbol).size() > MIN_FILTER_BARS) {
             const auto & series = this->bars_.at(symbol);            
             size_t window_size = 0;
+            int ν = 0;
             const span<const Bar> bars_span_1 = span<const Bar>(series).subspan(
                 series.size() - MIN_FILTER_BARS - 1,
                 MIN_FILTER_BARS
@@ -64,6 +65,7 @@ namespace strategy {
                 auto moments_result = simple_moving_moments(log_returns);
                 if(moments_result.has_value()) {
                     const auto & moments = moments_result.value();
+                    ν = moments.ν;
                     auto iterator = series.rbegin();
                     double last = (*iterator).close_price(); iterator ++;
                     double second_to_last = (*iterator).close_price(); iterator++;
@@ -87,7 +89,7 @@ namespace strategy {
 
             }            
              
-            signals.emplace_back(Signal(timestamp, symbol, this->direction_, this->μ_, this->σ_, this->r_, window_size, 0, x_min, x_max, x_log_min, x_log_max));
+            signals.emplace_back(Signal(timestamp, symbol, this->direction_, this->μ_, this->σ_, this->r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν));
         }
     }
 

@@ -1,6 +1,7 @@
 #ifndef __STUDENT_H__
 #define __STUDENT_H__
 #include "AugmentedNonLinearWavePacket.h"
+#include <optional>
 
 namespace filter {
     class StudentTerms: public AugmentedNonLinearWaveTerms {
@@ -45,9 +46,10 @@ namespace filter {
         public:                    
             inline Student(int min_lookback): AugmentedNonLinearWavePacket(), min_lookback_(min_lookback), r_(unordered_map<string, vector<double>>()) {}
             inline Student(): Student(LONG_LOOKBACK_WINDOW){}
-            vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;
+            vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;        
     };
 
+    optional<StudentTerms> student_terms(const Signal & signal, const vector<double> & r_);
 };
 
 #endif

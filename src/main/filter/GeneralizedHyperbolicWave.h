@@ -52,7 +52,7 @@ namespace filter {
             vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;
     };
 
-    optional<GeneralizedHyperbolicWaveTerms> hyperbolic_terms(Signal signal, const vector<double> & r_);
+    optional<GeneralizedHyperbolicWaveTerms> hyperbolic_terms(const Signal & signal, const vector<double> & r_);
     
 }
 #endif

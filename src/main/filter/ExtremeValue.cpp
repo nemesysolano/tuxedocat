@@ -58,7 +58,8 @@ namespace filter {
                     direction == SignalDirection::IDLE ? 0 : signal.x_min(),
                     direction == SignalDirection::IDLE ? 0 : signal.x_max(),
                     direction == SignalDirection::IDLE ? 0 : signal.x_log_min(),
-                    direction == SignalDirection::IDLE ? 0 : signal.x_log_max()
+                    direction == SignalDirection::IDLE ? 0 : signal.x_log_max(),
+                    signal.ν()
                 ));
             } else {
                 processed_signals.emplace_back(signal);
@@ -69,7 +70,7 @@ namespace filter {
     }
 
 
-    optional<ExtremeValueTerms> extreme_value_terms(Signal signal, const vector<double> & r_) {
+    optional<ExtremeValueTerms> extreme_value_terms(const Signal & signal, const vector<double> & r_) {
         const double σ = signal.σ();
         
         if (r_.size() < LONG_LOOKBACK_WINDOW + 1 || !isfinite(σ) || σ <= 0.0) {

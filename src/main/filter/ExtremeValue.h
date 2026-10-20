@@ -51,7 +51,7 @@ namespace filter {
             vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;
     };
 
-    optional<ExtremeValueTerms> extreme_value_terms(Signal signal, const vector<double> & r);
+    optional<ExtremeValueTerms> extreme_value_terms(const Signal & signal, const vector<double> & r);
 }
 
 #endif

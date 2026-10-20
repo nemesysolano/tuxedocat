@@ -16,9 +16,10 @@ namespace stats {
     
     class Moments {
         public:
-            inline Moments(double μ_, double σ_) :μ(μ_), σ(σ_) {}
+            inline Moments(double μ_, double σ_, int ν_) :μ(μ_), σ(σ_), ν(ν_){}
             const double μ; // Mean
             const double σ; // Standard Deviation
+            const int ν; // degrees of freedom.
     };    
     
     class Extreme {
