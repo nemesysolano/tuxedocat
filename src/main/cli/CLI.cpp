@@ -37,8 +37,8 @@ namespace cli {
     const int PLAY_OUTPUT_DIRECTORY_ARG = 5;    
     
     const string PLAY_SMALL_CAPS_STRATEGY("normalized-z");
-    const string PLAY_GAUSSIAN_FILTER("gaussian");
-    const string PLAY_HYPERBOLIC_FILTER("hyperbolic");
+    const string PLAY_GAUSSIAN_FILTER("gaussian"); //
+    const string PLAY_HYPERBOLIC_FILTER("hyperbolic"); // 
     const string PLAY_MERTON_JUMP("merton-jump"); 
     const string PLAY_EXTREME_VALUE("extreme-value");
 
@@ -126,7 +126,7 @@ namespace cli {
 
         // Output `journal` into standard output as json format.
         
-        std::println(output, "symbol,timestamp,open,high,low,close,volume,μ,σ,signal,window_size,r,x_min,x_max");
+        output << "symbol,timestamp,open,high,low,close,volume,μ,σ,signal,window_size,r,x_min,x_max" << endl;
         for (const auto & [symbol, entries] : journal) {
             bool first = true;
             for(const auto & [timestamp, pair]: entries) {
@@ -134,8 +134,7 @@ namespace cli {
                     first = false;
                     continue;
                 }
-                std::println(
-                    output,
+                output << format(
                     "{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
                     symbol,
                     timestamp,
@@ -151,7 +150,7 @@ namespace cli {
                     pair.second.get().r(),
                     pair.second.get().x_min(),
                     pair.second.get().x_max()
-                );                
+                ) << endl;                
             }
         }
     }
@@ -256,17 +255,19 @@ namespace cli {
             ));
         }
 
-        for(future<bool> & future: futures) {
-            future.wait();
-        }
+        bool all_successful = true;
 
         for(future<bool> & future: futures) {
             if(!future.get()) {
                 log_error_message("Failed to process one or more input files.");
-                return -5;
+                all_successful = false;
             }
         }
 
+        if(!all_successful) {
+            return -5;
+        }
+        
         return 0;
     }
 
