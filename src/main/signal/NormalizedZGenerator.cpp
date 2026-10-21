@@ -62,7 +62,28 @@ namespace strategy {
                     next++;
                 }
 
-                auto moments_result = simple_moving_moments(log_returns);
+                prev = bars_span_1.begin();
+                end = bars_span_1.end();
+                double S = 0;
+                int C = 0;
+
+                while(prev != end) {
+                    S+= prev->close_price();
+                    C++;
+                    prev++;
+                }
+
+                double M = S / C;
+                double D = 0;
+                
+                prev = bars_span_1.begin();
+                while(prev != end) {
+                    D += (prev->close_price() - M)*(prev->close_price() - M);
+                    prev++;
+                }
+                D = sqrt(D/(bars_span_1.size()-1));
+                
+                auto moments_result = simple_moving_moments(log_returns);                
                 if(moments_result.has_value()) {
                     const auto & moments = moments_result.value();
                     ν = moments.ν;
@@ -78,9 +99,9 @@ namespace strategy {
                     this->r_ = log(last / second_to_last);
                     this->direction_ = acceleration > 0 ? SignalDirection::LONG : SignalDirection::SHORT;
 
-                    if(acceleration > 0 && (this->μ_ + this->σ_) > x_log_max) {
+                    if(acceleration > 0 && (bars_span_1.back().close_price() + 1.5 * D) > x_max && (this->μ_ + this->σ_) > x_log_max) {
                         this->direction_ = SignalDirection::LONG;
-                    } else if (acceleration < 0 && (this->μ_ - this->σ_) < x_log_min){
+                    } else if (acceleration < 0 && (bars_span_1.back().close_price() - 1.5 * D) < x_min && (this->μ_ - this->σ_) < x_log_min){
                         this->direction_ = SignalDirection::SHORT;
                     } else {
                         this->direction_ = SignalDirection::IDLE;
