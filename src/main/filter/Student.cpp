@@ -25,7 +25,7 @@ namespace filter {
             optional<StudentTerms> terms_result = student_terms(signal, r);
             
             if(terms_result.has_value() && solve_system(signal, terms_result.value()) == GAUSSIAN_WAVE_SOLVED && coeff_.valid() && coeff_.r_squared > 0.95) {
-                double p = distributions::student::cdf(signal.r(), signal.ν(), signal.μ(), signal.σ());
+                double p = distributions::student::cdf(signal.r(), signal.ν(), signal.μ(), signal.σ()); // General Distribution -> student:cdf
                 SignalDirection direction =  signal.direction();
 
                 if(!((p > 0.95 && direction == SignalDirection::LONG) || (p < 0.05 && direction == SignalDirection::SHORT))) {

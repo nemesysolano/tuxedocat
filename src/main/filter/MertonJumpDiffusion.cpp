@@ -25,7 +25,7 @@ namespace filter {
             
             if(terms_result.has_value() && solve_system(signal, terms_result.value()) == GAUSSIAN_WAVE_SOLVED && coeff_.valid() && coeff_.r_squared > 0.95) {
                 MertonJumpDiffusionTerms& terms = terms_result.value();                                                
-                double p = distributions::merton::cdf(signal.r(), terms.m, terms.s, terms.λ, terms.γ, terms.δ); // General Distribution -> merton::pdf
+                double p = distributions::merton::cdf(signal.r(), terms.m, terms.s, terms.λ, terms.γ, terms.δ); // General Distribution -> merton::cdf
                 SignalDirection direction =  signal.direction();
 
                 if(!((p > 0.95 && direction == SignalDirection::LONG) || (p < 0.05 && direction == SignalDirection::SHORT))) {

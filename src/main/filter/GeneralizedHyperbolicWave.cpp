@@ -20,7 +20,7 @@ namespace filter {
             
             if(terms_result.has_value() && solve_system(signal, terms_result.value()) == GAUSSIAN_WAVE_SOLVED && coeff_.valid() && coeff_.r_squared > 0.95) {
                 const auto & terms = terms_result.value();                
-                double p = distributions::hypebolic::cdf(signal.r(), signal.σ(), signal.μ(), terms.α, terms.β, terms.c);  // General Distribution -> hyperbolic::pdf
+                double p = distributions::hypebolic::cdf(signal.r(), signal.σ(), signal.μ(), terms.α, terms.β, terms.c);  // General Distribution -> hyperbolic::cdf
                 SignalDirection direction =  signal.direction();
                 if(!((p > 0.95 && direction == SignalDirection::LONG) || (p < 0.05 && direction == SignalDirection::SHORT))) {
                     direction = SignalDirection::IDLE;

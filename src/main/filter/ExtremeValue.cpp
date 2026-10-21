@@ -39,7 +39,7 @@ namespace filter {
                 }
 
                 if(r0 > u0) {
-                    p = distributions::pareto::cdf(r0, u0, terms.β, terms.ξ); // General Distribution -> pareto::pdf
+                    p = distributions::pareto::cdf(r0, u0, terms.β, terms.ξ); // General Distribution -> pareto::cdf
                     if(!(p > 0.95 && (direction == SignalDirection::LONG || direction == SignalDirection::SHORT))) {
                         direction = SignalDirection::IDLE;
                         p = 0;
