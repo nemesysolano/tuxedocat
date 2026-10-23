@@ -1,7 +1,8 @@
 #ifndef __GAMMA_H__
 #define __GAMMA_H__
 #include "AugmentedNonLinearWavePacket.h"
-using namespace slice
+
+using namespace slice;
 namespace filter {
     class GammaTerms: public AugmentedNonLinearWaveTerms {
         public:
@@ -21,7 +22,7 @@ namespace filter {
                 double z_,
                 double ν_,               
                 double g_
-            ):GammaTerms(
+            ):AugmentedNonLinearWaveTerms(
                 u_,
                 u_δx_,
                 u_δx2_,
@@ -39,5 +40,17 @@ namespace filter {
             int ν;
             double g;
     };
+
+    class Gamma: public AugmentedNonLinearWavePacket {
+        protected:
+            int min_lookback_;
+            unordered_map<string, vector<double>> r_;
+        public:                    
+            inline Gamma(int min_lookback): AugmentedNonLinearWavePacket(), min_lookback_(min_lookback), r_(unordered_map<string, vector<double>>()) {}
+            inline Gamma(): Gamma(LONG_LOOKBACK_WINDOW){}
+            vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;        
+    };
+
+    optional<GammaTerms> student_terms(const Signal & signal, const vector<double> & r_);    
 }
 #endif

@@ -540,3 +540,170 @@ namespace distributions::merton {
         return (weights * norm_pdfs).sum() / weights.sum();
     }
 }
+
+    // u_G(r,t) = \int_{0}^{\infty} \frac{1}{σ \sqrt{2π g}} e^{-\frac{(r - μ - θ g)^2}{2σ^2 g}} \cdot \frac{g^{\frac{t}{ν} - 1} e^{-\frac{g}{ν}}}{ν^{\frac{t}{ν}} Γ(\frac{t}{ν})} dg
+namespace distributions::variance_gamma {
+    double pdf(double x, double t, int ν, double μ, double θ, double σ) {
+        if (std::isnan(x) || !std::isfinite(t) || t <= 0.0 || ν <= 0 ||
+            !std::isfinite(μ) || !std::isfinite(θ) ||
+            !std::isfinite(σ) || σ <= 0.0) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        if (std::isinf(x)) {
+            return 0.0;
+        }
+
+        const double shape = t / static_cast<double>(ν);
+        const double order = shape - 0.5;
+        const double displacement = x - μ;
+        const double variance_rate = θ * θ + 2.0 * σ * σ / ν;
+        const double bessel_rate = std::sqrt(variance_rate) / (σ * σ);
+        if (!std::isfinite(shape) || shape <= 0.0 ||
+            !std::isfinite(bessel_rate) || bessel_rate <= 0.0) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+
+        const double log_normalizer =
+            std::log(2.0) + θ * displacement / (σ * σ) -
+            std::log(σ) - 0.5 * std::log(2.0 * std::numbers::pi) -
+            shape * std::log(static_cast<double>(ν)) - std::lgamma(shape);
+
+        if (displacement == 0.0) {
+            if (order <= 0.0) {
+                return std::numeric_limits<double>::infinity();
+            }
+
+            const double log_density = log_normalizer +
+                std::log(0.5) +
+                std::lgamma(order) +
+                order * std::log(2.0 / (bessel_rate * bessel_rate * σ * σ));
+            return std::exp(log_density);
+        }
+
+        const double argument = std::abs(displacement) * bessel_rate;
+        const double bessel_value = boost::math::cyl_bessel_k(std::abs(order), argument);
+        if (bessel_value == 0.0) {
+            return 0.0;
+        }
+        if (std::isnan(bessel_value) || bessel_value < 0.0) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+
+        const double log_density = log_normalizer +
+            order * (std::log(std::abs(displacement)) -
+                     std::log(bessel_rate) - 2.0 * std::log(σ)) +
+            std::log(bessel_value);
+        return std::exp(log_density);
+    }
+
+    double cdf(double x, double t, int ν, double μ, double θ, double σ) {
+        if (std::isnan(x) || !std::isfinite(t) || t <= 0.0 || ν <= 0 ||
+            !std::isfinite(μ) || !std::isfinite(θ) ||
+            !std::isfinite(σ) || σ <= 0.0) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        if (x == -std::numeric_limits<double>::infinity()) {
+            return 0.0;
+        }
+        if (x == std::numeric_limits<double>::infinity()) {
+            return 1.0;
+        }
+
+        const double shape = t / static_cast<double>(ν);
+        if (!std::isfinite(shape) || shape <= 0.0) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+
+        const double log_gamma = std::lgamma(shape);
+        const double sqrt_ν = std::sqrt(static_cast<double>(ν));
+        
+        // OPTIMIZATION 1: Integrate directly over the Gamma variable `u` rather than `log_u`.
+        // This eliminates the infinite lower bound limit toward -inf.
+        const auto gamma_mixture_cdf = [=](double u) {
+            if (u <= 0.0) {
+                return 0.0;
+            }
+            
+            const double log_u = std::log(u);
+            const double log_pdf = (shape - 1.0) * log_u - u - log_gamma;
+            
+            // OPTIMIZATION 2: Fast exit. If PDF weight is below double precision limits, bypass the expensive erfc evaluation
+            if (log_pdf < -36.0) { 
+                return 0.0;
+            }
+            
+            const double pdf = std::exp(log_pdf);
+            const double root_mixing = sqrt_ν * std::exp(0.5 * log_u);
+            const double displacement = x - μ;
+            
+            double conditional_cdf;
+            if (root_mixing == 0.0) {
+                conditional_cdf = displacement < 0.0 ? 0.0 : (displacement > 0.0 ? 1.0 : 0.5);
+            } else {
+                const double z = (displacement / root_mixing - θ * root_mixing) / σ;
+                conditional_cdf = 0.5 * std::erfc(-z / std::numbers::sqrt2);
+            }
+            
+            return pdf * conditional_cdf;
+        };
+
+        double error = 0.0;
+        
+        // OPTIMIZATION 3: Bounded Support. Gamma distribution probability mass decays exponentially.
+        // Truncating the integral to [0, shape + 36.0] avoids infinite tail subdivisions and speeds up quadrature convergence.
+        const double upper_bound = shape + 36.0;
+
+        const double probability = boost::math::quadrature::gauss_kronrod<double, 61>::integrate(
+            gamma_mixture_cdf,
+            0.0,
+            upper_bound,
+            15,
+            1e-10,
+            &error
+        );
+        
+        if (!std::isfinite(probability) || !std::isfinite(error)) {
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        return std::clamp(probability, 0.0, 1.0);
+    }
+
+    expected<VarianceGammaParameters, TuxedoError> estimate_parameters(
+        span<const double> r,
+        int ν,
+        double μ,
+        double σ,
+        double t
+    ) {
+        if (r.empty()) return unexpected(TuxedoError::ERR_EMPTY_VECTOR);
+        if (r.size() < 3) return unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL);
+        if (ν <= 0 || !std::isfinite(μ) || !std::isfinite(σ) || σ <= 0.0 ||
+            !std::isfinite(t) || t <= 0.0) {
+            return unexpected(TuxedoError::ERR_BAD_INPUT);
+        }
+
+        // Compute empirical 3rd central moment mu_3 and skewness S over lookback span r
+        double sum_diff_3 = 0.0;
+        for (const double val : r) {
+            const double diff = val - μ;
+            sum_diff_3 += diff * diff * diff;
+        }
+        const double mu_3 = sum_diff_3 / static_cast<double>(r.size());
+        const double S = mu_3 / (σ * σ * σ);
+        if (!std::isfinite(S)) {
+            return unexpected(TuxedoError::ERR_BAD_INPUT);
+        }
+
+        // Exact real root of depressed cubic: 2*nu^2*t*theta^3 + 3*nu*t*sigma^2*theta - mu_3 = 0
+        const double nu_d = static_cast<double>(ν);
+        const double sqrt_2_over_nu = std::sqrt(2.0 / nu_d);
+        const double asinh_arg = S / ( std::sqrt(2.0 * nu_d) * t );
+        const double θ = σ * sqrt_2_over_nu * std::sinh(std::asinh(asinh_arg) / 3.0);
+
+        if (!std::isfinite(θ)) {
+            return unexpected(TuxedoError::ERR_BAD_INPUT);
+        }
+
+        return VarianceGammaParameters(t, ν, μ, θ, σ);
+    }    
+}

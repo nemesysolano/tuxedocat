@@ -106,4 +106,28 @@ namespace distributions::exponential{
     }
 }
 
+namespace distributions::variance_gamma {
+    class VarianceGammaParameters {
+        public:
+            const double t;
+            const int ν;
+            const double μ;
+            const double θ;
+            const double σ;
+
+            inline VarianceGammaParameters(double t_, int ν_, double μ_, double θ_, double σ_)
+                : t(t_), ν(ν_), μ(μ_), θ(θ_), σ(σ_) {}
+    };
+
+    double pdf(double x, double t, int ν, double μ, double θ, double σ);
+    double cdf(double x, double t, int ν, double μ, double θ, double σ);
+    expected<VarianceGammaParameters, TuxedoError> estimate_parameters(
+        span<const double> r,
+        int ν,
+        double μ,
+        double σ,
+        double t = 1.0
+    );
+}
+
 #endif
