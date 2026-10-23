@@ -1,9 +1,11 @@
 #include "Student.h"
 #include "events/SignalEvent.h"
+#include <algorithm>
+#include <cmath>
 #include <numbers>
 #include <optional>
 #include "stats/distributions.h"
-#include "Student.h"
+
 using namespace std;
 using namespace events;
 using namespace distributions;
@@ -25,12 +27,13 @@ namespace filter {
             optional<StudentTerms> terms_result = student_terms(signal, r);
             
             if(terms_result.has_value() && solve_system(signal, terms_result.value()) == GAUSSIAN_WAVE_SOLVED && coeff_.valid() && coeff_.r_squared > 0.95) {
-                double p = distributions::student::cdf(signal.r(), signal.ν(), signal.μ(), signal.σ()); // General Distribution -> student:cdf
-                SignalDirection direction =  signal.direction();
+                const StudentTerms & terms = terms_result.value();
+                double p = distributions::student::cdf(signal.r(), terms.ν, signal.μ(), signal.σ()); // General Distribution -> student::cdf
+                SignalDirection direction = signal.direction();
 
                 if(!((p > 0.95 && direction == SignalDirection::LONG) || (p < 0.05 && direction == SignalDirection::SHORT))) {
                     direction = SignalDirection::IDLE;
-                    p = 0;
+                    p = 0.0;
                 } 
 
                 processed_signals.emplace_back(Signal(
@@ -46,7 +49,7 @@ namespace filter {
                     direction == SignalDirection::IDLE ? 0 : signal.x_max(),
                     direction == SignalDirection::IDLE ? 0 : signal.x_log_min(),
                     direction == SignalDirection::IDLE ? 0 : signal.x_log_max(),
-                    signal.ν(),
+                    terms.ν,
                     signal.δ()
                 ));
             } else {
@@ -64,7 +67,26 @@ namespace filter {
             return nullopt;
         }
 
-        auto student_parameters_result = distributions::student::estimate_parameters(signal.ν(), signal.μ(), signal.σ());
+        constexpr size_t N = LONG_LOOKBACK_WINDOW;
+        double K = 0.0;
+        for (size_t i = r_.size(); i > r_.size() - LONG_LOOKBACK_WINDOW; --i) {
+            const double & r = r_[i - 1];
+            const double diff = r - signal.μ();
+            const double diff_2 = diff * diff;
+            K += diff_2 * diff_2;
+        }
+
+        const double σ_2 = σ * σ;
+        const double σ_4 = σ_2 * σ_2;
+        K = K / (N * σ_4) - 3.0;
+        if (!isfinite(K) || K <= 0.0) {
+            return nullopt;
+        }
+
+        // Dynamic tail degrees of freedom ν(t) estimated from empirical excess kurtosis K
+        const int dynamic_ν = clamp(static_cast<int>(round(6.0 / K + 1.0)), 1, 15);
+
+        auto student_parameters_result = distributions::student::estimate_parameters(dynamic_ν, signal.μ(), signal.σ());
         if(!student_parameters_result.has_value()) {
             return nullopt;
         }
@@ -72,9 +94,16 @@ namespace filter {
         const double target_z = distributions::student::pdf(  // General Distribution -> student::pdf
             signal.r(), student_parameters.ν, signal.μ(), signal.σ()
         );        
-        
-        const double z = (signal.r() - signal.μ()) / signal.σ();
+        if (!isfinite(target_z)) {
+            return nullopt;
+        }
+
+        const double z = (signal.r() - signal.μ()) / σ;
         const double u = distributions::normal::pdf(signal.r(), signal.μ(), signal.σ()); // Particular Distribution -> normal::pdf
+        if (!isfinite(u)) {
+            return nullopt;
+        }
+
         const double u_δx = -(z / σ) * u; // \frac{δ u}{δ x}
         const double u_δx2 = ((z * z - 1.0) / (σ * σ)) * u; // \frac{δ^2 u}{δ x^2}
         const double u_δx_power_2 = u_δx * u_δx; // (\frac{δ u}{δ x})^2
@@ -84,7 +113,7 @@ namespace filter {
         const double u_denominator = max(u, ε);
         const double u_δx_over_u = u_δx / u_denominator; // \frac{\frac{δ u}{δ x}}{u}
         const double u_δx2_over_u = u_δx2 / u_denominator; // \frac{\frac{δ^2 u}{δ x^2}}{u}
-        const double log_u_power_2_times_cos_u =2.0 * (-log(σ * sqrt(2.0 * numbers::pi)) - 0.5 * z * z) * cos(u); // \ln(u^2) \cos(u)
+        const double log_u_power_2_times_cos_u = 2.0 * (-log(σ * sqrt(2.0 * numbers::pi)) - 0.5 * z * z) * cos(u); // \ln(u^2) \cos(u)
         const double u_norm_times_cos_u = abs(u) * sin(u) * sin(u); // \Vert{}u\Vert{} (\sin(u))^2  
 
         return StudentTerms(

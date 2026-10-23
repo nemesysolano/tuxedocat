@@ -1,6 +1,7 @@
 #include "ExtremeValue.h"
 #include "events/SignalEvent.h"
 #include "stats/distributions.h"
+#include <cmath>
 #include <numbers>
 #include "utils/log.h"
 
@@ -27,8 +28,8 @@ namespace filter {
                 ExtremeValueTerms & terms = terms_result.value();                                                
                 double u0 = 0.0;
                 double r0 = 0.0;
-                double p = 0;
-                SignalDirection direction =  signal.direction();
+                double p = 0.0;
+                SignalDirection direction = signal.direction();
 
                 if (signal.direction() == SignalDirection::LONG) {
                     u0 = signal.x_log_max();
@@ -38,12 +39,16 @@ namespace filter {
                     r0 = -signal.r();
                 }
 
-                if(r0 > u0) {
+                if (r0 > u0 && u0 > 0.0) {
                     p = distributions::pareto::cdf(r0, u0, terms.β, terms.ξ); // General Distribution -> pareto::cdf
-                    if(!(p > 0.95 && (direction == SignalDirection::LONG || direction == SignalDirection::SHORT))) {
+                    if (!(p > 0.95 && (direction == SignalDirection::LONG || direction == SignalDirection::SHORT))) {
                         direction = SignalDirection::IDLE;
-                        p = 0;
-                    } 
+                        p = 0.0;
+                    }
+                } else {
+                    // Below exceedance threshold u0, GPD CDF is strictly 0
+                    direction = SignalDirection::IDLE;
+                    p = 0.0;
                 }
 
                 processed_signals.emplace_back(Signal(
@@ -83,9 +88,13 @@ namespace filter {
             return nullopt;
         }
         auto const & pareto_parameters = pareto_parameters_result.value();
-        const double z = (signal.r() - signal.μ()) / signal.σ();
-        const double R = signal.r() * z < 0 ? -1 : 1;
-        const double Z = z < 0 ? signal.x_log_min() : signal.x_log_max();
+        const double z = (signal.r() - signal.μ()) / σ;
+        const double R = z < 0.0 ? -signal.r() : signal.r();
+        const double Z = z < 0.0 ? -signal.x_log_min() : signal.x_log_max();
+        if (!isfinite(R) || !isfinite(Z) || Z <= 0.0) {
+            return nullopt;
+        }
+
         const double target_z = distributions::pareto::pdf(  // General Distribution -> pareto::pdf
             R,
             Z,
@@ -93,7 +102,7 @@ namespace filter {
             pareto_parameters.ξ
         );        
         const double u = distributions::exponential::pdf(R, Z, pareto_parameters.β); // Particular Distribution -> exponential::pdf
-        if (!isfinite(u) || !isfinite(pareto_parameters.β) || pareto_parameters.β <= 0.0) {
+        if (!isfinite(target_z) || !isfinite(u) || !isfinite(pareto_parameters.β) || pareto_parameters.β <= 0.0) {
             return nullopt;
         }
 
