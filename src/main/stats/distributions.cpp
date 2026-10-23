@@ -392,14 +392,14 @@ namespace distributions::merton {
         vector<double> empirical_cosines(frequency_count);
         vector<double> empirical_sines(frequency_count);
         
-        Eigen::Map<const Eigen::VectorXd> r_vec(r.data(), r.size());
+        Eigen::Map<const Eigen::ArrayXd> r_values(r.data(), r.size());
+        Eigen::ArrayXd phase(r.size());
 
         for (std::size_t i = 0; i < frequency_count; ++i) {
             const double u = (static_cast<double>(i + 1) / 8.0) / return_scale;
             frequencies[i] = u;
             
-            // SIMD Vectorized execution completely avoids std::cos inside a raw for loop
-            Eigen::VectorXd phase = u * r_vec;
+            phase = u * r_values;
             empirical_cosines[i] = phase.array().cos().mean();
             empirical_sines[i] = phase.array().sin().mean();
         }

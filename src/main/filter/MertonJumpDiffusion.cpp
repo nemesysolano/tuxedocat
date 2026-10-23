@@ -10,16 +10,16 @@ using namespace events;
 namespace filter {
     vector<Signal> MertonJumpDiffusion::process_signals(const vector<Signal> & signals) {
         vector<Signal> processed_signals;
+        processed_signals.reserve(signals.size());
         for(const Signal & signal: signals) {
             const string & symbol = signal.symbol();
 
             initialized_rows_.try_emplace(symbol, 0);
-            if(!r_.contains(symbol)) {
-                r_.emplace(symbol, vector<double>());
-            }
-
-            vector<double> & r = r_.at(symbol);
+            vector<double> & r = r_.try_emplace(symbol).first->second;
             r.push_back(signal.r());
+            if (r.size() > LONG_LOOKBACK_WINDOW + 1) {
+                r.erase(r.begin());
+            }
 
             optional<MertonJumpDiffusionTerms> terms_result = melton_jump_terms(signal, r);
             
