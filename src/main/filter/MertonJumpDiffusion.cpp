@@ -46,7 +46,8 @@ namespace filter {
                     direction == SignalDirection::IDLE ? 0 : signal.x_max(),
                     direction == SignalDirection::IDLE ? 0 : signal.x_log_min(),
                     direction == SignalDirection::IDLE ? 0 : signal.x_log_max(),
-                    signal.ν()
+                    signal.ν(),
+                    signal.δ()
                 ));
             } else {
                 processed_signals.emplace_back(signal);
@@ -63,7 +64,12 @@ namespace filter {
             return nullopt;
         }
 
-        auto merton_jump_parameters_result = distributions::merton::estimate_parameters(r);
+        span<const double> r_span(
+            r.data() + r.size() - LONG_LOOKBACK_WINDOW,
+            LONG_LOOKBACK_WINDOW
+        );
+
+        auto merton_jump_parameters_result = distributions::merton::estimate_parameters(r_span);
         if(!merton_jump_parameters_result.has_value()) {
             return nullopt;
         }

@@ -2,7 +2,14 @@ import datetime
 import os
 import sys
 
+import pandas as pd
 import yfinance as yf
+
+
+def drop_rows_with_missing_data(file_path):
+    history = pd.read_csv(file_path)
+    history = history.dropna()
+    history.to_csv(file_path, index=False)
 
 
 def download_history(symbol):
@@ -10,6 +17,7 @@ def download_history(symbol):
         os.path.dirname(os.path.realpath(__file__)), "..", "data", f"{symbol}.csv"
     )
     if os.path.isfile(file_path):
+        drop_rows_with_missing_data(file_path)
         return file_path
 
     end_date = datetime.datetime.now() + datetime.timedelta(days=1)
@@ -45,6 +53,7 @@ def download_history(symbol):
         column for column in history.columns if column not in ordered_columns
     )
     history = history[ordered_columns]
+    history = history.dropna()
 
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     history.to_csv(file_path, index=False)

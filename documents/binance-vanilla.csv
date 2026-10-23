@@ -1,0 +1,4 @@
+Symbol,Total Evaluations,Skipped Gaps,Rejected Strikes,Win Rate (%),Long Win Rate (%),Short Win Rate (%),P/L (%),Max Drawdown (%),Profit Factor,Sharpe Ratio,Sortino Ratio,Avg Trade Return (%),Avg Holding Bars,Final Capital
+DOGEUSDT,0,6395,0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1000.0
+XRPUSDT,0,7632,0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1000.0
+BTCUSDT,429,53,204,38.93,38.41,39.87,-90.06,90.06,0.54,-8.09,-8.39,-0.516,8.36,99.36

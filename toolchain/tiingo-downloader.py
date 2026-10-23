@@ -87,5 +87,6 @@ if __name__== "__main__":
             ordered.append(column)
 
     data = data[ordered]
+    data = data.dropna()
     data.to_csv(file_path, index=False)
     print(file_path)

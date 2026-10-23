@@ -30,18 +30,19 @@ namespace events {
             double x_log_min_;
             double x_log_max_;
             int ν_;
+            double δ_;
         public:
             Signal(
-                sys_seconds timestamp, const string & symbol, SignalDirection direction, double μ, double σ, double r, size_t window_size, double p, double x_min, double x_max, double x_log_min, double x_log_max, int ν
-            ): timestamp_(timestamp), symbol_(symbol), direction_(direction), μ_(μ), σ_(σ), r_(r), window_size_(window_size), p_(p), x_min_(x_min), x_max_(x_max), x_log_min_(x_log_min), x_log_max_(x_log_max), ν_(ν) {}
+                sys_seconds timestamp, const string & symbol, SignalDirection direction, double μ, double σ, double r, size_t window_size, double p, double x_min, double x_max, double x_log_min, double x_log_max, int ν, double δ
+            ): timestamp_(timestamp), symbol_(symbol), direction_(direction), μ_(μ), σ_(σ), r_(r), window_size_(window_size), p_(p), x_min_(x_min), x_max_(x_max), x_log_min_(x_log_min), x_log_max_(x_log_max), ν_(ν), δ_(δ) {}
 
             Signal(
                 sys_seconds timestamp, const string & symbol, SignalDirection direction, double μ, double σ, double r, size_t window_size, double p
-            ): Signal(timestamp, symbol, direction, μ, σ, r, window_size, p, 0, 0, 0, 0, 0) {}
+            ): Signal(timestamp, symbol, direction, μ, σ, r, window_size, p, 0, 0, 0, 0, 0, 0) {}
 
             Signal(
                 sys_seconds timestamp, const string & symbol, SignalDirection direction, double μ, double σ, double r, size_t window_size
-            ): Signal(timestamp, symbol, direction, μ, σ, r, window_size, 0, 0, 0, 0, 0, 0) {}
+            ): Signal(timestamp, symbol, direction, μ, σ, r, window_size, 0, 0, 0, 0, 0, 0, 0) {}
 
 
             sys_seconds timestamp() const { return timestamp_; }
@@ -57,6 +58,7 @@ namespace events {
             double x_log_min() const { return x_log_min_; }
             double x_log_max() const { return x_log_max_; }
             int ν() const { return ν_; }
+            double δ() const { return δ_; }
     };
 
     class SignalEvent: public Event {    

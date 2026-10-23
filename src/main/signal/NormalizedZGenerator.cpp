@@ -47,6 +47,7 @@ namespace strategy {
             const double x_min = lower_low.has_value() ? lower_low->price : 0.0;
             const double x_max = higher_high.has_value() ? higher_high->price : 0.0;
             sys_seconds timestamp = series.back().timestamp();
+            double D = 0.0;
 
             this->direction_ = SignalDirection::IDLE;
             if(lower_low.has_value() && higher_high.has_value() && max(lower_low.value().index, higher_high.value().index) > MIN_AVERAGE_BARS) {
@@ -74,7 +75,6 @@ namespace strategy {
                 }
 
                 double M = S / C;
-                double D = 0;
                 
                 prev = bars_span_1.begin();
                 while(prev != end) {
@@ -110,7 +110,7 @@ namespace strategy {
 
             }            
              
-            signals.emplace_back(Signal(timestamp, symbol, this->direction_, this->μ_, this->σ_, this->r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν));
+            signals.emplace_back(Signal(timestamp, symbol, this->direction_, this->μ_, this->σ_, this->r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν, D));
         }
     }
 

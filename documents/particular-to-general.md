@@ -155,5 +155,5 @@ Financial markets do not move in uniform clock time; they move in "business time
 * **The Baseline ($u_p$):** A Gaussian distribution evaluating price over standard, uniform calendar time $t$.
 * **The Target ($u_G$):** The Variance Gamma (VG) probability density function. It evaluates price as a continuous Brownian motion evaluated on a Gamma process (a randomized time clock).
 
-$$u_G(r,t) = \int_{0}^{\infty} \frac{1}{σ \sqrt{2π g}} e^{-\frac{(r - μ - \theta g)^2}{2σ^2 g}} \cdot \frac{g^{\frac{t}{ν} - 1} e^{-\frac{g}{ν}}}{ν^{\frac{t}{ν}} Γ(\frac{t}{ν})} dg$$
+$$u_G(r,t) = \int_{0}^{\infty} \frac{1}{σ \sqrt{2π g}} e^{-\frac{(r - μ - θ g)^2}{2σ^2 g}} \cdot \frac{g^{\frac{t}{ν} - 1} e^{-\frac{g}{ν}}}{ν^{\frac{t}{ν}} Γ(\frac{t}{ν})} dg$$
 
