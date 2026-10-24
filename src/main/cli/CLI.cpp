@@ -11,7 +11,6 @@
 #include "timeseries/timeseries.h"
 #include <cassert>
 #include <functional>
-#include <cmath>
 #include <iomanip>
 #include "filter/AugmentedNonLinearWavePacket.h"
 #include "filter/DynamicGaussianEnvelope.h"
@@ -19,6 +18,7 @@
 #include "filter/MertonJumpDiffusion.h"
 #include "filter/ExtremeValue.h"
 #include "filter/Student.h"
+#include "filter/VarianceGamma.h"
 
 #include <fstream>
 #include "process/ThreadPool.h"
@@ -43,9 +43,10 @@ namespace cli {
     const string PLAY_MERTON_JUMP("merton-jump"); 
     const string PLAY_EXTREME_VALUE("extreme-value");
     const string PLAY_STUDENT_T("student");
+    const string PLAY_VARIANCE_GAMMA("variance-gamma");
 
     const set<string> strategies_names({PLAY_SMALL_CAPS_STRATEGY});
-    const set<string> portfolio_names({PLAY_GAUSSIAN_FILTER, PLAY_HYPERBOLIC_FILTER, PLAY_MERTON_JUMP, PLAY_EXTREME_VALUE, PLAY_STUDENT_T});
+    const set<string> portfolio_names({PLAY_GAUSSIAN_FILTER, PLAY_HYPERBOLIC_FILTER, PLAY_MERTON_JUMP, PLAY_EXTREME_VALUE, PLAY_STUDENT_T, PLAY_VARIANCE_GAMMA});
 
     template<typename MapA, typename MapB>void assert_equals(const MapA & a, const MapB & b) {
         assert(a.size() == b.size());
@@ -88,6 +89,8 @@ namespace cli {
             return make_unique<ExtremeValue>();
         } else if (name == PLAY_STUDENT_T) {
             return make_unique<Student>();
+        }else if (name == PLAY_VARIANCE_GAMMA) {
+            return make_unique<VarianceGamma>();
         }
         return nullptr;
     }

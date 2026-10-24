@@ -1,12 +1,15 @@
-#ifndef __GAMMA_H__
-#define __GAMMA_H__
+#ifndef __VARIANCE_GAMMA_H__
+#define __VARIANCE_GAMMA_H__
 #include "AugmentedNonLinearWavePacket.h"
+#include <optional>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
-using namespace slice;
 namespace filter {
-    class GammaTerms: public AugmentedNonLinearWaveTerms {
+    class VarianceGammaTerms : public AugmentedNonLinearWaveTerms {
         public:
-            inline GammaTerms(
+            inline VarianceGammaTerms(
                 double u_,
                 double u_δx_,
                 double u_δx2_,
@@ -20,9 +23,10 @@ namespace filter {
                 double log_u_power_2_times_cos_u_,
                 double u_norm_times_cos_u_,
                 double z_,
-                double ν_,               
-                double g_
-            ):AugmentedNonLinearWaveTerms(
+                double t_,
+                int ν_,
+                double θ_
+            ) : AugmentedNonLinearWaveTerms(
                 u_,
                 u_δx_,
                 u_δx2_,
@@ -35,22 +39,28 @@ namespace filter {
                 u_δx2_over_u_,
                 log_u_power_2_times_cos_u_,
                 u_norm_times_cos_u_,
-                z_         
-            ),ν(ν_), g(g_){}
-            int ν;
-            double g;
+                z_
+            ), t(t_), ν(ν_), θ(θ_) {}
+
+            const double t;
+            const int ν;
+            const double θ;
     };
 
-    class Gamma: public AugmentedNonLinearWavePacket {
+    class VarianceGamma : public AugmentedNonLinearWavePacket {
         protected:
             int min_lookback_;
-            unordered_map<string, vector<double>> r_;
-        public:                    
-            inline Gamma(int min_lookback): AugmentedNonLinearWavePacket(), min_lookback_(min_lookback), r_(unordered_map<string, vector<double>>()) {}
-            inline Gamma(): Gamma(LONG_LOOKBACK_WINDOW){}
-            vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;        
+            std::unordered_map<std::string, std::vector<double>> r_;
+        public:
+            inline VarianceGamma(int min_lookback)
+                : AugmentedNonLinearWavePacket(),
+                  min_lookback_(min_lookback),
+                  r_(std::unordered_map<std::string, std::vector<double>>()) {}
+            inline VarianceGamma() : VarianceGamma(LONG_LOOKBACK_WINDOW) {}
+            std::vector<events::Signal> process_signals(const std::vector<events::Signal> & signals) override;
     };
 
-    optional<GammaTerms> student_terms(const Signal & signal, const vector<double> & r_);    
+    std::optional<VarianceGammaTerms> variance_gamma_terms(const events::Signal & signal, const std::vector<double> & r_);
 }
+
 #endif
