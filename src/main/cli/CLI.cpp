@@ -133,7 +133,7 @@ namespace cli {
 
         // Output `journal` into standard output as json format.
         
-        output << "symbol,timestamp,open,high,low,close,volume,μ,σ,δ,signal,window_size,r,x_min,x_max" << endl;
+        output << "symbol,timestamp,open,high,low,close,volume,μ,σ,δ,signal,window_size,r,x_min,x_max,acceleration" << endl;
         for (const auto & [symbol, entries] : journal) {
             bool first = true;
             for(const auto & [timestamp, pair]: entries) {
@@ -142,7 +142,7 @@ namespace cli {
                     continue;
                 }
                 output << format(
-                    "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+                    "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
                     symbol,
                     timestamp,
                     pair.first.open_price(),
@@ -157,7 +157,8 @@ namespace cli {
                     pair.second.get().window_size(),
                     pair.second.get().r(),
                     pair.second.get().x_min(),
-                    pair.second.get().x_max()
+                    pair.second.get().x_max(),
+                    pair.second.get().a()
                 ) << endl;                
             }
         }

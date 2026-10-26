@@ -50,8 +50,15 @@ namespace strategy {
             double D = 0.0;
 
             this->direction_ = SignalDirection::IDLE;
-            if(lower_low.has_value() && higher_high.has_value() && max(lower_low.value().index, higher_high.value().index) > MIN_AVERAGE_BARS) {
-                window_size = max(lower_low.value().index, higher_high.value().index);
+            window_size = !(lower_low.has_value() && higher_high.has_value()) ? 0 : max(lower_low.value().index, higher_high.value().index);
+            auto iterator = series.rbegin();
+            double last = (*iterator).close_price(); iterator ++;
+            double second_to_last = (*iterator).close_price(); iterator++;
+            double third_to_last = (*iterator).close_price(); iterator++;
+            double fourth_to_last = (*iterator).close_price();
+            double acceleration = (second_to_last - third_to_last) - (third_to_last - fourth_to_last);
+
+            if(lower_low.has_value() && higher_high.has_value() && max(lower_low.value().index, higher_high.value().index) > MIN_AVERAGE_BARS) {                
                 auto prev = bars_span_1.begin();
                 auto next = prev + 1;
                 auto end = bars_span_1.end();
@@ -87,12 +94,6 @@ namespace strategy {
                 if(moments_result.has_value()) {
                     const auto & moments = moments_result.value();
                     ν = moments.ν;
-                    auto iterator = series.rbegin();
-                    double last = (*iterator).close_price(); iterator ++;
-                    double second_to_last = (*iterator).close_price(); iterator++;
-                    double third_to_last = (*iterator).close_price(); iterator++;
-                    double fourth_to_last = (*iterator).close_price();
-                    double acceleration = log(log(second_to_last / third_to_last) / log(third_to_last / fourth_to_last));
                     
                     this->μ_ = moments.μ;
                     this->σ_ = moments.σ;      
@@ -110,7 +111,7 @@ namespace strategy {
 
             }            
              
-            signals.emplace_back(Signal(timestamp, symbol, this->direction_, this->μ_, this->σ_, this->r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν, D));
+            signals.emplace_back(Signal(timestamp, symbol, this->direction_, this->μ_, this->σ_, this->r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν, D, acceleration));
         }
     }
 
