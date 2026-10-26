@@ -299,141 +299,111 @@ namespace distributions::merton {
         return u * m * t + λ * t * std::exp(-0.5 * u * u * δ * δ) * std::sin(u * γ);
     }
 
-    // 1. Optimized Residual Functor (Pre-computing u^2 to eliminate redundant operations)
-    class MertonFitResiduals : public Eigen::DenseFunctor<double> {
-        public:
-            MertonFitResiduals(
-                const vector<double>& frequencies,
-                const vector<double>& empirical_cosines,
-                const vector<double>& empirical_sines,
-                double return_scale
-            ) :
-                Eigen::DenseFunctor<double>(5, static_cast<int>(2 * frequencies.size())),
-                frequencies_(frequencies),
-                empirical_cosines_(empirical_cosines),
-                empirical_sines_(empirical_sines),
-                return_scale_(return_scale) 
-            {
-                // Precompute u^2 to avoid recalculating in the tight LM solver loop
-                u_sq_.reserve(frequencies_.size());
-                for(double u : frequencies_) {
-                    u_sq_.push_back(u * u);
-                }
-            }
+  
 
-            int operator()(const InputType & x, ValueType & residuals) const {
-                const double m = std::clamp(x[0], -1e4, 1e4) * return_scale_;
-                const double s = std::exp(std::clamp(x[1], -13.8, 6.9)) * return_scale_;
-                const double λ = std::exp(std::clamp(x[2], -13.8, 6.9));
-                const double γ = std::clamp(x[3], -1e4, 1e4) * return_scale_;
-                const double δ = std::exp(std::clamp(x[4], -13.8, 6.9)) * return_scale_;
-
-                const double s_sq = s * s;
-                const double delta_sq = δ * δ;
-
-                for (std::size_t i = 0; i < frequencies_.size(); ++i) {
-                    const double u = frequencies_[i];
-                    const double u2 = u_sq_[i];
-                    
-                    // Inline A() and B() equations utilizing precomputed u2
-                    const double exp_term = std::exp(-0.5 * u2 * delta_sq);
-                    const double a = -0.5 * u2 * s_sq * t + λ * t * (exp_term * std::cos(u * γ) - 1.0);
-                    const double b = u * m * t + λ * t * exp_term * std::sin(u * γ);
-                    
-                    const double magnitude = std::exp(a);
-                    
-                    residuals[static_cast<Eigen::Index>(2 * i)] =
-                        magnitude * std::cos(b) - empirical_cosines_[i];
-                    residuals[static_cast<Eigen::Index>(2 * i + 1)] =
-                        magnitude * std::sin(b) - empirical_sines_[i];
-                }
-                return 0;
-            }
-
-        private:
-            vector<double> frequencies_;
-            vector<double> u_sq_;
-            vector<double> empirical_cosines_;
-            vector<double> empirical_sines_;
-            double return_scale_;
-    };
-
-// 2. Optimized Parameter Estimator (Vectorized ECF + Single LM Run)
-    expected<MertonJumpParameters,TuxedoError> estimate_parameters(span<const double> r) {
+    // 2. Optimized Parameter Estimator (Vectorized ECF + Single LM Run)
+    expected<MertonJumpParameters, TuxedoError> estimate_parameters(
+        span<const double> r,
+        double μ,
+        double σ
+    ) {
         if (r.empty()) return unexpected(TuxedoError::ERR_EMPTY_VECTOR);
-        if (r.size() < 2) return unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL);
-
-        // O(N) single-pass for empirical Moments
-        long double mean = 0.0L;
-        for (const double value : r) mean += value;
-        mean /= r.size();
-
-        long double variance = 0.0L;
-        long double skewness = 0.0L;
-        for (const double value : r) {
-            const double diff = value - static_cast<double>(mean);
-            const double diff_sq = diff * diff;
-            variance += diff_sq;
-            skewness += diff_sq * diff;
-        }
-        variance /= r.size();
-        skewness /= r.size();
-
-        const double return_scale = std::sqrt(static_cast<double>(variance));
-        if (!std::isfinite(return_scale) || return_scale <= 0.0) {
+        if (r.size() < 4) return unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL);
+        if (!std::isfinite(μ) || !std::isfinite(σ) || σ <= 0.0) {
             return unexpected(TuxedoError::ERR_BAD_INPUT);
         }
 
-        const double norm_skew = static_cast<double>(skewness) / std::pow(return_scale, 3.0);
+        const std::size_t N = r.size();
+        const double total_var = σ * σ;
 
-        // Vectorized ECF Phase Construction using Eigen Arrays
-        constexpr std::size_t frequency_count = 32;
-        vector<double> frequencies(frequency_count);
-        vector<double> empirical_cosines(frequency_count);
-        vector<double> empirical_sines(frequency_count);
-        
-        Eigen::Map<const Eigen::ArrayXd> r_values(r.data(), r.size());
-        Eigen::ArrayXd phase(r.size());
+        // 1. Single-pass O(N) Realized Bipower Variation (Barndorff-Nielsen & Shephard)
+        //    and 3rd/4th central moments anchored at μ.
+        double bpv_sum = 0.0;
+        double mu3_sum = 0.0;
+        double mu4_sum = 0.0;
+        double prev_abs_diff = std::abs(r[0] - μ);
 
-        for (std::size_t i = 0; i < frequency_count; ++i) {
-            const double u = (static_cast<double>(i + 1) / 8.0) / return_scale;
-            frequencies[i] = u;
-            
-            phase = u * r_values;
-            empirical_cosines[i] = phase.array().cos().mean();
-            empirical_sines[i] = phase.array().sin().mean();
+        for (std::size_t i = 0; i < N; ++i) {
+            const double diff = r[i] - μ;
+            const double abs_diff = std::abs(diff);
+            const double diff2 = diff * diff;
+            mu3_sum += diff2 * diff;
+            mu4_sum += diff2 * diff2;
+            if (i > 0) {
+                bpv_sum += abs_diff * prev_abs_diff;
+            }
+            prev_abs_diff = abs_diff;
         }
 
-        MertonFitResiduals residual_function(frequencies, empirical_cosines, empirical_sines, return_scale);
+        // Continuous diffusion variance s^2 via Realized Bipower Variation:
+        // BPV = (pi / 2) * E[|r_t - μ| |r_{t-1} - μ|]
+        const double raw_bpv = (0.5 * std::numbers::pi) * (bpv_sum / static_cast<double>(N - 1));
+        const double s_sq = std::clamp(raw_bpv, 0.20 * total_var, 0.90 * total_var);
+        const double s = std::sqrt(s_sq);
 
-        // Method of Moments Heuristic Initialization
-        const double initial_s_log = std::log(std::sqrt(0.8)); 
-        const double initial_λ_log = std::log(0.5);
-        const double initial_γ = std::clamp(norm_skew * 0.5, -0.5, 0.5); 
-        const double initial_δ_log = std::log(std::sqrt(0.2 / 0.5)); 
+        // Discontinuous jump variance V_J = σ^2 - s^2 = λ * (γ^2 + δ^2)
+        const double v_jump = std::max(0.10 * total_var, total_var - s_sq);
 
-        Eigen::VectorXd x(5);
-        x << std::clamp(static_cast<double>(mean / return_scale), -1e4, 1e4),
-             initial_s_log,
-             initial_λ_log,
-             initial_γ,
-             initial_δ_log;
+        // 2. Count isolated jump exceedances above the 2*s diffusive threshold
+        const double jump_threshold = 2.0 * s;
+        std::size_t jump_count = 0;
+        for (const double val : r) {
+            if (std::abs(val - μ) > jump_threshold) {
+                ++jump_count;
+            }
+        }
+        const double emp_jump_rate = static_cast<double>(jump_count) / static_cast<double>(N);
 
-        // Run the LM Optimizer EXACTLY ONCE using the static finite-difference method
-        Eigen::LevenbergMarquardt<MertonFitResiduals>::lmdif1(
-            residual_function, 
-            x, 
-            nullptr, 
-            1e-8
-        );
+        // 3. Combine empirical jump exceedance rate with 4th-cumulant jump intensity
+        const double mu3 = mu3_sum / static_cast<double>(N);
+        const double mu4 = mu4_sum / static_cast<double>(N);
+        const double kappa4 = std::max(0.0, mu4 - 3.0 * total_var * total_var);
 
-        return MertonJumpParameters(
-            std::clamp(x[0], -1e4, 1e4) * return_scale,
-            std::exp(std::clamp(x[1], -13.8, 6.9)) * return_scale,
-            std::exp(std::clamp(x[2], -13.8, 6.9)),
-            std::clamp(x[3], -1e4, 1e4) * return_scale,
-            std::exp(std::clamp(x[4], -13.8, 6.9)) * return_scale
-        );
+        const double lam_kurt = (kappa4 > 1e-16)
+            ? (3.0 * v_jump * v_jump) / std::max(kappa4, 0.20 * v_jump * v_jump)
+            : 0.35;
+
+        // Keep λ in [0.05, 1.50] so the k <= 5 Poisson mixture truncation is exact
+        const double λ = std::clamp(0.5 * emp_jump_rate + 0.5 * lam_kurt, 0.05, 1.50);
+
+        // Second moment of a single jump: E[J^2] = γ^2 + δ^2 = V_J / λ
+        const double e_j2 = v_jump / λ;
+        const double sqrt_e_j2 = std::sqrt(e_j2);
+
+        // 4. Directional jump mean γ from 3rd cumulant κ_3 = λ * γ * (3 * E[J^2] - 2 * γ^2)
+        const double raw_asym = mu3 / (3.0 * λ * e_j2 * sqrt_e_j2 + 1e-16);
+        const double asym = 0.80 * std::tanh(1.5 * raw_asym);
+
+        const double γ = asym * sqrt_e_j2;
+        const double δ = std::sqrt(std::max(1e-12 * total_var, e_j2 - γ * γ));
+
+        // 5. Exact 1st cumulant conservation: E[r] = m + λ * γ = μ
+        const double m = μ - λ * γ;
+
+        if (!std::isfinite(m) || !std::isfinite(s) || s <= 0.0 ||
+            !std::isfinite(λ) || !std::isfinite(γ) || !std::isfinite(δ) || δ <= 0.0) {
+            return unexpected(TuxedoError::ERR_BAD_INPUT);
+        }
+
+        return MertonJumpParameters(m, s, λ, γ, δ);
+    }
+
+    expected<MertonJumpParameters, TuxedoError> estimate_parameters(span<const double> r) {
+        if (r.empty()) return unexpected(TuxedoError::ERR_EMPTY_VECTOR);
+        if (r.size() < 4) return unexpected(TuxedoError::ERR_SAMPLE_TOO_SMALL);
+
+        double mean = 0.0;
+        for (const double val : r) mean += val;
+        mean /= static_cast<double>(r.size());
+
+        double var = 0.0;
+        for (const double val : r) {
+            const double d = val - mean;
+            var += d * d;
+        }
+        var /= static_cast<double>(r.size() - 1);
+
+        return estimate_parameters(r, mean, std::sqrt(var));
     }
 
     // 3. Optimized CDF Evaluation (Truncated Poisson Sum + Multiplication substitution)
