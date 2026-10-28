@@ -34,6 +34,7 @@ namespace stats {
     optional<Extreme> nearest_higher_high(span<const Bar> series); // $x_{\max}(t)$
     optional<Extreme> nearest_lower_low(span<const Bar> series);
     expected<Moments, TuxedoError> simple_moving_moments(span<const double> series);
+    expected<Moments, TuxedoError> d2_moments(double x_min, double x_max, span<const double> series);
 }
 
 #endif

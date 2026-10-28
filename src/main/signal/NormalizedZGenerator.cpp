@@ -1,10 +1,10 @@
 #include <print>
 #include "NormalizedZGenerator.h"
 #include "stats/averages.h"
+#include <algorithm>
 #include <cmath>
 #include "timeseries/timeseries.h"
 #include "utils/log.h"
-#include <cmath>
 
 using namespace std;
 using namespace data;
@@ -17,20 +17,6 @@ namespace strategy {
         return isfinite(number);
     }
 
-    /*
-    I will be strictly in the "limbo" between sessions 
-    (i.e., Day 1 has fully closed, you are computing your numbers overnight, and Day 2 has not yet opened).
-
-    As my CSV data file stops completely at the end of Day 1 (meaning the very last row in my dataframe is the Day 1 close,
-    and Day 2 does not exist yet in your data file), then bars.rbegin() does point directly to Day 1.
-    In that case, you don't have a "Day 2" bar in the file to iterate over, so bar_iterator naturally anchors to the most recent closed session.    
-
-    If my simulation or live execution feed treats each incoming record as a fully completed session 
-    (i.e., the state of the world at the market close of Day 1), then the tip of my data vector (bars.rbegin()) represents that 
-    most recent past closed record (t).
-    Because every bar in my historical feed is already a finalized session, 
-    you do not need to artificially truncate the span or look ahead. The current vector tip is your overnight limbo anchor point.    
-    */
     void NormalizedZGenerator::add_signal(const string & symbol, vector<Signal> & signals){
         if(this->bars_.contains(symbol) && this->bars_.at(symbol).size() > MIN_FILTER_BARS) {
             const auto & series = this->bars_.at(symbol);            
@@ -52,7 +38,7 @@ namespace strategy {
             this->direction_ = SignalDirection::IDLE;
             window_size = !(lower_low.has_value() && higher_high.has_value()) ? 0 : max(lower_low.value().index, higher_high.value().index);
             auto iterator = series.rbegin();
-            double last = (*iterator).close_price(); iterator ++;
+            double last = (*iterator).close_price(); iterator++;
             double second_to_last = (*iterator).close_price(); iterator++;
             double third_to_last = (*iterator).close_price(); iterator++;
             double fourth_to_last = (*iterator).close_price();
@@ -76,7 +62,7 @@ namespace strategy {
                 int C = 0;
 
                 while(prev != end) {
-                    S+= prev->close_price();
+                    S += prev->close_price();
                     C++;
                     prev++;
                 }
@@ -88,7 +74,7 @@ namespace strategy {
                     D += (prev->close_price() - M)*(prev->close_price() - M);
                     prev++;
                 }
-                D = sqrt(D/(bars_span_1.size()-1));
+                D = sqrt(D / (bars_span_1.size() - 1));
                 
                 auto moments_result = simple_moving_moments(log_returns);                
                 if(moments_result.has_value()) {
@@ -98,21 +84,47 @@ namespace strategy {
                     this->μ_ = moments.μ;
                     this->σ_ = moments.σ;      
                     this->r_ = log(last / second_to_last);
-                    this->direction_ = acceleration > 0 ? SignalDirection::LONG : SignalDirection::SHORT;
 
-                    if(acceleration > 0 && (bars_span_1.back().close_price() + 1.5 * D) > x_max && (this->μ_ + this->σ_) > x_log_max) {
+                    // Directionally aligned modulation factor d in [0, 1]
+                    double d = 0.0;
+                    if (this->σ_ > 0.0 && window_size > 0 && isfinite(this->μ_) && isfinite(this->σ_) && isfinite(acceleration) && acceleration != 0.0) {
+                        const double sqrt_w = sqrt(static_cast<double>(window_size));
+                        const double accel_sign = (acceleration > 0.0) ? 1.0 : -1.0;
+
+                        // 1. Horizon-normalized log-barrier span
+                        const double log_span = abs(x_log_max - x_log_min);
+                        const double span_ratio = log_span / (this->σ_ * sqrt_w + 1e-12);
+
+                        // 2. Signed drift gate: expands toward 2 when μ_ aligns with acceleration, contracts toward 0 when opposing
+                        const double signed_drift_z = (accel_sign * this->μ_ * sqrt_w) / (this->σ_ + 1e-12);
+                        const double drift_gate = 1.0 + tanh(signed_drift_z);
+
+                        // 3. Signed log-barrier asymmetry gate in [0.5, 1.5]
+                        const double signed_log_asym = (log_span > 0.0)
+                            ? ((accel_sign * (x_log_max + x_log_min)) / log_span)
+                            : 0.0;
+                        const double asym_gate = clamp(1.0 + 0.5 * signed_log_asym, 0.5, 1.5);
+
+                        const double raw_d = tanh(0.5 * span_ratio * drift_gate * asym_gate);
+                        if (isfinite(raw_d)) {
+                            d = clamp(raw_d, 0.0, 1.0);
+                        }
+                    }
+
+                    // Scale D by (1 + d)
+                    D *= (1.0 + d);
+
+                    if(acceleration > 0 && (bars_span_1.back().close_price() +  D) > x_max && (this->μ_ + this->σ_) > x_log_max) {
                         this->direction_ = SignalDirection::LONG;
-                    } else if (acceleration < 0 && (bars_span_1.back().close_price() - 1.5 * D) < x_min && (this->μ_ - this->σ_) < x_log_min){
+                    } else if (acceleration < 0 && (bars_span_1.back().close_price() - D) < x_min && (this->μ_ - this->σ_) < x_log_min){
                         this->direction_ = SignalDirection::SHORT;
                     } else {
                         this->direction_ = SignalDirection::IDLE;
                     }
                 }
-
             }            
              
             signals.emplace_back(Signal(timestamp, symbol, this->direction_, this->μ_, this->σ_, this->r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν, D, acceleration));
         }
     }
-
 }

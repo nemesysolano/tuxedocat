@@ -1,7 +1,7 @@
 #include "averages.h"
 #include <algorithm>
 #include <cmath>
-#include <limits>
+#include "data/D2.h"
 #include <vector>
 
 using namespace std;
@@ -68,10 +68,19 @@ namespace stats {
             diff_sum += (*iterator - μ) * (*iterator - μ);
         }
         double σ = sqrt(diff_sum / (series.size()-1));
-        double ν = series.size()-1;
+        int ν = (int)(series.size()-1);
         return Moments(μ, σ, ν);
 
     }
 
+    expected<Moments, TuxedoError> d2_moments(double x_min, double x_max, span<const double> series) {
+        size_t n = series.size() > D2_TABLE.size() ? D2_TABLE.size() : series.size();
+        const double & d2 = D2_TABLE.at(n-1);
+        const double μ = (x_max + x_min) / 2;
+        const double R = abs(x_max - x_min);
+        const double σ = R / d2;
+        int ν = (int)(series.size()-1);
+        return Moments(μ, σ, ν);
+    }
 
 }

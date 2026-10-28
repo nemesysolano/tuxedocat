@@ -7,6 +7,7 @@
 #include <filesystem>
 #include "Files.h"
 #include "signal/NormalizedZGenerator.h"
+#include "signal/EstimatedDevGenerator.h"
 #include "feed/DataFrameFeed.h"
 #include "timeseries/timeseries.h"
 #include <cassert>
@@ -38,6 +39,8 @@ namespace cli {
     const int PLAY_OUTPUT_DIRECTORY_ARG = 5;    
     
     const string PLAY_SMALL_CAPS_STRATEGY("normalized-z");
+    const string PLAY_ESTIMATED_STDEV_STRATEGY("estimated-stdev");
+
     const string PLAY_GAUSSIAN_FILTER("gaussian"); //
     const string PLAY_HYPERBOLIC_FILTER("hyperbolic"); // 
     const string PLAY_MERTON_JUMP("merton-jump"); 
@@ -45,7 +48,7 @@ namespace cli {
     const string PLAY_STUDENT_T("student");
     const string PLAY_VARIANCE_GAMMA("variance-gamma");
 
-    const set<string> strategies_names({PLAY_SMALL_CAPS_STRATEGY});
+    const set<string> strategies_names({PLAY_SMALL_CAPS_STRATEGY, PLAY_ESTIMATED_STDEV_STRATEGY});
     const set<string> portfolio_names({PLAY_GAUSSIAN_FILTER, PLAY_HYPERBOLIC_FILTER, PLAY_MERTON_JUMP, PLAY_EXTREME_VALUE, PLAY_STUDENT_T, PLAY_VARIANCE_GAMMA});
 
     template<typename MapA, typename MapB>void assert_equals(const MapA & a, const MapB & b) {
@@ -73,6 +76,8 @@ namespace cli {
     unique_ptr<Generator> strategy_factory(const string & name) {
         if(name == PLAY_SMALL_CAPS_STRATEGY) {
             return make_unique<NormalizedZGenerator>();
+        }else if (name == PLAY_ESTIMATED_STDEV_STRATEGY) {
+            return make_unique<EstimatedDevGenerator>();
         }
 
         return nullptr;

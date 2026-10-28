@@ -202,7 +202,8 @@ def evaluate_single_file(args_tuple):
         max_leverage,
         router_tier,
         slippage_bps,
-        allow_overlapping
+        timed_exit,
+        tier_2_order
     ) = args_tuple
 
     filepath = Path(filepath)
@@ -265,7 +266,7 @@ def evaluate_single_file(args_tuple):
     active_until_idx = -1
 
     for t in range(n):
-        if not allow_overlapping and t <= active_until_idx:
+        if t <= active_until_idx:
             continue
 
         raw_sig = signals[t]
@@ -293,13 +294,17 @@ def evaluate_single_file(args_tuple):
         x_min_val = float(x_mins[t])
         x_max_val = float(x_maxs[t])
 
-        # Tier 1 Take Profit and Stop Loss set to x_max or x_min
+        # Tier 1 Take Profit and Stop Loss set to x_max or x_min (validate positive finite barriers)
         if direction == 1:
             tp_price = x_max_val
             sl_price = x_min_val
         else:
             tp_price = x_min_val
             sl_price = x_max_val
+
+        if not np.isfinite(tp_price) or tp_price <= 0.0 or not np.isfinite(sl_price) or sl_price <= 0.0:
+            skipped_low_delta += 1
+            continue
 
         sl_distance = abs(entry_price - sl_price)
         if not np.isfinite(sl_distance) or sl_distance <= 0.0:
@@ -322,13 +327,16 @@ def evaluate_single_file(args_tuple):
             max_leverage=max_leverage
         )
 
-        # Apply calculated leverage to risk budget and position buying power
+        # Apply calculated leverage to risk budget and position buying power (strictly enforce whole shares >= 1)
         risk_budget = capital * risk_pct * leverage
         desired_shares = risk_budget / sl_distance
         max_shares_by_capital = (capital * max_position_pct * leverage) / entry_price
-        shares = max(1.0, min(desired_shares, max_shares_by_capital))
+        shares = float(math.floor(min(desired_shares, max_shares_by_capital)))
+        if shares < 1.0:
+            skipped_low_delta += 1
+            continue
 
-        est_exit_price = max(entry_price, tp_price)
+        est_exit_price = tp_price if tp_price > 0.0 else entry_price
         unit_fee_info = compute_alpaca_fees_and_costs(
             shares=1.0, entry_price=entry_price, exit_price=est_exit_price, direction=direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
         )
@@ -340,7 +348,7 @@ def evaluate_single_file(args_tuple):
             skipped_low_delta += 1
             continue
 
-        end_idx = min(t + 1 + trade_horizon, n)
+        end_idx = min(t + 1 + trade_horizon, n) if timed_exit else n
         if end_idx <= t + 1:
             continue
 
@@ -386,7 +394,7 @@ def evaluate_single_file(args_tuple):
                     t1_exit_price = b_open; t1_exit_idx = idx; t1_exit_reason = "TP"; break
 
                 hit_sl = b_high >= sl_price
-                hit_tp = b_low <= sl_price
+                hit_tp = b_low <= tp_price
                 if hit_sl and hit_tp:
                     t1_exit_price = sl_price; t1_exit_idx = idx; t1_exit_reason = "SL"; break
                 elif hit_sl:
@@ -394,7 +402,9 @@ def evaluate_single_file(args_tuple):
                 elif hit_tp:
                     t1_exit_price = tp_price; t1_exit_idx = idx; t1_exit_reason = "TP"; break
 
-            if (days_held + 1) >= (trade_horizon + 1) or idx == end_idx - 1:
+            if timed_exit and ((days_held + 1) >= (trade_horizon + 1) or idx == end_idx - 1):
+                t1_exit_price = b_close; t1_exit_idx = idx; t1_exit_reason = "TIMEOUT"; break
+            elif not timed_exit and idx == n - 1:
                 t1_exit_price = b_close; t1_exit_idx = idx; t1_exit_reason = "TIMEOUT"; break
 
         if t1_exit_reason == "TP":
@@ -426,7 +436,7 @@ def evaluate_single_file(args_tuple):
         final_exit_idx = t1_exit_idx
 
         t_stop = t1_exit_idx
-        if t1_exit_reason == "SL" and (t_stop + 1) < n:
+        if tier_2_order and t1_exit_reason == "SL" and (t_stop + 1) < n:
             t2_window_raw = windows[t_stop]
             t2_accel = accelerations[t_stop]
             if (
@@ -460,6 +470,8 @@ def evaluate_single_file(args_tuple):
 
                 if (
                     np.isfinite(t2_entry_price) and t2_entry_price > 0.0
+                    and np.isfinite(t2_tp) and t2_tp > 0.0
+                    and np.isfinite(t2_sl) and t2_sl > 0.0
                     and np.isfinite(t2_sl_dist) and t2_sl_dist > 0.0
                     and t2_capital > 0.0
                 ):
@@ -478,59 +490,62 @@ def evaluate_single_file(args_tuple):
                     t2_risk_budget = t2_capital * risk_pct * t2_leverage
                     t2_desired_shares = t2_risk_budget / t2_sl_dist
                     t2_max_shares_by_capital = (t2_capital * max_position_pct * t2_leverage) / t2_entry_price
-                    t2_shares = max(1.0, min(t2_desired_shares, t2_max_shares_by_capital))
+                    t2_shares = float(math.floor(min(t2_desired_shares, t2_max_shares_by_capital)))
 
-                    t2_est_exit_price = max(t2_entry_price, t2_tp)
-                    t2_unit_fee = compute_alpaca_fees_and_costs(
-                        shares=1.0, entry_price=t2_entry_price, exit_price=t2_est_exit_price, direction=t2_direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
-                    )
-                    t2_pos_fee = compute_alpaca_fees_and_costs(
-                        shares=t2_shares, entry_price=t2_entry_price, exit_price=t2_est_exit_price, direction=t2_direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
-                    )
-                    t2_required_min_delta = max(t2_unit_fee["per_share_cost"], t2_pos_fee["per_share_cost"])
-
-                    t2_end_idx = min(t_stop + 1 + t2_horizon, n)
-                    if t2_delta >= t2_required_min_delta and t2_end_idx > (t_stop + 1):
-                        tier2_count += 1
-                        leverages_used.append(t2_leverage)
-                        t2_exit_price = closes[t2_end_idx - 1]
-                        t2_exit_idx = t2_end_idx - 1
-
-                        for t2_days_held, idx in enumerate(range(t_stop + 1, t2_end_idx), start=1):
-                            b_open = float(opens[idx])
-                            b_high = float(highs[idx])
-                            b_low = float(lows[idx])
-                            b_close = float(closes[idx])
-
-                            if t2_direction == 1:
-                                if b_open <= t2_sl:
-                                    t2_exit_price = b_open; t2_exit_idx = idx; break
-                                if b_open >= t2_tp:
-                                    t2_exit_price = b_open; t2_exit_idx = idx; break
-                                if b_low <= t2_sl:
-                                    t2_exit_price = t2_sl; t2_exit_idx = idx; break
-                                if b_high >= t2_tp:
-                                    t2_exit_price = t2_tp; t2_exit_idx = idx; break
-                            else:
-                                if b_open >= t2_sl:
-                                    t2_exit_price = b_open; t2_exit_idx = idx; break
-                                if b_open <= t2_tp:
-                                    t2_exit_price = b_open; t2_exit_idx = idx; break
-                                if b_high >= t2_sl:
-                                    t2_exit_price = t2_sl; t2_exit_idx = idx; break
-                                if b_low <= t2_tp:
-                                    t2_exit_price = t2_tp; t2_exit_idx = idx; break
-
-                            if (t2_days_held + 1) >= (t2_horizon + 1) or idx == t2_end_idx - 1:
-                                t2_exit_price = b_close; t2_exit_idx = idx; break
-
-                        t2_fees = compute_alpaca_fees_and_costs(
-                            shares=t2_shares, entry_price=t2_entry_price, exit_price=t2_exit_price, direction=t2_direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
+                    if t2_shares >= 1.0:
+                        t2_est_exit_price = t2_tp if t2_tp > 0.0 else t2_entry_price
+                        t2_unit_fee = compute_alpaca_fees_and_costs(
+                            shares=1.0, entry_price=t2_entry_price, exit_price=t2_est_exit_price, direction=t2_direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
                         )
-                        t2_fees_dollars = t2_fees["total_cost"]
-                        t2_gross_pnl = t2_shares * (t2_exit_price - t2_entry_price) * t2_direction
-                        t2_net_pnl = t2_gross_pnl - t2_fees_dollars
-                        final_exit_idx = t2_exit_idx
+                        t2_pos_fee = compute_alpaca_fees_and_costs(
+                            shares=t2_shares, entry_price=t2_entry_price, exit_price=t2_est_exit_price, direction=t2_direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
+                        )
+                        t2_required_min_delta = max(t2_unit_fee["per_share_cost"], t2_pos_fee["per_share_cost"])
+
+                        t2_end_idx = min(t_stop + 1 + t2_horizon, n) if timed_exit else n
+                        if t2_delta >= t2_required_min_delta and t2_end_idx > (t_stop + 1):
+                            tier2_count += 1
+                            leverages_used.append(t2_leverage)
+                            t2_exit_price = closes[t2_end_idx - 1]
+                            t2_exit_idx = t2_end_idx - 1
+
+                            for t2_days_held, idx in enumerate(range(t_stop + 1, t2_end_idx), start=1):
+                                b_open = float(opens[idx])
+                                b_high = float(highs[idx])
+                                b_low = float(lows[idx])
+                                b_close = float(closes[idx])
+
+                                if t2_direction == 1:
+                                    if b_open <= t2_sl:
+                                        t2_exit_price = b_open; t2_exit_idx = idx; break
+                                    if b_open >= t2_tp:
+                                        t2_exit_price = b_open; t2_exit_idx = idx; break
+                                    if b_low <= t2_sl:
+                                        t2_exit_price = t2_sl; t2_exit_idx = idx; break
+                                    if b_high >= t2_tp:
+                                        t2_exit_price = t2_tp; t2_exit_idx = idx; break
+                                else:
+                                    if b_open >= t2_sl:
+                                        t2_exit_price = b_open; t2_exit_idx = idx; break
+                                    if b_open <= t2_tp:
+                                        t2_exit_price = b_open; t2_exit_idx = idx; break
+                                    if b_high >= t2_sl:
+                                        t2_exit_price = t2_sl; t2_exit_idx = idx; break
+                                    if b_low <= t2_tp:
+                                        t2_exit_price = t2_tp; t2_exit_idx = idx; break
+
+                                if timed_exit and ((t2_days_held + 1) >= (t2_horizon + 1) or idx == t2_end_idx - 1):
+                                    t2_exit_price = b_close; t2_exit_idx = idx; break
+                                elif not timed_exit and idx == n - 1:
+                                    t2_exit_price = b_close; t2_exit_idx = idx; break
+
+                            t2_fees = compute_alpaca_fees_and_costs(
+                                shares=t2_shares, entry_price=t2_entry_price, exit_price=t2_exit_price, direction=t2_direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
+                            )
+                            t2_fees_dollars = t2_fees["total_cost"]
+                            t2_gross_pnl = t2_shares * (t2_exit_price - t2_entry_price) * t2_direction
+                            t2_net_pnl = t2_gross_pnl - t2_fees_dollars
+                            final_exit_idx = t2_exit_idx
 
         total_trade_costs = t1_total_cost + t2_fees_dollars
         total_fees_paid += total_trade_costs
@@ -615,7 +630,8 @@ def process_alpaca_trades(args):
             args.max_leverage,
             args.router_tier,
             args.slippage_bps,
-            args.allow_overlapping
+            args.timed_exit,
+            args.tier_2_order
         )
         for f in csv_files
     ]
@@ -638,9 +654,12 @@ def process_alpaca_trades(args):
     df_results = pd.DataFrame(valid_records)
 
     df_results = df_results.sort_values(
-        by=['Return (%)', 'Evaluations'],
-        ascending=[False, False]
+        by=['Return (%)', 'Max Drawdown (%)'],
+        ascending=[False, True]
     ).reset_index(drop=True)
+    df_results['Final Capital ($)'] = df_results['Final Capital ($)'].map(
+        lambda amount: f'${amount:,.2f}'
+    )
 
     df_results.to_csv(args.output_file, index=False)
 
@@ -665,7 +684,8 @@ def parse_args():
         help='Alpaca commission tier per BrokFeeSched.pdf: free ($0), elite_fixed ($0.0040/sh), elite_tiered ($0.0025/sh).'
     )
     parser.add_argument('--slippage-bps', type=float, default=5.0, help='Per-leg execution slippage in basis points for US Equities/ETFs (default: 5.0 bps = 0.05%% per leg).')
-    parser.add_argument('--allow-overlapping', action='store_false', default=False, help='If set, allows overlapping trades (default: False).')
+    parser.add_argument('--tier-2-order', type=bool, default=False, help='If set, enables Tier 2 stop-loss recovery orders. Otherwise, strategy runs Tier 1 only.')
+    parser.add_argument('--timed-exit', type=bool, default=False, help='If set, exit positions after trade_horizon days. Otherwise, wait indefinitely for TP/SL.')
     return parser.parse_args()
 
 
