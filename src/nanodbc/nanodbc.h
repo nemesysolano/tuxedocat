@@ -77,6 +77,11 @@
 #ifndef NANODBC_NANODBC_H
 #define NANODBC_NANODBC_H
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#endif
+
 #include <any>
 #include <cstddef>
 #include <cstdint>
@@ -3292,5 +3297,9 @@ void prepare(statement& stmt, string const& query, long timeout = 0);
 /// @}
 
 } // namespace nanodbc
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 #endif

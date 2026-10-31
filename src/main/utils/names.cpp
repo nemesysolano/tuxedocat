@@ -3,6 +3,7 @@
 using namespace std;
 
 namespace names {
+    const string TIMESTAMP = "timestamp";
     const string OPEN_PRICE = "Open";
     const string HIGH_PRICE = "High";
     const string LOW_PRICE = "Low";

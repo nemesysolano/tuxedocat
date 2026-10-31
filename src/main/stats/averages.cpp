@@ -83,4 +83,15 @@ namespace stats {
         return Moments(μ, σ, ν);
     }
 
+    expected<Moments, TuxedoError> log_variance_moments(double x_min, double x_max, span<const double> series) {
+        if (!isfinite(x_min) || !isfinite(x_max)) {
+            return unexpected(TuxedoError::ERR_BAD_INPUT);
+        }
+
+        const double μ = (x_max + x_min) / 2;
+         const double R = exp(abs(x_max / x_min));
+        const double σ = R / sqrt(exp(2.0));
+        int ν = (int)(series.size()-1);
+        return Moments(μ, σ, ν);
+    }
 }

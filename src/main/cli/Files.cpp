@@ -1,5 +1,6 @@
 #include "Files.h"
 #include <cstdlib>
+#include <system_error>
 
 using namespace std;
 
@@ -114,5 +115,30 @@ namespace cli {
         }
 
         return p.string();
+    }
+
+    bool Files::remove(const string & path) {
+        std::error_code ec;
+        const auto entry_status = filesystem::symlink_status(path, ec);
+        if (ec) {
+            return ec == errc::no_such_file_or_directory;
+        }
+        if (entry_status.type() == filesystem::file_type::not_found) {
+            return true;
+        }
+
+        auto file_status = entry_status;
+        if (filesystem::is_symlink(entry_status)) {
+            file_status = filesystem::status(path, ec);
+            if (ec || file_status.type() == filesystem::file_type::not_found) {
+                return false;
+            }
+        }
+
+        if (!filesystem::is_regular_file(file_status)) {
+            return false;
+        }
+
+        return filesystem::remove(path, ec) && !ec;
     }
 }

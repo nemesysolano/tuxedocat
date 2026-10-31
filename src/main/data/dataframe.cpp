@@ -629,12 +629,7 @@ std::expected<DataFrame, TuxedoError> DataFrame::Create(const ODBCDataSource & o
             // Quote the symbol literal and alias column names directly to names::* constants
             // so DB2 uppercase folding does not mismatch nanodbc::result::get<double>(column_name)
             const string select_sql(format(
-                "SELECT SYMBOL, TIMESTAMP, "
-                "OPEN_PRICE AS \"{}\", "
-                "HIGH_PRICE AS \"{}\", "
-                "LOW_PRICE AS \"{}\", "
-                "CLOSE_PRICE AS \"{}\" "
-                "FROM TUXEDOCAT.QUOTE WHERE SYMBOL='{}' ORDER BY TIMESTAMP",
+                "SELECT SYMBOL, TIMESTAMP, OPEN_PRICE AS \"{}\", HIGH_PRICE AS \"{}\", LOW_PRICE AS \"{}\", CLOSE_PRICE AS \"{}\" FROM QUOTE WHERE SYMBOL='{}' ORDER BY TIMESTAMP",
                 names::OPEN_PRICE,
                 names::HIGH_PRICE,
                 names::LOW_PRICE,
@@ -642,8 +637,9 @@ std::expected<DataFrame, TuxedoError> DataFrame::Create(const ODBCDataSource & o
                 symbol
             ));
 
-            result cursor = execute(conn, NANODBC_TEXT(select_sql)); // 2021-02-05-00.00.00.000000
+            log_debug_message(select_sql);
 
+            result cursor = execute(conn, NANODBC_TEXT(select_sql)); // 2021-02-05-00.00.00.000000
             while (cursor.next()) {
                 const timestamp row_timestamp = cursor.get<timestamp>("TIMESTAMP");
                 const chrono::sys_seconds row_sys_seconds =
@@ -688,6 +684,7 @@ std::expected<DataFrame, TuxedoError> DataFrame::Create(const ODBCDataSource & o
         }
 
         if (rows == 0) {
+            log_error_message(format("{} has {} rows.", symbol, rows));
             return std::unexpected(TuxedoError::ERR_EMPTY_VECTOR);
         }
 

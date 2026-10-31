@@ -9,6 +9,10 @@
 #endif
 
 #include <nanodbc/nanodbc.h>
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#endif
 
 #include <algorithm>
 #include <clocale>
@@ -5065,7 +5069,7 @@ template <class T, std::enable_if_t<is_string<T>::value, int>>
 void result::result_impl::get_ref_impl(short column, T& result) const
 {
     bound_column const& col = bound_columns_[column];
-    const SQLULEN column_size = col.sqlsize_;
+/*  const SQLULEN column_size = col.sqlsize_; */
 
     switch (col.ctype_)
     {
@@ -8672,6 +8676,10 @@ template timestamp result::get(string const&, const timestamp&) const;
 template timestampoffset result::get(string const&, const timestampoffset&) const;
 template std::vector<std::uint8_t>
 result::get(string const&, const std::vector<std::uint8_t>&) const;
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 #if defined(_MSC_VER)
 template _variant_t result::get(string const&, _variant_t const&) const;
 #endif

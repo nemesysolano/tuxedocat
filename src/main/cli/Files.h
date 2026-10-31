@@ -15,6 +15,7 @@ namespace cli {
             static vector<string> listing(const string & directory, const string & filter); 
             static bool is_directory(const string & path);
             static bool is_regular_file(const string & path);
+            static bool remove(const string & path);
             static string program_directory(char* argv[]);
     };
 }
