@@ -10,6 +10,7 @@
 #include "data/slice.h"
 #include <memory>
 #include <expected>
+#include <utility>
 #include "utils/tuxedo-error.h"
 #include "data/dataframe.h"
 #include <sstream>
@@ -20,13 +21,26 @@
 #include <list>
 #include <vector>
 #include <span>
+#include "nanodbc/nanodbc.h"
+
+using namespace std;
 
 namespace dataframe {
     typedef std::function<double(double)> double_transformer;
     typedef std::function<void(std::span<double> row, size_t column_index, double x)> double_accumulator; 
     double identity_transformer(double x);
     void identity_accumulator(std::span<double> row, size_t column_index, double x);
-    
+
+    class ODBCDataSource {
+        public:
+            const string dsn;
+            const string uid;
+            const string pwd;
+
+            ODBCDataSource(string dsn, string uid, string pwd)
+                : dsn(std::move(dsn)), uid(std::move(uid)), pwd(std::move(pwd)) {}
+    };
+
     class DataFrame: public slice::Span2D {
         private:
             std::vector<double> data_;
@@ -88,7 +102,7 @@ namespace dataframe {
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input, char field_delimiter);
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input);
             static std::expected<DataFrame, TuxedoError> Create(const std::string & file_path);
-
+            static std::expected<DataFrame, TuxedoError> Create(const ODBCDataSource & odbc_datasource, const string & symbol);
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer, double_accumulator accumulator, std::vector<double> & accumulated) const;
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer, double_accumulator accumulator) const;
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer) const;

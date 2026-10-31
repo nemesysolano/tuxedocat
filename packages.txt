@@ -7,4 +7,4 @@ yfinance
 matplotlib
 mplfinance
 plotly
-ibm_db
+pyodbc

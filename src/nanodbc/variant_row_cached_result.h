@@ -1,0 +1,84 @@
+#ifndef NANODBC_VARIANT_ROW_CACHED_RESULT_H
+#define NANODBC_VARIANT_ROW_CACHED_RESULT_H
+
+#if defined(_MSC_VER)
+
+#include <comutil.h> // _variant_t
+#include "nanodbc.h"
+
+namespace nanodbc
+{
+
+class variant_row_cached_result : private result
+{
+public:
+    // Import minimal operations set for necessary usability
+    using result::columns;
+    using result::unbind;
+    using result::operator bool;
+
+    /// \brief Empty result set.
+    variant_row_cached_result() = default;
+
+    /// \brief Converting contructor.
+    variant_row_cached_result(result&& result);
+
+    /// \brief Move constructor.
+    variant_row_cached_result(variant_row_cached_result&& rhs) noexcept;
+
+    /// \brief Move assignment operator.
+    variant_row_cached_result& operator=(variant_row_cached_result&& rhs) noexcept;
+
+    /// \brief The cached row is not shared, so a copy is refused rather than made.
+    /// Declaring the move operations already withdrew these; saying so states the whole
+    /// set rather than half of it.
+    variant_row_cached_result(variant_row_cached_result const&) = delete;
+    variant_row_cached_result& operator=(variant_row_cached_result const&) = delete;
+
+    /// \brief Destructor.
+    ~variant_row_cached_result() = default;
+
+    /// Member swap.
+    void swap(variant_row_cached_result& rhs) noexcept;
+
+    /// \brief Gets cached data from the given column of the current rowset.
+    ///
+    /// Columns are numbered from left to right and 0-indexed.
+    [[nodiscard]] _variant_t const& get(short column) const;
+
+    /// \brief Returns true if and only if cached value of the given column is of VT_NULL type.
+    [[nodiscard]] bool is_null(short column) const;
+
+    /// \brief Returns the next result.
+    [[nodiscard]] bool next();
+
+    /// \brief Access to underlying result
+    ///
+    /// For example, in order to access to columns metadata.
+    nanodbc::result& result() noexcept { return static_cast<nanodbc::result&>(*this); }
+
+    /// \brief Access to underlying result
+    ///
+    /// For example, in order to access to columns metadata.
+    nanodbc::result const& result() const noexcept
+    {
+        return static_cast<nanodbc::result const&>(*this);
+    }
+
+private:
+    /// \brief Clears cache of row values as result::next pre-condition.
+    void clear_row();
+
+    /// \brief Re-fills cache of row values as result::next post-condition.
+    void fill_row();
+
+private:
+    std::vector<_variant_t> row_;
+    std::size_t row_size_{0};
+};
+
+} // namespace nanodbc
+
+#endif // defined(_MSC_VER)
+
+#endif

@@ -6,7 +6,7 @@ CFLAGS := -Wall -Wextra -Wno-deprecated-declarations -DEIGEN_USE_BLAS -std=c++23
 
 ifeq ($(shell uname -s), Darwin)
     CC := clang++
-    CFLAGS += -stdlib=libc++ -I/opt/homebrew/include/eigen3 -I/opt/homebrew/include
+    CFLAGS += -stdlib=libc++ -I/opt/homebrew/include/eigen3 -I/opt/homebrew/include -I/opt/homebrew/opt/unixodbc/include
     BOOST_INCLUDE_DIRS ?= /opt/homebrew/include /usr/local/include
 else ifeq ($(shell uname -s), SunOS) 
     # Use native GCC 14 on Solaris (automatically handles its own headers and libstdc++)
@@ -33,7 +33,7 @@ DEPS := $(OBJS:.o=.d)
 -include $(DEPS)
 
 ifeq ($(shell uname -s), Darwin)
-    LDFLAGS += -framework Accelerate -L/opt/homebrew/lib
+    LDFLAGS += -framework Accelerate -L/opt/homebrew/lib -L/opt/homebrew/opt/unixodbc/lib -lodbc
 else ifeq ($(shell uname -s), SunOS) 
     # g++ automatically links libstdc++; we only need to provide OpenBLAS here
     LDFLAGS += -L/usr/local/openblas/lib -Wl,-rpath,/usr/local/openblas/lib -lopenblas

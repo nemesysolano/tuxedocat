@@ -13,12 +13,6 @@ using namespace dataframe;
 using namespace events;
 
 namespace feed {
-    extern const string OPEN_PRICE;
-    extern const string LOW_PRICE;
-    extern const string HIGH_PRICE;
-    extern const string CLOSE_PRICE ;
-    extern const string VOLUME ;
-
     class DataFrameFeed;
     using MarketEventHandler = function<void(unique_ptr<MarketEvent> market_event, const DataFrameFeed & dataframe, const unordered_map<string, size_t> & records_loaded)>;
     void market_event_handler_default_impl(unique_ptr<MarketEvent> market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded);

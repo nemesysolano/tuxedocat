@@ -9,23 +9,18 @@
 #include <ranges> 
 #include <unordered_map>
 #include "process/ThreadPool.h"
+#include "utils/names.h"
 
 using namespace std;
 using namespace events;
 
 namespace feed {
-    const string OPEN_PRICE = "Open";
-    const string HIGH_PRICE = "High";
-    const string LOW_PRICE = "Low";
-    const string CLOSE_PRICE = "Close";
-    const string VOLUME = "Volume";
-
     vector<reference_wrapper<const string>> EXPECTED_COLUMN_NAMES({
-        OPEN_PRICE,
-        LOW_PRICE,
-        HIGH_PRICE,
-        CLOSE_PRICE,
-        VOLUME
+        names::OPEN_PRICE,
+        names::LOW_PRICE,
+        names::HIGH_PRICE,
+        names::CLOSE_PRICE,
+        names::VOLUME
     });
 
     void market_event_handler_default_impl(unique_ptr<MarketEvent> market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded) {
@@ -63,11 +58,11 @@ namespace feed {
                     bars.emplace(symbol, Bar(
                         timestamp,
                         symbol,
-                        dataframe[timestamp, OPEN_PRICE].value(),
-                        dataframe[timestamp, HIGH_PRICE].value(),
-                        dataframe[timestamp, LOW_PRICE].value(),
-                        dataframe[timestamp, CLOSE_PRICE].value(),
-                        (int)dataframe[timestamp, VOLUME].value()
+                        dataframe[timestamp, names::OPEN_PRICE].value(),
+                        dataframe[timestamp, names::HIGH_PRICE].value(),
+                        dataframe[timestamp, names::LOW_PRICE].value(),
+                        dataframe[timestamp, names::CLOSE_PRICE].value(),
+                        (int)dataframe[timestamp, names::VOLUME].value()
                     ));
                     records_loaded[symbol] = index + 1;
                 } else {

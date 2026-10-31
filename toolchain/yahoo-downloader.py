@@ -12,26 +12,7 @@ def drop_rows_with_missing_data(file_path):
     history.to_csv(file_path, index=False)
 
 
-def download_history(symbol):
-    file_path = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "..", "data", f"{symbol}.csv"
-    )
-    if os.path.isfile(file_path):
-        drop_rows_with_missing_data(file_path)
-        return file_path
-
-    end_date = datetime.datetime.now() + datetime.timedelta(days=1)
-    start_date = end_date - datetime.timedelta(days=365 * 10 + 1)
-
-    history = yf.Ticker(symbol).history(
-        start=start_date,
-        end=end_date,
-        interval="1d",
-        auto_adjust=False,
-    )
-    if history.empty:
-        raise RuntimeError(f"Yahoo Finance returned no historical data for {symbol}.")
-
+def normalize_history(history):
     history.index = history.index.tz_localize(None)
     history.index.name = "Timestamp"
     history = history.reset_index().rename(columns={"Adj Close": "AdjClose"})
@@ -54,6 +35,45 @@ def download_history(symbol):
     )
     history = history[ordered_columns]
     history = history.dropna()
+    return history
+
+
+def download_history(symbol):
+    file_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)), "..", "data", f"{symbol}.csv"
+    )
+    existing_history = None
+    end_date = datetime.datetime.now() + datetime.timedelta(days=1)
+
+    if os.path.isfile(file_path):
+        drop_rows_with_missing_data(file_path)
+        existing_history = pd.read_csv(file_path)
+        if not existing_history.empty:
+            last_timestamp = pd.to_datetime(existing_history["Timestamp"]).max()
+            start_date = last_timestamp.to_pydatetime() + datetime.timedelta(days=1)
+        else:
+            start_date = end_date - datetime.timedelta(days=365 * 10 + 1)
+    else:
+        start_date = end_date - datetime.timedelta(days=365 * 10 + 1)
+
+    if start_date >= end_date and existing_history is not None:
+        return file_path
+
+    history = yf.Ticker(symbol).history(
+        start=start_date,
+        end=end_date,
+        interval="1d",
+        auto_adjust=False,
+    )
+    if history.empty:
+        if existing_history is not None:
+            return file_path
+        raise RuntimeError(f"Yahoo Finance returned no historical data for {symbol}.")
+
+    history = normalize_history(history)
+    if existing_history is not None and not existing_history.empty:
+        history = pd.concat([existing_history, history], ignore_index=True)
+        history = history.drop_duplicates(subset=["Timestamp"], keep="last")
 
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     history.to_csv(file_path, index=False)

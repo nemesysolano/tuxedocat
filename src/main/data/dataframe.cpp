@@ -9,7 +9,11 @@
 #include <cmath>
 #include "utils/log.h"
 #include "utils/tuxedo-error.h"
+#include "utils/names.h"
+
+using namespace names;
 using namespace std;
+using namespace nanodbc;
 
 namespace dataframe {
     double identity_transformer(double x) {return x;}
@@ -597,6 +601,105 @@ namespace dataframe {
         }
         return std::move(dataframe_result.value());
 
+    }
+
+std::expected<DataFrame, TuxedoError> DataFrame::Create(const ODBCDataSource & odbc_datasource, const string & symbol) {
+        std::vector<double> data;
+        std::map<std::string, size_t> column_name_to_column_index_ = {
+            {names::OPEN_PRICE, 0},
+            {names::HIGH_PRICE, 1},
+            {names::LOW_PRICE, 2},
+            {names::CLOSE_PRICE, 3},
+            {names::VOLUME, 4} // Remove this entry (and data.push_back(volume) below) if only 4 OHLC columns are needed
+        };
+        std::map<std::chrono::sys_seconds, size_t> timestamp_to_row_index_;
+        std::set<std::chrono::sys_seconds> timestamps_;
+        std::vector<std::chrono::sys_seconds> timestamps_vector_;
+
+        size_t rows = 0;
+        const size_t cols = column_name_to_column_index_.size();
+
+        try {
+            const string connection_string(format("DSN={};UID={};PWD={}", odbc_datasource.dsn, odbc_datasource.uid, odbc_datasource.pwd));
+            log_debug_message(format("connection to {}", connection_string));
+
+            connection conn(NANODBC_TEXT(connection_string));
+            log_debug_message(format("connected to {}", connection_string));
+
+            // Quote the symbol literal and alias column names directly to names::* constants
+            // so DB2 uppercase folding does not mismatch nanodbc::result::get<double>(column_name)
+            const string select_sql(format(
+                "SELECT SYMBOL, TIMESTAMP, "
+                "OPEN_PRICE AS \"{}\", "
+                "HIGH_PRICE AS \"{}\", "
+                "LOW_PRICE AS \"{}\", "
+                "CLOSE_PRICE AS \"{}\" "
+                "FROM TUXEDOCAT.QUOTE WHERE SYMBOL='{}' ORDER BY TIMESTAMP",
+                names::OPEN_PRICE,
+                names::HIGH_PRICE,
+                names::LOW_PRICE,
+                names::CLOSE_PRICE,
+                symbol
+            ));
+
+            result cursor = execute(conn, NANODBC_TEXT(select_sql)); // 2021-02-05-00.00.00.000000
+
+            while (cursor.next()) {
+                const timestamp row_timestamp = cursor.get<timestamp>("TIMESTAMP");
+                const chrono::sys_seconds row_sys_seconds =
+                    chrono::sys_days{
+                        chrono::year{row_timestamp.year} /
+                        chrono::month{static_cast<unsigned int>(row_timestamp.month)} /
+                        chrono::day{static_cast<unsigned int>(row_timestamp.day)}
+                    } +
+                    chrono::hours{row_timestamp.hour} +
+                    chrono::minutes{row_timestamp.min} +
+                    chrono::seconds{row_timestamp.sec};
+
+                // Skip or overwrite if duplicate timestamps exist, keeping row indices consistent
+                if (timestamp_to_row_index_.contains(row_sys_seconds)) {
+                    continue;
+                }
+
+                double open_price = cursor.get<double>(names::OPEN_PRICE, 0.0);
+                double high_price = cursor.get<double>(names::HIGH_PRICE, 0.0);
+                double low_price = cursor.get<double>(names::LOW_PRICE, 0.0);
+                double close_price = cursor.get<double>(names::CLOSE_PRICE, 0.0);
+                double volume = 0.0;
+
+                timestamp_to_row_index_[row_sys_seconds] = rows;
+                timestamps_.insert(row_sys_seconds);
+                timestamps_vector_.push_back(row_sys_seconds);
+
+                data.push_back(open_price);
+                data.push_back(high_price);
+                data.push_back(low_price);
+                data.push_back(close_price);
+                data.push_back(volume);
+
+                ++rows;
+            }
+        } catch (const nanodbc::database_error & e) {
+            log_debug_message(format("ODBC error in DataFrame::Create for symbol {}: {}", symbol, e.what()));
+            return std::unexpected(TuxedoError::ERR_CANT_OPEN_FILE);
+        } catch (const std::exception & e) {
+            log_debug_message(format("Error in DataFrame::Create for symbol {}: {}", symbol, e.what()));
+            return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
+        }
+
+        if (rows == 0) {
+            return std::unexpected(TuxedoError::ERR_EMPTY_VECTOR);
+        }
+
+        return DataFrame(
+            rows,
+            cols,
+            std::move(data),
+            std::move(column_name_to_column_index_),
+            std::move(timestamp_to_row_index_),
+            std::move(timestamps_),
+            std::move(timestamps_vector_)
+        );
     }
 
     // Optional but highly recommended: expose the index lookup
