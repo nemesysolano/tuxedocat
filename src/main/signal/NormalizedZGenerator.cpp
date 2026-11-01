@@ -34,8 +34,11 @@ namespace strategy {
             const double x_max = higher_high.has_value() ? higher_high->price : 0.0;
             sys_seconds timestamp = series.back().timestamp();
             double D = 0.0;
+            double μ_ = 0;
+            double σ_ = 0;      
+            double r_ = 0;
+            SignalDirection direction_ = SignalDirection::IDLE;
 
-            this->direction_ = SignalDirection::IDLE;
             window_size = !(lower_low.has_value() && higher_high.has_value()) ? 0 : max(lower_low.value().index, higher_high.value().index);
             auto iterator = series.rbegin();
             double last = (*iterator).close_price(); iterator++;
@@ -81,22 +84,22 @@ namespace strategy {
                     const auto & moments = moments_result.value();
                     ν = moments.ν;
                     
-                    this->μ_ = moments.μ;
-                    this->σ_ = moments.σ;      
-                    this->r_ = log(last / second_to_last);
+                    μ_ = moments.μ;
+                    σ_ = moments.σ;
+                    r_ = log(last / second_to_last);
 
                     // Directionally aligned modulation factor d in [0, 1]
                     double d = 0.0;
-                    if (this->σ_ > 0.0 && window_size > 0 && isfinite(this->μ_) && isfinite(this->σ_) && isfinite(acceleration) && acceleration != 0.0) {
+                    if (σ_ > 0.0 && window_size > 0 && isfinite(μ_) && isfinite(σ_) && isfinite(acceleration) && acceleration != 0.0) {
                         const double sqrt_w = sqrt(static_cast<double>(window_size));
                         const double accel_sign = (acceleration > 0.0) ? 1.0 : -1.0;
 
                         // 1. Horizon-normalized log-barrier span
                         const double log_span = abs(x_log_max - x_log_min);
-                        const double span_ratio = log_span / (this->σ_ * sqrt_w + 1e-12);
+                        const double span_ratio = log_span / (σ_ * sqrt_w + 1e-12);
 
                         // 2. Signed drift gate: expands toward 2 when μ_ aligns with acceleration, contracts toward 0 when opposing
-                        const double signed_drift_z = (accel_sign * this->μ_ * sqrt_w) / (this->σ_ + 1e-12);
+                        const double signed_drift_z = (accel_sign * μ_ * sqrt_w) / (σ_ + 1e-12);
                         const double drift_gate = 1.0 + tanh(signed_drift_z);
 
                         // 3. Signed log-barrier asymmetry gate in [0.5, 1.5]
@@ -114,17 +117,17 @@ namespace strategy {
                     // Scale D by (1 + d)
                     D *= (1.0 + d);
 
-                    if(acceleration > 0 && (bars_span_1.back().close_price() +  D) > x_max && (this->μ_ + this->σ_) > x_log_max) {
-                        this->direction_ = SignalDirection::LONG;
-                    } else if (acceleration < 0 && (bars_span_1.back().close_price() - D) < x_min && (this->μ_ - this->σ_) < x_log_min){
-                        this->direction_ = SignalDirection::SHORT;
+                    if(acceleration > 0 && (bars_span_1.back().close_price() +  D) > x_max && (μ_ + σ_) > x_log_max) {
+                        direction_ = SignalDirection::LONG;
+                    } else if (acceleration < 0 && (bars_span_1.back().close_price() - D) < x_min && (μ_ - σ_) < x_log_min){
+                        direction_ = SignalDirection::SHORT;
                     } else {
-                        this->direction_ = SignalDirection::IDLE;
+                        direction_ = SignalDirection::IDLE;
                     }
                 }
             }            
              
-            signals.emplace_back(Signal(timestamp, symbol, this->direction_, this->μ_, this->σ_, this->r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν, D, acceleration));
+            signals.emplace_back(Signal(timestamp, symbol, direction_, μ_, σ_, r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν, D, acceleration));
         }
     }
 }

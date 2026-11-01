@@ -13,13 +13,8 @@ using namespace stats;
 
 namespace strategy {
     class NormalizedZGenerator: public Generator {
-        private:
-            double μ_; // Previous μ_
-            double σ_; // Previous s_
-            double r_; // Previous r_;
-            SignalDirection direction_; // Direction
         public:
-            inline NormalizedZGenerator(): Generator(), μ_(0), σ_(0), r_(0), direction_(SignalDirection::IDLE) {}
+            inline NormalizedZGenerator(): Generator() {}
             void add_signal(const string & symbol, vector<Signal> & signals) override;
 
     };
