@@ -28,6 +28,7 @@ def round_up_cent(value: float) -> float:
 def compute_optimal_leverage(
     direction: int,
     entry_price: float,
+    sl_price: float,
     x_min: float,
     x_max: float,
     delta: float,
@@ -37,10 +38,11 @@ def compute_optimal_leverage(
     max_leverage: float = 4.0
 ) -> int:
     """
-    Calculate optimal leverage L* based on μ, σ, δ, r^2, x_min, and x_max,
+    Calculate optimal leverage L* based on μ, σ, δ, r^2, x_min, x_max, and the stop loss,
     rounded up to the nearest ceiling integer:
-      1. Barrier Asymmetry (x_min, x_max, entry_price):
+      1. Barrier Asymmetry (TP = x_max/x_min, SL = sl_price, entry_price):
          b = TP_distance / SL_distance
+         (with SL at half the entry-to-TP distance, b = 2)
       2. Volatility-to-Channel Ratio (δ, x_min, x_max):
          vol_ratio = δ / |x_max - x_min|
       3. Directional Drift-to-Volatility Term (μ, σ):
@@ -59,16 +61,13 @@ def compute_optimal_leverage(
     if not np.isfinite(channel_width) or channel_width <= 0.0:
         channel_width = 2.0 * delta
 
-    if direction == 1:
-        tp_dist = abs(x_max - entry_price)
-        sl_dist = abs(entry_price - x_min)
-    else:
-        tp_dist = abs(entry_price - x_min)
-        sl_dist = abs(x_max - entry_price)
+    tp_price = x_max if direction == 1 else x_min
+    tp_dist = abs(tp_price - entry_price)
+    sl_dist = abs(entry_price - sl_price)
 
-    if sl_dist <= 0.0:
+    if not np.isfinite(sl_dist) or sl_dist <= 0.0:
         sl_dist = 0.5 * delta
-    if tp_dist <= 0.0:
+    if not np.isfinite(tp_dist) or tp_dist <= 0.0:
         tp_dist = 1.5 * delta
 
     # 1. Reward-to-risk barrier asymmetry b
@@ -193,18 +192,176 @@ def ensure_acceleration_series(df: pd.DataFrame) -> np.ndarray:
     return acc
 
 
+def ensure_log_return_series(df: pd.DataFrame) -> np.ndarray:
+    """
+    Extract log-return r from explicit column `r` if present;
+    otherwise compute log(close / close.shift(1)).
+    """
+    if 'r' in df.columns:
+        return pd.to_numeric(df['r'], errors='coerce').fillna(0.0).values
+    closes = pd.to_numeric(df['close'], errors='coerce').values
+    lrets = np.zeros(len(df))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        lrets[1:] = np.where((closes[1:] > 0) & (closes[:-1] > 0), np.log(closes[1:] / closes[:-1]), 0.0)
+    return lrets
+
+
+# ==============================================================================
+# STOP LOSS PLACEMENT
+# ==============================================================================
+
+DEFAULT_SL_PARAMS = {
+    'mode': 'fixed',        # 'fixed' (SL = base_ratio * TP distance) or 'dynamic'
+    'base_ratio': 0.5,      # SL/TP distance ratio when every dynamic factor is neutral
+    'min_ratio': 0.25,      # Hard lower bound on SL/TP ratio (max reward-to-risk = 1 / min_ratio)
+    'max_ratio': 1.0,       # Hard upper bound on SL/TP ratio (min reward-to-risk = 1 / max_ratio)
+    'drift_weight': 0.3,    # Sensitivity to horizon drift-to-noise (μ, σ, window_size)
+    'accel_weight': 0.2,    # Sensitivity to acceleration alignment (acceleration, δ)
+    'shock_weight': 0.2,    # Sensitivity to last-bar return shock (r, σ)
+    'noise_mult': 0.5,      # SL floor as multiple of expected horizon move: entry * σ * sqrt(window_size)
+}
+
+
+def compute_stop_loss(
+    direction: int,
+    entry_price: float,
+    tp_price: float,
+    mu: float,
+    sigma: float,
+    delta: float,
+    window_size: int,
+    r: float,
+    x_min: float,
+    x_max: float,
+    acceleration: float,
+    params: dict = None
+):
+    """
+    Return the stop-loss price for a trade, or None if no valid stop can be placed.
+
+    'fixed' mode:
+        SL distance = base_ratio * |TP - entry|   (base_ratio = 0.5 reproduces the original rule)
+
+    'dynamic' mode: SL distance = ratio * TP distance, with
+        ratio = base_ratio * f_drift * f_accel * f_shock
+      1. f_drift = 1 + w_d * tanh(direction * μ * sqrt(W) / σ)
+         Horizon drift-to-noise. Drift in the trade direction raises the odds of reaching TP,
+         so the stop gets more room; adverse drift tightens it.
+      2. f_accel = 1 + w_a * tanh(direction * acceleration / δ)
+         Acceleration with the trade means momentum is building, so the stop gets more room;
+         acceleration against the trade (the Tier 2 reversal condition) tightens it.
+      3. f_shock = 1 + w_s * tanh(|r| / σ - 1)
+         Last bar return relative to typical volatility. A shock bar widens the stop to
+         avoid whipsaw; a quiet bar tightens it.
+      Then, in order:
+      4. Noise floor: SL distance >= noise_mult * entry * σ * sqrt(W), so the stop sits
+         outside the expected random move over the trade horizon.
+      5. Structural cap: SL never goes beyond the opposite channel barrier (x_min for longs,
+         x_max for shorts), where the signal's thesis is invalidated.
+      6. Ratio bounds: clip SL distance to [min_ratio, max_ratio] * TP distance. This step
+         has the final word, so reward-to-risk always stays in [1/max_ratio, 1/min_ratio].
+      Dynamic mode requires TP on the profitable side of entry; otherwise it returns None.
+    """
+    p = dict(DEFAULT_SL_PARAMS)
+    if params:
+        p.update(params)
+
+    if not np.isfinite(entry_price) or entry_price <= 0.0 or not np.isfinite(tp_price) or tp_price <= 0.0:
+        return None
+
+    if p['mode'] == 'fixed':
+        sl_price = entry_price - direction * p['base_ratio'] * abs(tp_price - entry_price)
+        return sl_price if np.isfinite(sl_price) and sl_price > 0.0 else None
+
+    tp_dist = direction * (tp_price - entry_price)
+    if not np.isfinite(tp_dist) or tp_dist <= 0.0:
+        return None
+
+    sigma_ok = np.isfinite(sigma) and sigma > 0.0
+    horizon = max(int(window_size), 1) if np.isfinite(window_size) else 1
+    sqrt_h = math.sqrt(horizon)
+
+    # 1. Horizon drift-to-noise alignment
+    f_drift = 1.0
+    if sigma_ok and np.isfinite(mu):
+        f_drift = 1.0 + p['drift_weight'] * math.tanh(direction * mu * sqrt_h / sigma)
+
+    # 2. Acceleration alignment, normalized by δ (fallback: one-bar expected price move)
+    f_accel = 1.0
+    accel_scale = delta if (np.isfinite(delta) and delta > 0.0) else (entry_price * sigma if sigma_ok else 0.0)
+    if accel_scale > 0.0 and np.isfinite(acceleration):
+        f_accel = 1.0 + p['accel_weight'] * math.tanh(direction * acceleration / accel_scale)
+
+    # 3. Last-bar return shock
+    f_shock = 1.0
+    if sigma_ok and np.isfinite(r):
+        f_shock = 1.0 + p['shock_weight'] * math.tanh(abs(r) / sigma - 1.0)
+
+    sl_dist = p['base_ratio'] * f_drift * f_accel * f_shock * tp_dist
+
+    # 4. Noise floor over trade horizon
+    if sigma_ok:
+        sl_dist = max(sl_dist, p['noise_mult'] * entry_price * sigma * sqrt_h)
+
+    # 5. Structural cap at the opposite channel barrier
+    opposite = x_min if direction == 1 else x_max
+    if np.isfinite(opposite):
+        struct_dist = direction * (entry_price - opposite)
+        if struct_dist > 0.0:
+            sl_dist = min(sl_dist, struct_dist)
+
+    # 6. Reward-to-risk bounds
+    sl_dist = float(np.clip(sl_dist, p['min_ratio'] * tp_dist, p['max_ratio'] * tp_dist))
+
+    sl_price = entry_price - direction * sl_dist
+    return sl_price if np.isfinite(sl_price) and sl_price > 0.0 else None
+
+
 def evaluate_single_file(args_tuple):
-    (
-        filepath,
-        initial_capital,
-        risk_pct,
-        max_position_pct,
-        max_leverage,
-        router_tier,
-        slippage_bps,
-        timed_exit,
-        tier_2_order
-    ) = args_tuple
+    trade_all_delta = False
+    min_records = 2000
+    if len(args_tuple) >= 12:
+        (
+            filepath,
+            initial_capital,
+            risk_pct,
+            max_position_pct,
+            max_leverage,
+            router_tier,
+            slippage_bps,
+            timed_exit,
+            tier_2_order,
+            sl_params,
+            min_records,
+            trade_all_delta
+        ) = args_tuple[:12]
+    elif len(args_tuple) == 11:
+        (
+            filepath,
+            initial_capital,
+            risk_pct,
+            max_position_pct,
+            max_leverage,
+            router_tier,
+            slippage_bps,
+            timed_exit,
+            tier_2_order,
+            sl_params,
+            min_records
+        ) = args_tuple
+    else:
+        (
+            filepath,
+            initial_capital,
+            risk_pct,
+            max_position_pct,
+            max_leverage,
+            router_tier,
+            slippage_bps,
+            timed_exit,
+            tier_2_order,
+            sl_params
+        ) = args_tuple
 
     filepath = Path(filepath)
     try:
@@ -214,7 +371,7 @@ def evaluate_single_file(args_tuple):
     except Exception as e:
         return {"error": f"Failed to read {filepath}: {str(e)}"}
 
-    if df.empty:
+    if df.empty or len(df) < min_records:
         return None
 
     df.columns = [str(c).strip().lower() for c in df.columns]
@@ -227,6 +384,7 @@ def evaluate_single_file(args_tuple):
     deltas = ensure_delta_column(df).values
     r_sq_s = ensure_r_squared_series(df)
     accelerations = ensure_acceleration_series(df)
+    log_returns = ensure_log_return_series(df)
 
     closes = df['close'].astype(float).values
     opens = df['open'].astype(float).values if 'open' in df.columns else closes
@@ -294,15 +452,25 @@ def evaluate_single_file(args_tuple):
         x_min_val = float(x_mins[t])
         x_max_val = float(x_maxs[t])
 
-        # Tier 1 Take Profit and Stop Loss set to x_max or x_min (validate positive finite barriers)
-        if direction == 1:
-            tp_price = x_max_val
-            sl_price = x_min_val
-        else:
-            tp_price = x_min_val
-            sl_price = x_max_val
+        # Tier 1 Take Profit set to x_max or x_min; Stop Loss placed opposite the TP by
+        # compute_stop_loss ('fixed': half the entry-to-TP distance; 'dynamic': factor model)
+        tp_price = x_max_val if direction == 1 else x_min_val
+        sl_price = compute_stop_loss(
+            direction=direction,
+            entry_price=entry_price,
+            tp_price=tp_price,
+            mu=μ,
+            sigma=σ,
+            delta=delta,
+            window_size=trade_horizon,
+            r=float(log_returns[t]),
+            x_min=x_min_val,
+            x_max=x_max_val,
+            acceleration=float(accelerations[t]),
+            params=sl_params
+        )
 
-        if not np.isfinite(tp_price) or tp_price <= 0.0 or not np.isfinite(sl_price) or sl_price <= 0.0:
+        if sl_price is None or not np.isfinite(tp_price) or tp_price <= 0.0:
             skipped_low_delta += 1
             continue
 
@@ -318,6 +486,7 @@ def evaluate_single_file(args_tuple):
         leverage = compute_optimal_leverage(
             direction=direction,
             entry_price=entry_price,
+            sl_price=sl_price,
             x_min=x_min_val,
             x_max=x_max_val,
             delta=delta,
@@ -344,7 +513,7 @@ def evaluate_single_file(args_tuple):
             shares=shares, entry_price=entry_price, exit_price=est_exit_price, direction=direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
         )
         required_min_delta = max(unit_fee_info["per_share_cost"], pos_fee_info["per_share_cost"])
-        if delta < required_min_delta:
+        if not trade_all_delta and delta < required_min_delta:
             skipped_low_delta += 1
             continue
 
@@ -457,13 +626,25 @@ def evaluate_single_file(args_tuple):
                 t2_x_min = float(x_mins[t_stop])
                 t2_x_max = float(x_maxs[t_stop])
 
-                # Use bare x_max and x_min at t_stop as absolute price barriers (no 0.5 scaling)
-                if t2_direction == 1:
-                    t2_tp = t2_x_max
-                    t2_sl = t2_x_min
-                else:
-                    t2_tp = t2_x_min
-                    t2_sl = t2_x_max
+                # Use bare x_max or x_min at t_stop as absolute TP barrier (no 0.5 scaling);
+                # Stop Loss placed opposite the TP by compute_stop_loss (NaN if none is valid)
+                t2_tp = t2_x_max if t2_direction == 1 else t2_x_min
+                t2_sl = compute_stop_loss(
+                    direction=t2_direction,
+                    entry_price=t2_entry_price,
+                    tp_price=t2_tp,
+                    mu=t2_mu,
+                    sigma=t2_sigma,
+                    delta=t2_delta,
+                    window_size=t2_horizon,
+                    r=float(log_returns[t_stop]),
+                    x_min=t2_x_min,
+                    x_max=t2_x_max,
+                    acceleration=float(t2_accel),
+                    params=sl_params
+                )
+                if t2_sl is None:
+                    t2_sl = float('nan')
 
                 t2_sl_dist = abs(t2_entry_price - t2_sl)
                 t2_capital = capital + t1_net_pnl
@@ -478,6 +659,7 @@ def evaluate_single_file(args_tuple):
                     t2_leverage = compute_optimal_leverage(
                         direction=t2_direction,
                         entry_price=t2_entry_price,
+                        sl_price=t2_sl,
                         x_min=t2_x_min,
                         x_max=t2_x_max,
                         delta=t2_delta,
@@ -503,7 +685,7 @@ def evaluate_single_file(args_tuple):
                         t2_required_min_delta = max(t2_unit_fee["per_share_cost"], t2_pos_fee["per_share_cost"])
 
                         t2_end_idx = min(t_stop + 1 + t2_horizon, n) if timed_exit else n
-                        if t2_delta >= t2_required_min_delta and t2_end_idx > (t_stop + 1):
+                        if (trade_all_delta or t2_delta >= t2_required_min_delta) and t2_end_idx > (t_stop + 1):
                             tier2_count += 1
                             leverages_used.append(t2_leverage)
                             t2_exit_price = closes[t2_end_idx - 1]
@@ -594,7 +776,7 @@ def evaluate_single_file(args_tuple):
         'Long Wins': long_wins,
         'Short Wins': short_wins,
         'TP Hits': tp_hits,
-        'SL Hits (0.5δ)': sl_hits,
+        'SL Hits': sl_hits,
         'Timeouts': timeout_exits,
         'Win Rate (%)': round(win_rate, 2),
         'TP Hit Rate (%)': round(tp_rate, 2),
@@ -621,6 +803,17 @@ def process_alpaca_trades(args):
 
     print(f"Simulating Alpaca US Equity/ETF trades across {len(csv_files)} files using {cpu_count()} CPU cores...")
 
+    sl_params = {
+        'mode': args.sl_mode,
+        'base_ratio': args.sl_base_ratio,
+        'min_ratio': args.sl_min_ratio,
+        'max_ratio': args.sl_max_ratio,
+        'drift_weight': args.sl_drift_weight,
+        'accel_weight': args.sl_accel_weight,
+        'shock_weight': args.sl_shock_weight,
+        'noise_mult': args.sl_noise_mult,
+    }
+
     task_args = [
         (
             f,
@@ -631,7 +824,10 @@ def process_alpaca_trades(args):
             args.router_tier,
             args.slippage_bps,
             args.timed_exit,
-            args.tier_2_order
+            args.tier_2_order,
+            sl_params,
+            args.min_records,
+            args.trade_all_delta
         )
         for f in csv_files
     ]
@@ -667,6 +863,16 @@ def process_alpaca_trades(args):
     print(df_results.head(20).to_string())
 
 
+def str2bool(val):
+    if isinstance(val, bool):
+        return val
+    if val.lower() in ('true', '1', 'yes', 'y', 't'):
+        return True
+    if val.lower() in ('false', '0', 'no', 'n', 'f'):
+        return False
+    raise argparse.ArgumentTypeError(f"Boolean value expected, got {val}")
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Simulate US Equities & ETFs Signal Trading with Optimal Leverage & Tier-2 Stop-Loss Recovery Orders.'
@@ -684,8 +890,28 @@ def parse_args():
         help='Alpaca commission tier per BrokFeeSched.pdf: free ($0), elite_fixed ($0.0040/sh), elite_tiered ($0.0025/sh).'
     )
     parser.add_argument('--slippage-bps', type=float, default=5.0, help='Per-leg execution slippage in basis points for US Equities/ETFs (default: 5.0 bps = 0.05%% per leg).')
-    parser.add_argument('--tier-2-order', type=bool, default=False, help='If set, enables Tier 2 stop-loss recovery orders. Otherwise, strategy runs Tier 1 only.')
-    parser.add_argument('--timed-exit', type=bool, default=False, help='If set, exit positions after trade_horizon days. Otherwise, wait indefinitely for TP/SL.')
+    parser.add_argument('--tier-2-order', '--tier_2_order', dest='tier_2_order', type=str2bool, nargs='?', const=True, default=False, help='If set, enables Tier 2 stop-loss recovery orders. Otherwise, strategy runs Tier 1 only (default: False).')
+    parser.add_argument('--timed-exit', '--timed_exit', dest='timed_exit', type=str2bool, nargs='?', const=True, default=False, help='If set, exit positions after trade_horizon days. Otherwise, wait indefinitely for TP/SL (default: False).')
+    parser.add_argument('--min-records', type=int, default=720, help='Minimum number of records required in CSV file to be evaluated (default: 2000).')
+    parser.add_argument(
+        '--trade-all-delta',
+        '--trade_all_delta',
+        dest='trade_all_delta',
+        type=str2bool,
+        nargs='?',
+        const=True,
+        default=True,
+        help='If set, bypasses the "δ < Fees" check and trades signals regardless of volatility vs fee threshold (default: False).'
+    )
+    sl = DEFAULT_SL_PARAMS
+    parser.add_argument('--sl-mode', choices=['fixed', 'dynamic'], default=sl['mode'], help="Stop loss placement: 'fixed' (base-ratio * TP distance) or 'dynamic' (μ, σ, δ, r, window_size, acceleration, x_min/x_max factor model) (default: %(default)s).")
+    parser.add_argument('--sl-base-ratio', type=float, default=sl['base_ratio'], help='SL/TP distance ratio; used as-is in fixed mode, as the neutral ratio in dynamic mode (default: %(default)s).')
+    parser.add_argument('--sl-min-ratio', type=float, default=sl['min_ratio'], help='Dynamic mode: lower bound on SL/TP distance ratio (default: %(default)s).')
+    parser.add_argument('--sl-max-ratio', type=float, default=sl['max_ratio'], help='Dynamic mode: upper bound on SL/TP distance ratio (default: %(default)s).')
+    parser.add_argument('--sl-drift-weight', type=float, default=sl['drift_weight'], help='Dynamic mode: weight of horizon drift-to-noise factor μ·sqrt(W)/σ (default: %(default)s).')
+    parser.add_argument('--sl-accel-weight', type=float, default=sl['accel_weight'], help='Dynamic mode: weight of acceleration/δ alignment factor (default: %(default)s).')
+    parser.add_argument('--sl-shock-weight', type=float, default=sl['shock_weight'], help='Dynamic mode: weight of last-bar |r|/σ shock factor (default: %(default)s).')
+    parser.add_argument('--sl-noise-mult', type=float, default=sl['noise_mult'], help='Dynamic mode: SL floor as multiple of entry·σ·sqrt(W) (default: %(default)s).')
     return parser.parse_args()
 
 

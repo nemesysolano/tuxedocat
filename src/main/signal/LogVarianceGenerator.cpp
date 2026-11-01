@@ -84,11 +84,11 @@ namespace strategy {
                     ν = log_moments.ν;                    
                     μ_ = log_moments.μ;
                     σ_ = log_moments.σ;                                              
-                    // const double current_close = bars_span_1.back().close_price();
+                    
 
-                    if(acceleration > 0 && μ_ + σ_ > 0) {
+                    if((acceleration > 0) && (μ_ + σ_ > 0) ) {
                         direction_ = SignalDirection::LONG;
-                    } else if (acceleration < 0 && μ_ - σ_ < 0){
+                    } else if ((acceleration < 0) && (μ_ - σ_ < 0)){
                         direction_ = SignalDirection::SHORT;
                     } else {
                         direction_ = SignalDirection::IDLE;

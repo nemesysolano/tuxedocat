@@ -87,10 +87,16 @@ namespace stats {
         if (!isfinite(x_min) || !isfinite(x_max)) {
             return unexpected(TuxedoError::ERR_BAD_INPUT);
         }
+        double R = exp(x_max / x_min);
+        double divisor = exp(2 * sqrt(log(2)));
+
+        if(x_max < 0 || x_min < 0) {
+            R = exp(R);
+            divisor = exp(divisor);
+        }
 
         const double μ = (x_max + x_min) / 2;
-         const double R = exp(abs(x_max / x_min));
-        const double σ = R / sqrt(exp(2.0));
+        const double σ = R / divisor;
         int ν = (int)(series.size()-1);
         return Moments(μ, σ, ν);
     }
