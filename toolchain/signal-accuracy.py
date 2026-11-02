@@ -152,3 +152,5 @@ if __name__ == '__main__':
 # x_max: Nearest higher high countind backwards from $t-1$ inclusive
 # window_size: Expiration timeout counting from $t+1$.
 # signal: Predicted direction for `close` staring from $t+1$ inclusive.
+
+# https://dtrader.deriv.com/?chart_type=area&interval=1t&symbol=1HZ100V&trade_type=rise_fall

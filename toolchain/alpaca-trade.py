@@ -25,6 +25,36 @@ def round_up_cent(value: float) -> float:
     return math.ceil((value - 1e-12) * 100.0) / 100.0
 
 
+ALPACA_MIN_MARGINABLE_PRICE = 5.0
+SPLIT_DISCONTINUITY_MAX_RATIO = 4.0  # > 300% overnight jump (> 4.0x or < 0.25x)
+
+
+def is_split_discontinuity(
+    prev_close: float,
+    b_open: float,
+    b_high: float = None,
+    b_low: float = None,
+    max_ratio: float = SPLIT_DISCONTINUITY_MAX_RATIO
+) -> bool:
+    """
+    Detect unadjusted reverse/forward stock splits or corporate-action price discontinuities
+    where the overnight open (or bar range) jumps by > 300% (> 4.0x or < 0.25x) vs prior close.
+    """
+    if not np.isfinite(prev_close) or prev_close <= 0.0 or not np.isfinite(b_open) or b_open <= 0.0:
+        return True
+    min_ratio = 1.0 / max_ratio
+    open_ratio = b_open / prev_close
+    if open_ratio > max_ratio or open_ratio < min_ratio:
+        return True
+    if b_high is not None and np.isfinite(b_high) and b_high > 0.0:
+        if (b_high / prev_close) > max_ratio:
+            return True
+    if b_low is not None and np.isfinite(b_low) and b_low > 0.0:
+        if (b_low / prev_close) < min_ratio:
+            return True
+    return False
+
+
 def compute_optimal_leverage(
     direction: int,
     entry_price: float,
@@ -55,6 +85,11 @@ def compute_optimal_leverage(
         or not np.isfinite(delta) or delta <= 0.0
         or not np.isfinite(sigma) or sigma <= 0.0
     ):
+        return 1
+
+    # Alpaca marginability rule: securities < $5.00 ($3.00 maintenance / $5.00 Reg-T & day-trade)
+    # require 100% margin (1x leverage).
+    if entry_price < ALPACA_MIN_MARGINABLE_PRICE:
         return 1
 
     channel_width = abs(x_max - x_min)
@@ -269,13 +304,13 @@ def compute_stop_loss(
     if not np.isfinite(entry_price) or entry_price <= 0.0 or not np.isfinite(tp_price) or tp_price <= 0.0:
         return None
 
-    if p['mode'] == 'fixed':
-        sl_price = entry_price - direction * p['base_ratio'] * abs(tp_price - entry_price)
-        return sl_price if np.isfinite(sl_price) and sl_price > 0.0 else None
-
     tp_dist = direction * (tp_price - entry_price)
     if not np.isfinite(tp_dist) or tp_dist <= 0.0:
         return None
+
+    if p['mode'] == 'fixed':
+        sl_price = entry_price - direction * p['base_ratio'] * tp_dist
+        return sl_price if np.isfinite(sl_price) and sl_price > 0.0 else None
 
     sigma_ok = np.isfinite(sigma) and sigma > 0.0
     horizon = max(int(window_size), 1) if np.isfinite(window_size) else 1
@@ -448,6 +483,9 @@ def evaluate_single_file(args_tuple):
         entry_price = float(opens[t + 1])
         if not np.isfinite(entry_price) or entry_price <= 0.0:
             continue
+        if is_split_discontinuity(float(closes[t]), entry_price, float(highs[t + 1]), float(lows[t + 1])):
+            skipped_low_delta += 1
+            continue
 
         x_min_val = float(x_mins[t])
         x_max_val = float(x_maxs[t])
@@ -541,6 +579,12 @@ def evaluate_single_file(args_tuple):
             b_high = float(highs[idx])
             b_low = float(lows[idx])
             b_close = float(closes[idx])
+
+            if idx > (t + 1) and is_split_discontinuity(float(closes[idx - 1]), b_open, b_high, b_low):
+                t1_exit_price = float(closes[idx - 1])
+                t1_exit_idx = idx - 1
+                t1_exit_reason = "TIMEOUT"
+                break
 
             if direction == 1:
                 if b_open <= sl_price:
@@ -651,6 +695,7 @@ def evaluate_single_file(args_tuple):
 
                 if (
                     np.isfinite(t2_entry_price) and t2_entry_price > 0.0
+                    and not is_split_discontinuity(float(closes[t_stop]), t2_entry_price, float(highs[t_stop + 1]), float(lows[t_stop + 1]))
                     and np.isfinite(t2_tp) and t2_tp > 0.0
                     and np.isfinite(t2_sl) and t2_sl > 0.0
                     and np.isfinite(t2_sl_dist) and t2_sl_dist > 0.0
@@ -696,6 +741,11 @@ def evaluate_single_file(args_tuple):
                                 b_high = float(highs[idx])
                                 b_low = float(lows[idx])
                                 b_close = float(closes[idx])
+
+                                if idx > (t_stop + 1) and is_split_discontinuity(float(closes[idx - 1]), b_open, b_high, b_low):
+                                    t2_exit_price = float(closes[idx - 1])
+                                    t2_exit_idx = idx - 1
+                                    break
 
                                 if t2_direction == 1:
                                     if b_open <= t2_sl:
