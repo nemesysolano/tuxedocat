@@ -12,7 +12,6 @@
 #include <expected>
 #include <utility>
 #include "utils/tuxedo-error.h"
-#include "data/dataframe.h"
 #include <sstream>
 #include <set>
 #include <iomanip> // <-- Add this for std::get_time
@@ -21,9 +20,12 @@
 #include <list>
 #include <vector>
 #include <span>
+#include <format>
+#include <mutex>
+#include <condition_variable>
 #include "nanodbc/nanodbc.h"
 
-using namespace std;
+using namespace ::std;
 
 namespace dataframe {
     typedef std::function<double(double)> double_transformer;
@@ -31,14 +33,46 @@ namespace dataframe {
     double identity_transformer(double x);
     void identity_accumulator(std::span<double> row, size_t column_index, double x);
 
-    class ODBCDataSource {
+
+    class ODBConnectionLifeCycle;
+
+    class ODBCConnectionWrapper {
+        private:
+            unique_ptr<nanodbc::connection> conn_;
+            ODBConnectionLifeCycle & life_cycle_;
+
+        public:
+            ODBCConnectionWrapper(unique_ptr<nanodbc::connection> conn, ODBConnectionLifeCycle & life_cycle): conn_(std::move(conn)), life_cycle_(life_cycle) {}
+            ODBCConnectionWrapper(ODBCConnectionWrapper&& other) noexcept: conn_(std::move(other.conn_)), life_cycle_(other.life_cycle_) {}
+            ~ODBCConnectionWrapper();
+            inline nanodbc::result result(const string & sql, long rowset_size = 1000) {
+                return nanodbc::execute(*conn_, sql, rowset_size);
+            }
+    };
+
+    class ODBConnectionLifeCycle {
+        public:
+            virtual void release(unique_ptr<nanodbc::connection> conn) = 0;
+            virtual ODBCConnectionWrapper get_connection() = 0;
+            virtual ~ODBConnectionLifeCycle() = default;
+    };
+
+    class ODBCDataSource: public ODBConnectionLifeCycle {
+        private:
+            vector<unique_ptr<nanodbc::connection>> available_;
+            mutex available_mutex_; // Guards `available_`; held only for the vector push/pop.
+            condition_variable available_cv_; // Signalled when a connection is returned to `available_`.
         public:
             const string dsn;
             const string uid;
             const string pwd;
-
-            ODBCDataSource(string dsn, string uid, string pwd)
-                : dsn(std::move(dsn)), uid(std::move(uid)), pwd(std::move(pwd)) {}
+            const size_t size;
+            const string connection_string;
+            ODBCDataSource(string dsn_, string uid_, string pwd_, size_t size_);
+            ODBCDataSource(string dsn_, string uid_, string pwd_): ODBCDataSource(dsn_, uid_, pwd_, 4) {}
+            void release(unique_ptr<nanodbc::connection> conn) override;
+            ODBCConnectionWrapper get_connection() override;
+            virtual ~ODBCDataSource() override = default;
     };
 
     class DataFrame: public slice::Span2D {
@@ -102,7 +136,7 @@ namespace dataframe {
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input, char field_delimiter);
             static std::expected<DataFrame, TuxedoError> Create(std::istream &input);
             static std::expected<DataFrame, TuxedoError> Create(const std::string & file_path);
-            static std::expected<DataFrame, TuxedoError> Create(const ODBCDataSource & odbc_datasource, const string & symbol);
+            static std::expected<DataFrame, TuxedoError> Create(ODBCDataSource & odbc_datasource, const string & symbol);
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer, double_accumulator accumulator, std::vector<double> & accumulated) const;
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer, double_accumulator accumulator) const;
             std::expected<DataFrame, TuxedoError> copy(const std::vector<std::string> & source_columns, const std::vector<std::string> & target_columns, double_transformer transformer) const;

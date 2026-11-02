@@ -10,14 +10,19 @@
 #include "utils/log.h"
 #include "utils/tuxedo-error.h"
 #include "utils/names.h"
-
+#include "nanodbc/nanodbc.h"
+#include "timeseries/timeseries.h"
+using namespace timeseries;
 using namespace names;
-using namespace std;
 using namespace nanodbc;
-
+using namespace std;
 namespace dataframe {
     double identity_transformer(double x) {return x;}
     void identity_accumulator(std::span<double> row, size_t column_index, double x) { row[column_index] = x;}
+
+    ODBCConnectionWrapper::~ODBCConnectionWrapper() {
+        life_cycle_.release(std::move(conn_));
+    }
 
     namespace {
         inline bool parse_double_fast(const std::string & cell, double & value) {
@@ -25,6 +30,37 @@ namespace dataframe {
             const char * end = begin + cell.size();
             auto [ptr, ec] = std::from_chars(begin, end, value);
             return ec == std::errc() && ptr == end;
+        }
+    }
+
+    ODBCDataSource::ODBCDataSource(string dsn_, string uid_, string pwd_, size_t size_): dsn(dsn_), uid(uid_), pwd(pwd_), size(size_), connection_string(format("DSN={};UID={};PWD={}", dsn_, uid_, pwd_)) {
+        for(size_t index = 0; index < size_; index++) {
+            available_.emplace_back(make_unique<nanodbc::connection>(connection_string));
+        }
+    }
+
+    // Blocks until a pooled connection is available. Returns nullopt only if the pool was
+    // created empty (size == 0), since no connection could ever become available.
+    ODBCConnectionWrapper ODBCDataSource::get_connection() {
+        unique_ptr<nanodbc::connection> conn = nullptr;
+        {
+            unique_lock<mutex> lock(available_mutex_);
+            available_cv_.wait(lock, [this] { return !available_.empty(); });
+
+            conn = std::move(available_.back());
+            available_.pop_back();
+        }
+
+        return ODBCConnectionWrapper(std::move(conn), *this);
+    }
+
+    void ODBCDataSource::release(unique_ptr<nanodbc::connection> conn) {
+        if (conn) {
+            {
+                lock_guard<mutex> lock(available_mutex_);
+                available_.emplace_back(std::move(conn));
+            }
+            available_cv_.notify_one();
         }
     }
 
@@ -603,7 +639,7 @@ namespace dataframe {
 
     }
 
-std::expected<DataFrame, TuxedoError> DataFrame::Create(const ODBCDataSource & odbc_datasource, const string & symbol) {
+std::expected<DataFrame, TuxedoError> DataFrame::Create(ODBCDataSource & odbc_datasource, const string & symbol) {
         std::vector<double> data;
         std::map<std::string, size_t> column_name_to_column_index_ = {
             {names::OPEN_PRICE, 0},
@@ -621,10 +657,6 @@ std::expected<DataFrame, TuxedoError> DataFrame::Create(const ODBCDataSource & o
 
         try {
             const string connection_string(format("DSN={};UID={};PWD={}", odbc_datasource.dsn, odbc_datasource.uid, odbc_datasource.pwd));
-            log_debug_message(format("connection to {}", connection_string));
-
-            connection conn(NANODBC_TEXT(connection_string));
-            log_debug_message(format("connected to {}", connection_string));
 
             // Quote the symbol literal and alias column names directly to names::* constants
             // so DB2 uppercase folding does not mismatch nanodbc::result::get<double>(column_name)
@@ -637,11 +669,10 @@ std::expected<DataFrame, TuxedoError> DataFrame::Create(const ODBCDataSource & o
                 symbol
             ));
 
-            log_debug_message(select_sql);
-
-            result cursor = execute(conn, NANODBC_TEXT(select_sql)); // 2021-02-05-00.00.00.000000
+            ODBCConnectionWrapper wrapper = odbc_datasource.get_connection();
+            result cursor = wrapper.result(select_sql); // 2021-02-05-00.00.00.000000
             while (cursor.next()) {
-                const timestamp row_timestamp = cursor.get<timestamp>("TIMESTAMP");
+                const timestamp row_timestamp = cursor.get<timestamp>(1);
                 const chrono::sys_seconds row_sys_seconds =
                     chrono::sys_days{
                         chrono::year{row_timestamp.year} /
@@ -656,11 +687,10 @@ std::expected<DataFrame, TuxedoError> DataFrame::Create(const ODBCDataSource & o
                 if (timestamp_to_row_index_.contains(row_sys_seconds)) {
                     continue;
                 }
-
-                double open_price = cursor.get<double>(names::OPEN_PRICE, 0.0);
-                double high_price = cursor.get<double>(names::HIGH_PRICE, 0.0);
-                double low_price = cursor.get<double>(names::LOW_PRICE, 0.0);
-                double close_price = cursor.get<double>(names::CLOSE_PRICE, 0.0);
+                double open_price  = cursor.get<double>(2, 0.0);
+                double high_price  = cursor.get<double>(3, 0.0);
+                double low_price   = cursor.get<double>(4, 0.0);
+                double close_price = cursor.get<double>(5, 0.0);
                 double volume = 0.0;
 
                 timestamp_to_row_index_[row_sys_seconds] = rows;
@@ -676,11 +706,13 @@ std::expected<DataFrame, TuxedoError> DataFrame::Create(const ODBCDataSource & o
                 ++rows;
             }
         } catch (const nanodbc::database_error & e) {
-            log_debug_message(format("ODBC error in DataFrame::Create for symbol {}: {}", symbol, e.what()));
+            log_error_message(format("ODBC error in DataFrame::Create for symbol {}: {}", symbol, e.what()));
             return std::unexpected(TuxedoError::ERR_CANT_OPEN_FILE);
+
         } catch (const std::exception & e) {
-            log_debug_message(format("Error in DataFrame::Create for symbol {}: {}", symbol, e.what()));
+            log_error_message(format("Error in DataFrame::Create for symbol {}: {}", symbol, e.what()));
             return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
+
         }
 
         if (rows == 0) {

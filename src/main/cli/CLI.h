@@ -2,8 +2,10 @@
 #define __CLI_H__
 #include <unordered_map>
 #include "CLI_FUNCTION.h"
+#include "events/SignalEvent.h"
 
 using namespace std;
+using namespace events;
 
 namespace cli {    
     extern const unordered_map<string, CLI_FUNCTION> cli_functions_map;    

@@ -99,7 +99,7 @@ def add_files(args):
 if __name__ == "__main__":
     arguments = parse_args()
     dsn = (
-        "DRIVER={ODBC Driver 17 for SQL Server};"
+        "DRIVER={ODBC Driver 18 for SQL Server};"
         f"SERVER={arguments.sqlserver_host};"
         f"DATABASE={arguments.database};"
         f"UID={arguments.sqlserver_user};"

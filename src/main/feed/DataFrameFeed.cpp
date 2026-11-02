@@ -10,9 +10,11 @@
 #include <unordered_map>
 #include "process/ThreadPool.h"
 #include "utils/names.h"
+#include "nanodbc/nanodbc.h"
 
 using namespace std;
 using namespace events;
+using namespace dataframe;
 
 namespace feed {
     vector<reference_wrapper<const string>> EXPECTED_COLUMN_NAMES({
@@ -29,11 +31,7 @@ namespace feed {
         (void)records_loaded;
     }
 
-    void DataFrameFeed::publish_market_event(unique_ptr<MarketEvent> market_event, const unordered_map<string, size_t> & records_loaded) {
-        this->market_event_handler_(std::move(market_event), *this, records_loaded);
-    }
-
-    void DataFrameFeed::process_dataframes(){
+    void DataFrameFeed::process_dataframes(MarketEventHandler market_event_handler_){
         bool has_records = true;
         auto symbols(views::keys(dataframes_));
 
@@ -70,7 +68,7 @@ namespace feed {
                 }
             }
 
-            publish_market_event(make_unique<MarketEvent>(std::move(bars)), records_loaded);
+            market_event_handler_(make_unique<MarketEvent>(std::move(bars)), *this, records_loaded);
             has_records = exhausted_dataframes != dataframes_.size();
             bars.clear();
         }
@@ -93,14 +91,76 @@ namespace feed {
         return full_file_path.substr(name_offset, extension_start - name_offset);
     }
 
-    expected<DataFrameFeed,TuxedoError> DataFrameFeed::Create(const vector<string> file_paths, MarketEventHandler market_event_handler) {
+    vector<string> fetch_symbols(ODBCDataSource & datasource) {
+        ODBCConnectionWrapper wrapper = datasource.get_connection();
+        nanodbc::result symbols_result = wrapper.result("SELECT SYMBOL, COUNT(*) FROM QUOTE GROUP BY SYMBOL ORDER BY COUNT(*) DESC");
+        vector<string> symbols;
+        while(symbols_result.next()) {
+            string symbol = symbols_result.get<string>(0);
+            symbols.push_back(symbol);
+        }        
+
+        return symbols;
+    }
+
+    expected<DataFrameFeed,TuxedoError> DataFrameFeed::Create(ODBCDataSource & datasource) {
+        process::ThreadPool thread_pool;
+        unordered_map<string, unique_ptr<DataFrame>> dataframes;
+        vector<future<pair<string, unique_ptr<DataFrame>>>> dataframe_futures;
+        size_t loaded_dataframes = 0;
+        vector<string> symbols = fetch_symbols(datasource);
+        
+        for(const string & symbol: symbols) {
+            auto future = thread_pool.enqueue([symbol, &datasource]() {
+                string file_path = format("{}.csv", symbol);
+                auto dataframe_result = DataFrame::Create(datasource, symbol);
+                if (!dataframe_result.has_value()) {
+                    return pair<string, unique_ptr<DataFrame>>(file_name(file_path), nullptr);
+                }
+
+                auto dataframe = std::make_unique<DataFrame>(std::move(dataframe_result.value()));                
+                return pair<string, unique_ptr<DataFrame>>(file_name(file_path), std::move(dataframe));
+            });
+
+            dataframe_futures.emplace_back(std::move(future));            
+        }
+
+        
+
+        for (auto & future : dataframe_futures) {
+            auto loaded = future.get();
+            if (!loaded.second) {
+                continue;
+            }
+            dataframes.emplace(loaded.first, std::move(loaded.second));            
+            loaded_dataframes++;
+        }
+
+        if(loaded_dataframes > 0) {
+            return DataFrameFeed(std::move(dataframes));
+        } else
+            return unexpected(TuxedoError::ERR_BAD_INPUT);        
+    }
+
+    expected<DataFrameFeed, TuxedoError> DataFrameFeed::Create(ODBCDataSource & datasource, const string & symbol) {
+        auto dataframe_result = DataFrame::Create(datasource, symbol);
+        if (!dataframe_result.has_value()) {
+            return unexpected(dataframe_result.error());
+        }
+
+        unordered_map<string, unique_ptr<DataFrame>> dataframes;
+        dataframes.emplace(symbol, std::make_unique<DataFrame>(std::move(dataframe_result.value())));
+        return DataFrameFeed(std::move(dataframes));
+    }
+
+    expected<DataFrameFeed,TuxedoError> DataFrameFeed::Create(const vector<string> file_paths) {
         process::ThreadPool thread_pool;
         unordered_map<string, unique_ptr<DataFrame>> dataframes;
         vector<future<pair<string, unique_ptr<DataFrame>>>> dataframe_futures;
         size_t loaded_dataframes = 0;
 
         for (const auto & file_path : file_paths) {
-            auto future = thread_pool.enqueue([&file_path]() {
+            auto future = thread_pool.enqueue([file_path]() {
                 if (!filesystem::is_regular_file(file_path)) {
                     return pair<string, unique_ptr<DataFrame>>(file_name(file_path), nullptr);
                 }
@@ -127,7 +187,7 @@ namespace feed {
         }
 
         if(loaded_dataframes > 0) {
-            return DataFrameFeed(std::move(dataframes), market_event_handler);
+            return DataFrameFeed(std::move(dataframes));
         } else
             return unexpected(TuxedoError::ERR_BAD_INPUT);
     }

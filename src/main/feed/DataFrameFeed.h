@@ -3,53 +3,52 @@
 #include "data/dataframe.h"
 #include "utils/tuxedo-error.h"
 #include "events/MarketEvent.h"
+#include <cstddef>
 #include <expected>
-#include <ranges>
 #include <functional>
+#include <memory>
+#include <ranges>
+#include <string>
 #include <unordered_map>
-
-using namespace std;
-using namespace dataframe;
-using namespace events;
+#include <utility>
+#include <vector>
 
 namespace feed {
     class DataFrameFeed;
-    using MarketEventHandler = function<void(unique_ptr<MarketEvent> market_event, const DataFrameFeed & dataframe, const unordered_map<string, size_t> & records_loaded)>;
-    void market_event_handler_default_impl(unique_ptr<MarketEvent> market_event, const DataFrameFeed & dataframe_feed, const unordered_map<string, size_t> & records_loaded);
+    using MarketEventHandler = std::function<void(std::unique_ptr<events::MarketEvent> market_event, const DataFrameFeed & dataframe, const std::unordered_map<std::string, std::size_t> & records_loaded)>;
+    void market_event_handler_default_impl(std::unique_ptr<events::MarketEvent> market_event, const DataFrameFeed & dataframe_feed, const std::unordered_map<std::string, std::size_t> & records_loaded);
+    std::vector<std::string> fetch_symbols(dataframe::ODBCDataSource & datasource);
 
     class DataFrameFeed{
         private:
-            unordered_map<string, unique_ptr<DataFrame>> dataframes_;
-            vector<string> symbols_;
-            MarketEventHandler market_event_handler_;
+            std::unordered_map<std::string, std::unique_ptr<dataframe::DataFrame>> dataframes_;
+            std::vector<std::string> symbols_;
 
         public:
-            inline DataFrameFeed(unordered_map<string, unique_ptr<DataFrame>> dataframes, MarketEventHandler market_event_handler):
+            inline DataFrameFeed(std::unordered_map<std::string, std::unique_ptr<dataframe::DataFrame>> dataframes):
                 dataframes_(std::move(dataframes)),
-                symbols_(ranges::to<vector<string>>(views::keys(dataframes_))),
-                market_event_handler_(market_event_handler) {};
-
-            inline DataFrameFeed(unordered_map<string, unique_ptr<DataFrame>> dataframes): DataFrameFeed(std::move(dataframes), market_event_handler_default_impl) {};
+                symbols_(std::ranges::to<std::vector<std::string>>(std::views::keys(dataframes_))) {}
 
             DataFrameFeed(const DataFrameFeed&) = delete;
             DataFrameFeed& operator=(const DataFrameFeed&) = delete;
             DataFrameFeed(DataFrameFeed&&) noexcept = default;
             DataFrameFeed& operator=(DataFrameFeed&&) noexcept = default;
-            virtual void publish_market_event(unique_ptr<MarketEvent> market_event, const unordered_map<string, size_t> & records_loaded);
-            void process_dataframes();
+            void process_dataframes(MarketEventHandler market_event_handler_);
             
-            inline const vector<string> & symbols() { return symbols_; }
-            inline const expected<reference_wrapper<DataFrame>,TuxedoError> dataframe(const string & symbol) const {
+            inline const std::vector<std::string> & symbols() const { return symbols_; }
+            inline const std::expected<std::reference_wrapper<const dataframe::DataFrame>, TuxedoError> dataframe(const std::string & symbol) const {
                 if(dataframes_.contains(symbol)) {
-                    return ref(*dataframes_.at(symbol).get());
+                    return std::ref(*dataframes_.at(symbol).get());
                 }
 
-                return unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+                return std::unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
             }
             virtual ~DataFrameFeed() {};
 
-            static string file_name(const string & full_file_path);
-            static expected<DataFrameFeed,TuxedoError> Create(const vector<string> file_paths, MarketEventHandler market_event_handler);
+            static std::string file_name(const std::string & full_file_path);
+            static std::expected<DataFrameFeed, TuxedoError> Create(const std::vector<std::string> file_paths);
+            static std::expected<DataFrameFeed, TuxedoError> Create(dataframe::ODBCDataSource & datasource);
+            static std::expected<DataFrameFeed, TuxedoError> Create(dataframe::ODBCDataSource & datasource, const std::string & symbol);
     };
 }
 #endif
