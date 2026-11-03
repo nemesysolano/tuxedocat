@@ -2,32 +2,35 @@ import argparse
 import datetime
 import math
 import os
-from pathlib import Path
 from multiprocessing import Pool, cpu_count
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 
 # ==============================================================================
-# ALPACA BROKERAGE FEE SCHEDULE (US Equities & ETFs - NMS Securities)
-# Source: https://files.alpaca.markets/disclosures/library/BrokFeeSched.pdf
-# Revised: October 12, 2026
+# FIXED TRADING & BROKERAGE FEE CONSTANTS
+# Alpaca US Equities & ETFs (NMS Securities) - Free Router Tier + Standard Regulatory Fees
 # ==============================================================================
 
-SEC_FEE_RATE = 0.0000206
-FINRA_TAF_RATE = 0.0
-FINRA_CAT_RATE = 0.000003
+INITIAL_CAPITAL = 10000.0
+RISK_PCT = 0.01             # 1% risk per trade at stop loss
+MAX_POSITION_PCT = 0.25     # Maximum 25% portfolio buying power per position
+MAX_LEVERAGE = 4.0          # Max leverage cap
+MIN_RECORDS = 500           # Minimum history length in CSV
+SLIPPAGE_BPS = 5.0          # 5.0 bps (0.05%) execution slippage per leg
+SEC_FEE_RATE = 0.0000206    # SEC fee on sell side
+FINRA_TAF_RATE = 0.0        # FINRA TAF rate (equities capped at $8.30)
+FINRA_CAT_RATE = 0.000003   # FINRA CAT rate per executed share
+ALPACA_MIN_MARGINABLE_PRICE = 5.0  # Under $5.00 leverage capped at 1x
+SPLIT_DISCONTINUITY_MAX_RATIO = 4.0  # > 300% jump/drop filter
 
 
 def round_up_cent(value: float) -> float:
     if value <= 0.0:
         return 0.0
     return math.ceil((value - 1e-12) * 100.0) / 100.0
-
-
-ALPACA_MIN_MARGINABLE_PRICE = 5.0
-SPLIT_DISCONTINUITY_MAX_RATIO = 4.0  # > 300% overnight jump (> 4.0x or < 0.25x)
 
 
 def is_split_discontinuity(
@@ -38,8 +41,8 @@ def is_split_discontinuity(
     max_ratio: float = SPLIT_DISCONTINUITY_MAX_RATIO
 ) -> bool:
     """
-    Detect unadjusted reverse/forward stock splits or corporate-action price discontinuities
-    where the overnight open (or bar range) jumps by > 300% (> 4.0x or < 0.25x) vs prior close.
+    Detect unadjusted reverse/forward stock splits or corporate-action discontinuities
+    where overnight open (or range) moves by > 300% (> 4.0x or < 0.25x) vs prior close.
     """
     if not np.isfinite(prev_close) or prev_close <= 0.0 or not np.isfinite(b_open) or b_open <= 0.0:
         return True
@@ -60,26 +63,21 @@ def compute_optimal_leverage(
     direction: int,
     entry_price: float,
     sl_price: float,
+    tp_price: float,
     x_min: float,
     x_max: float,
     delta: float,
     mu: float,
     sigma: float,
     r_sq: float,
-    max_leverage: float = 4.0
+    max_leverage: float = MAX_LEVERAGE
 ) -> int:
     """
-    Calculate optimal leverage L* based on μ, σ, δ, r^2, x_min, x_max, and the stop loss,
-    rounded up to the nearest ceiling integer:
-      1. Barrier Asymmetry (TP = x_max/x_min, SL = sl_price, entry_price):
-         b = TP_distance / SL_distance
-         (with SL at half the entry-to-TP distance, b = 2)
-      2. Volatility-to-Channel Ratio (δ, x_min, x_max):
-         vol_ratio = δ / |x_max - x_min|
-      3. Directional Drift-to-Volatility Term (μ, σ):
-         drift_term = 1 + 0.5 * tanh((direction * μ) / σ)
-      4. Squared Return / Determination Factor (r^2, σ):
-         r2_term = r^2 (if r^2 is in [0.5, 1.0] as PDE R^2) or 1 + r^2 / (σ^2 + r^2)
+    Calculate optimal leverage L* based on μ, σ, δ, r^2, TP, SL, and channel boundaries:
+      1. Barrier Asymmetry: b = TP_distance / SL_distance
+      2. Volatility-to-Channel Ratio: vol_ratio = δ / |x_max - x_min|
+      3. Directional Drift Term: drift_term = 1 + 0.5 * tanh((direction * μ) / σ)
+      4. Determination Term: r2_term based on PDE R^2 or squared return
     """
     if (
         not np.isfinite(entry_price) or entry_price <= 0.0
@@ -88,8 +86,7 @@ def compute_optimal_leverage(
     ):
         return 1
 
-    # Alpaca marginability rule: securities < $5.00 ($3.00 maintenance / $5.00 Reg-T & day-trade)
-    # require 100% margin (1x leverage).
+    # Alpaca marginability: under $5.00 leverage is capped at 1x
     if entry_price < ALPACA_MIN_MARGINABLE_PRICE:
         return 1
 
@@ -97,7 +94,6 @@ def compute_optimal_leverage(
     if not np.isfinite(channel_width) or channel_width <= 0.0:
         channel_width = 2.0 * delta
 
-    tp_price = x_max if direction == 1 else x_min
     tp_dist = abs(tp_price - entry_price)
     sl_dist = abs(entry_price - sl_price)
 
@@ -106,17 +102,11 @@ def compute_optimal_leverage(
     if not np.isfinite(tp_dist) or tp_dist <= 0.0:
         tp_dist = 1.5 * delta
 
-    # 1. Reward-to-risk barrier asymmetry b
     b = tp_dist / sl_dist
-
-    # 2. Price standard deviation δ relative to barrier span (x_max - x_min)
     vol_ratio = delta / channel_width
-
-    # 3. Directional log-return drift-to-volatility multiplier (μ, σ)
     z_drift = (direction * mu) / sigma if np.isfinite(mu) else 0.0
     drift_term = 1.0 + 0.5 * math.tanh(z_drift)
 
-    # 4. r^2 modulation (supports both PDE R^2 in [0.5, 1.0] and squared log-return r^2)
     r_sq_clean = float(r_sq) if (np.isfinite(r_sq) and r_sq >= 0.0) else 0.0
     if 0.5 <= r_sq_clean <= 1.0:
         r2_term = r_sq_clean
@@ -133,11 +123,10 @@ def compute_alpaca_fees_and_costs(
     entry_price: float,
     exit_price: float,
     direction: int,
-    router_tier: str = "free",
     sec_rate: float = SEC_FEE_RATE,
     taf_rate: float = FINRA_TAF_RATE,
     cat_rate: float = FINRA_CAT_RATE,
-    slippage_bps: float = 5.0,
+    slippage_bps: float = SLIPPAGE_BPS,
     round_to_cent: bool = True
 ) -> dict:
     qty = abs(float(shares))
@@ -155,29 +144,20 @@ def compute_alpaca_fees_and_costs(
         buy_price = exit_price
 
     sell_notional = qty * sell_price
-
-    if router_tier == "elite_fixed":
-        comm_leg = 0.0040 * qty
-    elif router_tier == "elite_tiered":
-        comm_leg = 0.0025 * qty
-    else:
-        comm_leg = 0.0
+    commission = 0.0  # Free router tier
 
     raw_sec = sec_rate * sell_notional
     raw_taf = min(taf_rate * qty, 8.30) if taf_rate > 0.0 else 0.0
-    raw_cat_buy = cat_rate * qty
-    raw_cat_sell = cat_rate * qty
+    raw_cat = cat_rate * qty * 2.0  # buy + sell legs
 
     if round_to_cent:
-        commission = round_up_cent(comm_leg) + round_up_cent(comm_leg)
         sec_fee = round_up_cent(raw_sec)
         taf_fee = round_up_cent(raw_taf)
-        cat_fee = round_up_cent(raw_cat_buy + raw_cat_sell)
+        cat_fee = round_up_cent(raw_cat)
     else:
-        commission = 2.0 * comm_leg
         sec_fee = raw_sec
         taf_fee = raw_taf
-        cat_fee = raw_cat_buy + raw_cat_sell
+        cat_fee = raw_cat
 
     slippage_cost = qty * (buy_price + sell_price) * (slippage_bps * 1e-4) if slippage_bps > 0.0 else 0.0
     total_cost = commission + sec_fee + taf_fee + cat_fee + slippage_cost
@@ -196,10 +176,6 @@ def ensure_delta_column(df: pd.DataFrame, lookback: int = 28) -> pd.Series:
 
 
 def ensure_r_squared_series(df: pd.DataFrame) -> np.ndarray:
-    """
-    Extract r^2 from explicit column (`r^2`, `r_squared`, `r2`) if present;
-    otherwise compute squared log-return `r ** 2` from `r` (or log(close / close.shift(1))).
-    """
     for col_name in ['r^2', 'r_squared', 'r2']:
         if col_name in df.columns:
             return pd.to_numeric(df[col_name], errors='coerce').fillna(0.0).values
@@ -213,155 +189,56 @@ def ensure_r_squared_series(df: pd.DataFrame) -> np.ndarray:
     return lrets * lrets
 
 
-def ensure_acceleration_series(df: pd.DataFrame) -> np.ndarray:
+def compute_barriers(direction: int, entry_price: float, x_min: float, x_max: float, delta: float):
     """
-    Extract acceleration from explicit column (`acceleration`, `accel`, `a`) if present;
-    otherwise compute discrete second difference of close prices.
+    Long entry:  take_profit = x_max + δ, stop_loss = x_min
+    Short entry: take_profit = x_min - δ, stop_loss = x_max
+    Validates finite values and positive risk/reward distances.
     """
-    for col_name in ['acceleration', 'accel', 'a']:
-        if col_name in df.columns:
-            return pd.to_numeric(df[col_name], errors='coerce').fillna(0.0).values
-    closes = pd.to_numeric(df['close'], errors='coerce').fillna(0.0).values
-    acc = np.zeros(len(df))
-    if len(df) >= 3:
-        acc[2:] = closes[2:] - 2.0 * closes[1:-1] + closes[:-2]
-    return acc
-
-
-def ensure_log_return_series(df: pd.DataFrame) -> np.ndarray:
-    """
-    Extract log-return r from explicit column `r` if present;
-    otherwise compute log(close / close.shift(1)).
-    """
-    if 'r' in df.columns:
-        return pd.to_numeric(df['r'], errors='coerce').fillna(0.0).values
-    closes = pd.to_numeric(df['close'], errors='coerce').values
-    lrets = np.zeros(len(df))
-    with np.errstate(divide='ignore', invalid='ignore'):
-        lrets[1:] = np.where((closes[1:] > 0) & (closes[:-1] > 0), np.log(closes[1:] / closes[:-1]), 0.0)
-    return lrets
-
-
-# ==============================================================================
-# STOP LOSS PLACEMENT
-# ==============================================================================
-
-DEFAULT_SL_PARAMS = {
-    'mode': 'fixed',        # 'fixed' (SL = base_ratio * TP distance) or 'dynamic'
-    'base_ratio': 0.5,      # SL/TP distance ratio when every dynamic factor is neutral
-    'min_ratio': 0.25,      # Hard lower bound on SL/TP ratio (max reward-to-risk = 1 / min_ratio)
-    'max_ratio': 1.0,       # Hard upper bound on SL/TP ratio (min reward-to-risk = 1 / max_ratio)
-    'drift_weight': 0.3,    # Sensitivity to horizon drift-to-noise (μ, σ, window_size)
-    'accel_weight': 0.2,    # Sensitivity to acceleration alignment (acceleration, δ)
-    'shock_weight': 0.2,    # Sensitivity to last-bar return shock (r, σ)
-    'noise_mult': 0.5,      # SL floor as multiple of expected horizon move: entry * σ * sqrt(window_size)
-}
-
-
-def compute_stop_loss(
-    direction: int,
-    entry_price: float,
-    tp_price: float,
-    mu: float = 0.0,
-    sigma: float = 0.0,
-    delta: float = 0.0,
-    window_size: int = 1,
-    r: float = 0.0,
-    x_min: float = 0.0,
-    x_max: float = 0.0,
-    acceleration: float = 0.0,
-    params: dict = None
-):
-    """
-    Use the channel barriers [x_min, x_max] directly as Take Profit and Stop Loss:
-      - Long  (direction ==  1): TP = x_max, SL = x_min
-      - Short (direction == -1): TP = x_min, SL = x_max
-    Requires entry_price to lie strictly between x_min and x_max (0 < x_min < entry_price < x_max).
-    """
-    sl_price = x_min if direction == 1 else x_max
     if (
         not np.isfinite(entry_price) or entry_price <= 0.0
-        or not np.isfinite(tp_price) or tp_price <= 0.0
-        or not np.isfinite(sl_price) or sl_price <= 0.0
+        or not np.isfinite(x_min) or x_min <= 0.0
+        or not np.isfinite(x_max) or x_max <= 0.0
+        or not np.isfinite(delta) or delta < 0.0
     ):
-        return None
+        return None, None
+
+    if direction == 1:
+        tp_price = x_max + delta
+        sl_price = x_min
+    else:
+        tp_price = x_min - delta
+        sl_price = x_max
+
+    if not np.isfinite(tp_price) or tp_price <= 0.0 or not np.isfinite(sl_price) or sl_price <= 0.0:
+        return None, None
 
     tp_dist = direction * (tp_price - entry_price)
     sl_dist = direction * (entry_price - sl_price)
-    if not np.isfinite(tp_dist) or tp_dist <= 0.0 or not np.isfinite(sl_dist) or sl_dist <= 0.0:
-        return None
+    if tp_dist <= 0.0 or sl_dist <= 0.0:
+        return None, None
 
-    return float(sl_price)
+    return float(tp_price), float(sl_price)
 
 
-def evaluate_single_file(args_tuple):
-    trade_all_delta = False
-    min_records = 2000
-    if len(args_tuple) >= 12:
-        (
-            filepath,
-            initial_capital,
-            risk_pct,
-            max_position_pct,
-            max_leverage,
-            router_tier,
-            slippage_bps,
-            timed_exit,
-            tier_2_order,
-            sl_params,
-            min_records,
-            trade_all_delta
-        ) = args_tuple[:12]
-    elif len(args_tuple) == 11:
-        (
-            filepath,
-            initial_capital,
-            risk_pct,
-            max_position_pct,
-            max_leverage,
-            router_tier,
-            slippage_bps,
-            timed_exit,
-            tier_2_order,
-            sl_params,
-            min_records
-        ) = args_tuple
-    else:
-        (
-            filepath,
-            initial_capital,
-            risk_pct,
-            max_position_pct,
-            max_leverage,
-            router_tier,
-            slippage_bps,
-            timed_exit,
-            tier_2_order,
-            sl_params
-        ) = args_tuple
-
+def evaluate_single_file(filepath):
     filepath = Path(filepath)
     try:
         df = pd.read_csv(filepath)
-    except pd.errors.EmptyDataError:
-        return None
     except Exception as e:
         return {"error": f"Failed to read {filepath}: {str(e)}"}
 
-    if df.empty or len(df) < min_records:
+    if df.empty or len(df) < MIN_RECORDS:
         return None
 
     df.columns = [str(c).strip().lower() for c in df.columns]
     required_cols = {'timestamp', 'close', 'signal', 'window_size', 'x_min', 'x_max'}
     if not required_cols.issubset(df.columns):
-        missing = required_cols - set(df.columns)
-        return {"error": f"Skipping {filepath}: Missing required columns {missing}"}
+        return None
 
     df = df.sort_values('timestamp').reset_index(drop=True)
     deltas = ensure_delta_column(df).values
     r_sq_s = ensure_r_squared_series(df)
-    accelerations = ensure_acceleration_series(df)
-    log_returns = ensure_log_return_series(df)
 
     closes = df['close'].astype(float).values
     opens = df['open'].astype(float).values if 'open' in df.columns else closes
@@ -375,13 +252,11 @@ def evaluate_single_file(args_tuple):
     σ_s = df['σ'].astype(float).values if 'σ' in df.columns else np.ones(len(df)) * 0.01
     n = len(df)
 
-    capital = float(initial_capital)
+    capital = float(INITIAL_CAPITAL)
     peak_capital = capital
     max_drawdown_pct = 0.0
 
     evaluations = 0
-    tier1_count = 0
-    tier2_count = 0
     skipped_low_delta = 0
     tp_hits = 0
     sl_hits = 0
@@ -416,7 +291,6 @@ def evaluate_single_file(args_tuple):
             continue
 
         direction = int(raw_sig)
-        trade_horizon = int(window_size)
         delta = float(deltas[t]) if pd.notna(deltas[t]) else 0.0
         μ = float(μ_s[t]) if t < len(μ_s) and pd.notna(μ_s[t]) else 0.0
         σ = float(σ_s[t]) if t < len(σ_s) and pd.notna(σ_s[t]) else 0.01
@@ -432,77 +306,46 @@ def evaluate_single_file(args_tuple):
         x_min_val = float(x_mins[t])
         x_max_val = float(x_maxs[t])
 
-        # Tier 1 Take Profit set to x_max or x_min; Stop Loss placed opposite the TP by
-        # compute_stop_loss ('fixed': half the entry-to-TP distance; 'dynamic': factor model)
-        tp_price = x_max_val if direction == 1 else x_min_val
-        sl_price = compute_stop_loss(
-            direction=direction,
-            entry_price=entry_price,
-            tp_price=tp_price,
-            mu=μ,
-            sigma=σ,
-            delta=delta,
-            window_size=trade_horizon,
-            r=float(log_returns[t]),
-            x_min=x_min_val,
-            x_max=x_max_val,
-            acceleration=float(accelerations[t]),
-            params=sl_params
-        )
-
-        if sl_price is None or not np.isfinite(tp_price) or tp_price <= 0.0:
+        tp_price, sl_price = compute_barriers(direction, entry_price, x_min_val, x_max_val, delta)
+        if tp_price is None or sl_price is None:
             skipped_low_delta += 1
             continue
 
         sl_distance = abs(entry_price - sl_price)
-        if not np.isfinite(sl_distance) or sl_distance <= 0.0:
-            skipped_low_delta += 1
-            continue
-
         if capital <= 0.0:
             break
 
-        # Compute optimal leverage from μ, σ, δ, r^2, x_min, and x_max (rounded to ceiling int)
         leverage = compute_optimal_leverage(
             direction=direction,
             entry_price=entry_price,
             sl_price=sl_price,
+            tp_price=tp_price,
             x_min=x_min_val,
             x_max=x_max_val,
             delta=delta,
             mu=μ,
             sigma=σ,
             r_sq=r_sq,
-            max_leverage=max_leverage
+            max_leverage=MAX_LEVERAGE
         )
 
-        # Apply calculated leverage to risk budget and position buying power (strictly enforce whole shares >= 1)
-        risk_budget = capital * risk_pct * leverage
+        risk_budget = capital * RISK_PCT * leverage
         desired_shares = risk_budget / sl_distance
-        max_shares_by_capital = (capital * max_position_pct * leverage) / entry_price
+        max_shares_by_capital = (capital * MAX_POSITION_PCT * leverage) / entry_price
         shares = float(math.floor(min(desired_shares, max_shares_by_capital)))
         if shares < 1.0:
             skipped_low_delta += 1
             continue
 
-        est_exit_price = tp_price if tp_price > 0.0 else entry_price
-        unit_fee_info = compute_alpaca_fees_and_costs(
-            shares=1.0, entry_price=entry_price, exit_price=est_exit_price, direction=direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
-        )
-        pos_fee_info = compute_alpaca_fees_and_costs(
-            shares=shares, entry_price=entry_price, exit_price=est_exit_price, direction=direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
-        )
+        est_exit_price = tp_price
+        unit_fee_info = compute_alpaca_fees_and_costs(shares=1.0, entry_price=entry_price, exit_price=est_exit_price, direction=direction)
+        pos_fee_info = compute_alpaca_fees_and_costs(shares=shares, entry_price=entry_price, exit_price=est_exit_price, direction=direction)
         required_min_delta = max(unit_fee_info["per_share_cost"], pos_fee_info["per_share_cost"])
-        if not trade_all_delta and delta < required_min_delta:
+        if delta < required_min_delta:
             skipped_low_delta += 1
             continue
 
-        end_idx = min(t + 1 + trade_horizon, n) if timed_exit else n
-        if end_idx <= t + 1:
-            continue
-
         evaluations += 1
-        tier1_count += 1
         leverages_used.append(leverage)
         if direction == 1:
             long_trades += 1
@@ -510,13 +353,13 @@ def evaluate_single_file(args_tuple):
             short_trades += 1
 
         # ======================================================================
-        # TIER 1 TRADE SIMULATION
+        # TRADE SIMULATION
         # ======================================================================
         t1_exit_price = None
         t1_exit_idx = None
         t1_exit_reason = None
 
-        for days_held, idx in enumerate(range(t + 1, end_idx), start=1):
+        for idx in range(t + 1, n):
             b_open = float(opens[idx])
             b_high = float(highs[idx])
             b_low = float(lows[idx])
@@ -557,9 +400,7 @@ def evaluate_single_file(args_tuple):
                 elif hit_tp:
                     t1_exit_price = tp_price; t1_exit_idx = idx; t1_exit_reason = "TP"; break
 
-            if timed_exit and ((days_held + 1) >= (trade_horizon + 1) or idx == end_idx - 1):
-                t1_exit_price = b_close; t1_exit_idx = idx; t1_exit_reason = "TIMEOUT"; break
-            elif not timed_exit and idx == n - 1:
+            if idx == n - 1:
                 t1_exit_price = b_close; t1_exit_idx = idx; t1_exit_reason = "TIMEOUT"; break
 
         if t1_exit_reason == "TP":
@@ -570,164 +411,17 @@ def evaluate_single_file(args_tuple):
             timeout_exits += 1
 
         t1_fees = compute_alpaca_fees_and_costs(
-            shares=shares, entry_price=entry_price, exit_price=t1_exit_price, direction=direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
+            shares=shares, entry_price=entry_price, exit_price=t1_exit_price, direction=direction
         )
-        t1_total_cost = t1_fees["total_cost"]
+        total_fees = t1_fees["total_cost"]
+        total_fees_paid += total_fees
 
-        gross_pnl_t1 = shares * (t1_exit_price - entry_price) * direction
-        t1_net_pnl = gross_pnl_t1 - t1_total_cost
-
-        # ======================================================================
-        # TIER 2 ORDER LOGIC (AT t_stop = t1_exit_idx)
-        # Created ONLY when:
-        #   1. Tier 1 reaches stop loss (t1_exit_reason == "SL")
-        #   2. window_size > 0 at t_stop
-        #   3. direction of stopped Tier 1 signal is OPPOSITE to np.sign(acceleration) at t_stop
-        # All variables (trade_horizon, sl_distance, leverage, shares, etc.)
-        # are recalculated at time t_stop using bare window_size, x_max, x_min at t_stop.
-        # ======================================================================
-        t2_net_pnl = 0.0
-        t2_fees_dollars = 0.0
-        final_exit_idx = t1_exit_idx
-
-        t_stop = t1_exit_idx
-        if tier_2_order and t1_exit_reason == "SL" and (t_stop + 1) < n:
-            t2_window_raw = windows[t_stop]
-            t2_accel = accelerations[t_stop]
-            if (
-                pd.notna(t2_window_raw)
-                and int(t2_window_raw) > 0
-                and pd.notna(t2_accel)
-                and np.sign(t2_accel) == -direction
-            ):
-                t2_direction = 1 if direction == -1 else -1
-                t2_horizon = int(t2_window_raw)  # Bare window_size as is; no 0.5 scaling
-
-                t2_delta = float(deltas[t_stop]) if pd.notna(deltas[t_stop]) else 0.0
-                t2_mu = float(μ_s[t_stop]) if t_stop < len(μ_s) and pd.notna(μ_s[t_stop]) else 0.0
-                t2_sigma = float(σ_s[t_stop]) if t_stop < len(σ_s) and pd.notna(σ_s[t_stop]) else 0.01
-                t2_r_sq = float(r_sq_s[t_stop]) if t_stop < len(r_sq_s) and pd.notna(r_sq_s[t_stop]) else 0.0
-
-                t2_entry_price = float(opens[t_stop + 1])
-                t2_x_min = float(x_mins[t_stop])
-                t2_x_max = float(x_maxs[t_stop])
-
-                # Use bare x_max or x_min at t_stop as absolute TP barrier (no 0.5 scaling);
-                # Stop Loss placed opposite the TP by compute_stop_loss (NaN if none is valid)
-                t2_tp = t2_x_max if t2_direction == 1 else t2_x_min
-                t2_sl = compute_stop_loss(
-                    direction=t2_direction,
-                    entry_price=t2_entry_price,
-                    tp_price=t2_tp,
-                    mu=t2_mu,
-                    sigma=t2_sigma,
-                    delta=t2_delta,
-                    window_size=t2_horizon,
-                    r=float(log_returns[t_stop]),
-                    x_min=t2_x_min,
-                    x_max=t2_x_max,
-                    acceleration=float(t2_accel),
-                    params=sl_params
-                )
-                if t2_sl is None:
-                    t2_sl = float('nan')
-
-                t2_sl_dist = abs(t2_entry_price - t2_sl)
-                t2_capital = capital + t1_net_pnl
-
-                if (
-                    np.isfinite(t2_entry_price) and t2_entry_price > 0.0
-                    and not is_split_discontinuity(float(closes[t_stop]), t2_entry_price, float(highs[t_stop + 1]), float(lows[t_stop + 1]))
-                    and np.isfinite(t2_tp) and t2_tp > 0.0
-                    and np.isfinite(t2_sl) and t2_sl > 0.0
-                    and np.isfinite(t2_sl_dist) and t2_sl_dist > 0.0
-                    and t2_capital > 0.0
-                ):
-                    t2_leverage = compute_optimal_leverage(
-                        direction=t2_direction,
-                        entry_price=t2_entry_price,
-                        sl_price=t2_sl,
-                        x_min=t2_x_min,
-                        x_max=t2_x_max,
-                        delta=t2_delta,
-                        mu=t2_mu,
-                        sigma=t2_sigma,
-                        r_sq=t2_r_sq,
-                        max_leverage=max_leverage
-                    )
-
-                    t2_risk_budget = t2_capital * risk_pct * t2_leverage
-                    t2_desired_shares = t2_risk_budget / t2_sl_dist
-                    t2_max_shares_by_capital = (t2_capital * max_position_pct * t2_leverage) / t2_entry_price
-                    t2_shares = float(math.floor(min(t2_desired_shares, t2_max_shares_by_capital)))
-
-                    if t2_shares >= 1.0:
-                        t2_est_exit_price = t2_tp if t2_tp > 0.0 else t2_entry_price
-                        t2_unit_fee = compute_alpaca_fees_and_costs(
-                            shares=1.0, entry_price=t2_entry_price, exit_price=t2_est_exit_price, direction=t2_direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
-                        )
-                        t2_pos_fee = compute_alpaca_fees_and_costs(
-                            shares=t2_shares, entry_price=t2_entry_price, exit_price=t2_est_exit_price, direction=t2_direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
-                        )
-                        t2_required_min_delta = max(t2_unit_fee["per_share_cost"], t2_pos_fee["per_share_cost"])
-
-                        t2_end_idx = min(t_stop + 1 + t2_horizon, n) if timed_exit else n
-                        if (trade_all_delta or t2_delta >= t2_required_min_delta) and t2_end_idx > (t_stop + 1):
-                            tier2_count += 1
-                            leverages_used.append(t2_leverage)
-                            t2_exit_price = closes[t2_end_idx - 1]
-                            t2_exit_idx = t2_end_idx - 1
-
-                            for t2_days_held, idx in enumerate(range(t_stop + 1, t2_end_idx), start=1):
-                                b_open = float(opens[idx])
-                                b_high = float(highs[idx])
-                                b_low = float(lows[idx])
-                                b_close = float(closes[idx])
-
-                                if idx > (t_stop + 1) and is_split_discontinuity(float(closes[idx - 1]), b_open, b_high, b_low):
-                                    t2_exit_price = float(closes[idx - 1])
-                                    t2_exit_idx = idx - 1
-                                    break
-
-                                if t2_direction == 1:
-                                    if b_open <= t2_sl:
-                                        t2_exit_price = b_open; t2_exit_idx = idx; break
-                                    if b_open >= t2_tp:
-                                        t2_exit_price = b_open; t2_exit_idx = idx; break
-                                    if b_low <= t2_sl:
-                                        t2_exit_price = t2_sl; t2_exit_idx = idx; break
-                                    if b_high >= t2_tp:
-                                        t2_exit_price = t2_tp; t2_exit_idx = idx; break
-                                else:
-                                    if b_open >= t2_sl:
-                                        t2_exit_price = b_open; t2_exit_idx = idx; break
-                                    if b_open <= t2_tp:
-                                        t2_exit_price = b_open; t2_exit_idx = idx; break
-                                    if b_high >= t2_sl:
-                                        t2_exit_price = t2_sl; t2_exit_idx = idx; break
-                                    if b_low <= t2_tp:
-                                        t2_exit_price = t2_tp; t2_exit_idx = idx; break
-
-                                if timed_exit and ((t2_days_held + 1) >= (t2_horizon + 1) or idx == t2_end_idx - 1):
-                                    t2_exit_price = b_close; t2_exit_idx = idx; break
-                                elif not timed_exit and idx == n - 1:
-                                    t2_exit_price = b_close; t2_exit_idx = idx; break
-
-                            t2_fees = compute_alpaca_fees_and_costs(
-                                shares=t2_shares, entry_price=t2_entry_price, exit_price=t2_exit_price, direction=t2_direction, router_tier=router_tier, slippage_bps=slippage_bps, round_to_cent=True
-                            )
-                            t2_fees_dollars = t2_fees["total_cost"]
-                            t2_gross_pnl = t2_shares * (t2_exit_price - t2_entry_price) * t2_direction
-                            t2_net_pnl = t2_gross_pnl - t2_fees_dollars
-                            final_exit_idx = t2_exit_idx
-
-        total_trade_costs = t1_total_cost + t2_fees_dollars
-        total_fees_paid += total_trade_costs
-        net_pnl = t1_net_pnl + t2_net_pnl
+        gross_pnl = shares * (t1_exit_price - entry_price) * direction
+        net_pnl = gross_pnl - total_fees
 
         capital += net_pnl
-        active_until_idx = final_exit_idx
-        bars_held = (final_exit_idx - (t + 1)) + 1
+        active_until_idx = t1_exit_idx
+        bars_held = (t1_exit_idx - (t + 1)) + 1
         holding_bars_list.append(bars_held)
 
         if net_pnl > 0.0:
@@ -753,7 +447,7 @@ def evaluate_single_file(args_tuple):
     win_rate = (winning_trades / evaluations) * 100.0
     tp_rate = (tp_hits / evaluations) * 100.0
     sl_rate = (sl_hits / evaluations) * 100.0
-    total_return_pct = ((capital - initial_capital) / initial_capital) * 100.0
+    total_return_pct = ((capital - INITIAL_CAPITAL) / INITIAL_CAPITAL) * 100.0
     profit_factor = (gross_profit / gross_loss) if gross_loss > 0.0 else np.inf
     avg_hold_bars = float(np.mean(holding_bars_list)) if holding_bars_list else 0.0
     avg_leverage = int(math.ceil(float(np.mean(leverages_used)))) if leverages_used else 1
@@ -761,8 +455,6 @@ def evaluate_single_file(args_tuple):
     return {
         'Symbol': filepath.stem,
         'Evaluations': evaluations,
-        'Tier 1': tier1_count,
-        'Tier 2': tier2_count,
         'δ < Fees': skipped_low_delta,
         'Wins': winning_trades,
         'Long Wins': long_wins,
@@ -783,8 +475,7 @@ def evaluate_single_file(args_tuple):
     }
 
 
-def extract_latest_signal_from_file(args_tuple):
-    filepath, sl_params, max_leverage, target_date = args_tuple
+def extract_latest_signal_from_file(filepath):
     filepath = Path(filepath)
     try:
         df = pd.read_csv(filepath)
@@ -803,16 +494,24 @@ def extract_latest_signal_from_file(args_tuple):
     if df.empty:
         return None
 
-    # Identify row t to inspect:
-    # If target_date is given (YYYY-MM-DD), find matching date; otherwise use latest session row (last index)
-    if target_date:
-        ts_str = df['timestamp'].astype(str)
-        matches = df[ts_str.str.startswith(target_date)]
-        if matches.empty:
+    # Only extract signals occurring on current OS date
+    today_date = datetime.date.today()
+    today_str = today_date.isoformat()
+    ts_str = df['timestamp'].astype(str).str.slice(0, 10)
+    is_today = (ts_str == today_str)
+    if not is_today.any():
+        try:
+            ts_dt = pd.to_datetime(df['timestamp'], errors='coerce')
+            is_today = ts_dt.dt.date == today_date
+        except Exception:
             return None
-        t = matches.index[-1]
-    else:
-        t = len(df) - 1
+
+    valid_mask = is_today & df['signal'].isin([1, -1, 1.0, -1.0])
+    signal_indices = df.index[valid_mask]
+    if len(signal_indices) == 0:
+        return None
+
+    t = signal_indices[-1]
 
     raw_sig = df.at[t, 'signal']
     if pd.isna(raw_sig) or raw_sig not in [1, -1, 1.0, -1.0]:
@@ -825,49 +524,25 @@ def extract_latest_signal_from_file(args_tuple):
     window_size = int(raw_window)
 
     last_close = float(df.at[t, 'close'])
-    if not np.isfinite(last_close) or last_close <= 0.0:
-        return None
-
     timestamp = str(df.at[t, 'timestamp'])
     x_min_val = float(df.at[t, 'x_min'])
     x_max_val = float(df.at[t, 'x_max'])
 
-    # Helper series for stop loss / leverage
     deltas = ensure_delta_column(df).values
     r_sq_s = ensure_r_squared_series(df)
-    accelerations = ensure_acceleration_series(df)
-    log_returns = ensure_log_return_series(df)
     μ_s = df['μ'].astype(float).values if 'μ' in df.columns else np.zeros(len(df))
     σ_s = df['σ'].astype(float).values if 'σ' in df.columns else np.ones(len(df)) * 0.01
 
-    delta = float(deltas[t])
+    delta = float(deltas[t]) if t < len(deltas) else float('nan')
     μ = float(μ_s[t]) if t < len(μ_s) else float('nan')
     σ = float(σ_s[t]) if t < len(σ_s) else float('nan')
     r_sq = float(r_sq_s[t]) if t < len(r_sq_s) else float('nan')
-    r_val = float(log_returns[t]) if t < len(log_returns) else float('nan')
-    accel_val = float(accelerations[t]) if t < len(accelerations) else float('nan')
 
-    if not all(np.isfinite(v) for v in (last_close, x_min_val, x_max_val, delta, μ, σ, r_sq, r_val, accel_val)):
+    if not all(np.isfinite(v) for v in (last_close, x_min_val, x_max_val, delta, μ, σ, r_sq)):
         return None
 
-    # Overnight estimated entry price at close t (pre-open t + 1)
-    tp_price = x_max_val if direction == 1 else x_min_val
-    sl_price = compute_stop_loss(
-        direction=direction,
-        entry_price=last_close,
-        tp_price=tp_price,
-        mu=μ,
-        sigma=σ,
-        delta=delta,
-        window_size=window_size,
-        r=r_val,
-        x_min=x_min_val,
-        x_max=x_max_val,
-        acceleration=accel_val,
-        params=sl_params
-    )
-
-    if sl_price is None or not np.isfinite(tp_price) or tp_price <= 0.0:
+    tp_price, sl_price = compute_barriers(direction, last_close, x_min_val, x_max_val, delta)
+    if tp_price is None or sl_price is None:
         return None
 
     sl_dist = abs(last_close - sl_price)
@@ -878,13 +553,14 @@ def extract_latest_signal_from_file(args_tuple):
         direction=direction,
         entry_price=last_close,
         sl_price=sl_price,
+        tp_price=tp_price,
         x_min=x_min_val,
         x_max=x_max_val,
         delta=delta,
         mu=μ,
         sigma=σ,
         r_sq=r_sq,
-        max_leverage=max_leverage
+        max_leverage=MAX_LEVERAGE
     )
 
     return {
@@ -903,8 +579,8 @@ def extract_latest_signal_from_file(args_tuple):
     }
 
 
-def notify_active_signals(csv_files, output_file, sl_params, max_leverage, target_date=None):
-    today_str = target_date if target_date else datetime.date.today().isoformat()
+def notify_active_signals(csv_files, output_file):
+    today_str = datetime.date.today().isoformat()
     print(f"\n{'=' * 115}")
     print(f"  ALPACA OVERNIGHT ACTIVE SIGNALS MONITOR — System Date: {today_str}")
     print(f"{'=' * 115}")
@@ -925,39 +601,18 @@ def notify_active_signals(csv_files, output_file, sl_params, max_leverage, targe
         print(f"{'=' * 115}\n")
         return
 
-    task_args = [
-        (f, sl_params, max_leverage, target_date)
-        for f in filtered_csv_files
-    ]
-
     with Pool(cpu_count()) as pool:
-        results = pool.map(extract_latest_signal_from_file, task_args)
+        results = pool.map(extract_latest_signal_from_file, filtered_csv_files)
 
     raw_signals = [r for r in results if r is not None]
     if not raw_signals:
-        print(f"\n[INFO] No active signals found for {today_str} across {len(filtered_csv_files)} symbols.\n")
+        print(f"\n[INFO] No active signals found for today ({today_str}) across {len(filtered_csv_files)} symbols.\n")
         print(f"{'=' * 115}\n")
         return
 
-    # Filter to current system date (today_str) if present; otherwise use the latest session date in the dataset
-    for r in raw_signals:
-        r['_date'] = str(r['Timestamp'])[:10]
-
-    if target_date:
-        active_date = target_date
-        date_filtered = [r for r in raw_signals if r['_date'] == active_date]
-    else:
-        today_matches = [r for r in raw_signals if r['_date'] == today_str]
-        if today_matches:
-            active_date = today_str
-            date_filtered = today_matches
-        else:
-            active_date = max(r['_date'] for r in raw_signals)
-            date_filtered = [r for r in raw_signals if r['_date'] == active_date]
-            print(f"[NOTE] No bars dated {today_str} found in input CSVs; showing signals for latest session date: {active_date}")
-
+    active_date = today_str
     active_signals = []
-    for r in date_filtered:
+    for r in raw_signals:
         sym = r['Symbol']
         perf = report_map.get(sym)
         if perf is None:
@@ -966,7 +621,6 @@ def notify_active_signals(csv_files, output_file, sl_params, max_leverage, targe
         r['Hist PF'] = pd.to_numeric(perf.get('Profit Factor', np.nan), errors='coerce')
         r['Hist DD (%)'] = pd.to_numeric(perf.get('Max Drawdown (%)', np.nan), errors='coerce')
         r['Hist Ret (%)'] = pd.to_numeric(perf.get('Return (%)', np.nan), errors='coerce')
-        r.pop('_date', None)
         active_signals.append(r)
 
     if not active_signals:
@@ -997,49 +651,22 @@ def notify_active_signals(csv_files, output_file, sl_params, max_leverage, targe
     print(f"\n{'=' * 115}\n")
 
 
-def process_alpaca_trades(args):
-    input_path = Path(args.input_folder)
+def process_alpaca_trades(input_dir, output_file, notify_today):
+    input_path = Path(input_dir)
     if input_path.is_file():
         csv_files = [input_path]
-    else:
+    elif input_path.is_dir():
         csv_files = sorted(input_path.glob("*.csv"))
+    else:
+        raise FileNotFoundError(f"Input path does not exist: {input_dir}")
 
     if not csv_files:
-        raise FileNotFoundError(f"No CSV files found in {args.input_folder}")
-
-    sl_params = {
-        'mode': args.sl_mode,
-        'base_ratio': args.sl_base_ratio,
-        'min_ratio': args.sl_min_ratio,
-        'max_ratio': args.sl_max_ratio,
-        'drift_weight': args.sl_drift_weight,
-        'accel_weight': args.sl_accel_weight,
-        'shock_weight': args.sl_shock_weight,
-        'noise_mult': args.sl_noise_mult,
-    }
+        raise FileNotFoundError(f"No CSV files found in {input_dir}")
 
     print(f"Simulating Alpaca US Equity/ETF trades across {len(csv_files)} files using {cpu_count()} CPU cores...")
 
-    task_args = [
-        (
-            f,
-            args.initial_capital,
-            args.risk_pct,
-            args.max_position_pct,
-            args.max_leverage,
-            args.router_tier,
-            args.slippage_bps,
-            args.timed_exit,
-            args.tier_2_order,
-            sl_params,
-            args.min_records,
-            args.trade_all_delta
-        )
-        for f in csv_files
-    ]
-
     with Pool(cpu_count()) as pool:
-        summaries = pool.map(evaluate_single_file, task_args)
+        summaries = pool.map(evaluate_single_file, csv_files)
 
     valid_records = []
     for result in summaries:
@@ -1063,77 +690,45 @@ def process_alpaca_trades(args):
         lambda amount: f'${amount:,.2f}'
     )
 
-    df_results.to_csv(args.output_file, index=False)
+    output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    df_results.to_csv(output_path, index=False)
 
-    print(f"Saved {len(valid_records)} symbol records to {args.output_file}")
+    print(f"Saved {len(valid_records)} symbol records to {output_file}")
     print(df_results.head(20).to_string())
 
-    if args.notify_today:
-        target_date = args.notify_date if args.notify_date else None
-        notify_active_signals(
-            csv_files=csv_files,
-            output_file=args.output_file,
-            sl_params=sl_params,
-            max_leverage=args.max_leverage,
-            target_date=target_date
-        )
-
-
-def str2bool(val):
-    if isinstance(val, bool):
-        return val
-    if val.lower() in ('true', '1', 'yes', 'y', 't'):
-        return True
-    if val.lower() in ('false', '0', 'no', 'n', 'f'):
-        return False
-    raise argparse.ArgumentTypeError(f"Boolean value expected, got {val}")
+    if notify_today:
+        notify_active_signals(csv_files=csv_files, output_file=output_file)
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Simulate US Equities & ETFs Signal Trading with Optimal Leverage & Tier-2 Stop-Loss Recovery Orders.'
+        description="Simulate US Equities & ETFs Signal Trading with fixed cost factors and channel barrier targets."
     )
-    parser.add_argument('input_folder', help='Folder containing input signal CSV files (or a single CSV file).')
-    parser.add_argument('output_file', help='Path to write the trading performance summary CSV.')
-    parser.add_argument('--notify-today', '--notify-tody', dest='notify_today', action='store_true', help='Inspect the latest session row (at time t) across symbols and print all active trade signals to stdout.')
-    parser.add_argument('--notify-date', type=str, default=None, help='Optional specific date (YYYY-MM-DD) to inspect for signals when using --notify-today. If omitted, uses the latest row available.')
-    parser.add_argument('--initial-capital', type=float, default=10000.0, help='Initial account capital in USD (default: 10000.0).')
-    parser.add_argument('--risk-pct', type=float, default=0.01, help='Base fraction of capital risked per trade at stop loss (default: 0.01 = 1%%).')
-    parser.add_argument('--max-position-pct', type=float, default=0.25, help='Base maximum fraction of capital allocated to a single position (default: 0.25 = 25%%).')
-    parser.add_argument('--max-leverage', type=float, default=5.0, help='Maximum allowed leverage cap (default: 5.0x).')
     parser.add_argument(
-        '--router-tier',
-        choices=['free', 'elite_fixed', 'elite_tiered'],
-        default='free',
-        help='Alpaca commission tier per BrokFeeSched.pdf: free ($0), elite_fixed ($0.0040/sh), elite_tiered ($0.0025/sh).'
+        "input_dir",
+        metavar="input_dir",
+        help="Folder containing input signal CSV files (or a single CSV file)."
     )
-    parser.add_argument('--slippage-bps', type=float, default=5.0, help='Per-leg execution slippage in basis points for US Equities/ETFs (default: 5.0 bps = 0.05%% per leg).')
-    parser.add_argument('--tier-2-order', '--tier_2_order', dest='tier_2_order', type=str2bool, nargs='?', const=True, default=False, help='If set, enables Tier 2 stop-loss recovery orders. Otherwise, strategy runs Tier 1 only (default: False).')
-    parser.add_argument('--timed-exit', '--timed_exit', dest='timed_exit', type=str2bool, nargs='?', const=True, default=False, help='If set, exit positions after trade_horizon days. Otherwise, wait indefinitely for TP/SL (default: False).')
-    parser.add_argument('--min-records', type=int, default=720, help='Minimum number of records required in CSV file to be evaluated (default: 2000).')
     parser.add_argument(
-        '--trade-all-delta',
-        '--trade_all_delta',
-        dest='trade_all_delta',
-        type=str2bool,
-        nargs='?',
-        const=True,
-        default=True,
-        help='If set, bypasses the "δ < Fees" check and trades signals regardless of volatility vs fee threshold (default: False).'
+        "output_file",
+        metavar="output_file",
+        help="Path to write the trading performance summary CSV."
     )
-    sl = DEFAULT_SL_PARAMS
-    parser.add_argument('--sl-mode', choices=['fixed', 'dynamic'], default=sl['mode'], help="Stop loss placement: 'fixed' (base-ratio * TP distance) or 'dynamic' (μ, σ, δ, r, window_size, acceleration, x_min/x_max factor model) (default: %(default)s).")
-    parser.add_argument('--sl-base-ratio', type=float, default=sl['base_ratio'], help='SL/TP distance ratio; used as-is in fixed mode, as the neutral ratio in dynamic mode (default: %(default)s).')
-    parser.add_argument('--sl-min-ratio', type=float, default=sl['min_ratio'], help='Dynamic mode: lower bound on SL/TP distance ratio (default: %(default)s).')
-    parser.add_argument('--sl-max-ratio', type=float, default=sl['max_ratio'], help='Dynamic mode: upper bound on SL/TP distance ratio (default: %(default)s).')
-    parser.add_argument('--sl-drift-weight', type=float, default=sl['drift_weight'], help='Dynamic mode: weight of horizon drift-to-noise factor μ·sqrt(W)/σ (default: %(default)s).')
-    parser.add_argument('--sl-accel-weight', type=float, default=sl['accel_weight'], help='Dynamic mode: weight of acceleration/δ alignment factor (default: %(default)s).')
-    parser.add_argument('--sl-shock-weight', type=float, default=sl['shock_weight'], help='Dynamic mode: weight of last-bar |r|/σ shock factor (default: %(default)s).')
-    parser.add_argument('--sl-noise-mult', type=float, default=sl['noise_mult'], help='Dynamic mode: SL floor as multiple of entry·σ·sqrt(W) (default: %(default)s).')
-    args = parser.parse_args()
-    return args
+    parser.add_argument(
+        "--notify-today",
+        "--notify-tody",
+        dest="notify_today",
+        action="store_true",
+        help="Inspect the latest session row across symbols and print non-NaN active trade signals to stdout."
+    )
+    return parser.parse_args()
 
 
 if __name__ == '__main__':
     args = parse_args()
-    process_alpaca_trades(args)
+    process_alpaca_trades(
+        input_dir=args.input_dir,
+        output_file=args.output_file,
+        notify_today=args.notify_today
+    )

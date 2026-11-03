@@ -10,7 +10,8 @@ if [ ! -d "${PYTHON_ENV}" ]; then
 else
     source "${PYTHON_ENV}/bin/activate"
 fi
-
+export ALPACA_API_KEY="PKZ2HPI2RCS42PQRGM4IBWNKVB"
+export ALPACA_API_SECRET="2QZNpxG3HWtB6d1Zo64FWR6tZkbMaGeqzkkHjEcYhHF9"
 
 export TOOLCHAIN_PATH
 export PATH="${PATH}:${TOOLCHAIN_PATH}"
