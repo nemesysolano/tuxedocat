@@ -1,10 +1,16 @@
-# Default compiler for macOS / Ubuntu
-CC := clang++
-
 LDFLAGS := 
-CFLAGS := -Wall -Wextra -Wno-deprecated-declarations -DEIGEN_USE_BLAS -std=c++23 -MMD -MP -Iinclude -Isrc/main 
+CFLAGS := -Wall -Wextra -Wno-deprecated-declarations -DEIGEN_USE_BLAS -std=c++23 -MMD -MP -Iinclude -Isrc -Isrc/main 
 
-ifeq ($(shell uname -s), Darwin)
+# Windows builds target the active MSYS2/MinGW environment by default.
+ifeq ($(OS),Windows_NT)
+    WINDOWS_PREFIX ?= $(if $(MINGW_PREFIX),$(MINGW_PREFIX),/mingw64)
+    CC := $(WINDOWS_PREFIX)/bin/g++.exe
+    CFLAGS += -I$(WINDOWS_PREFIX)/include/eigen3 -I$(WINDOWS_PREFIX)/include
+    BOOST_INCLUDE_DIRS ?= $(WINDOWS_PREFIX)/include
+    LDFLAGS += -L$(WINDOWS_PREFIX)/lib -lopenblas -lodbc32 -lstdc++exp
+    SHARED_EXT := .dll
+    EXE_EXT := .exe
+else ifeq ($(shell uname -s), Darwin)
     CC := clang++
     CFLAGS += -stdlib=libc++ -I/opt/homebrew/include/eigen3 -I/opt/homebrew/include -I/opt/homebrew/opt/unixodbc/include
     BOOST_INCLUDE_DIRS ?= /opt/homebrew/include /usr/local/include
@@ -34,6 +40,8 @@ DEPS := $(OBJS:.o=.d)
 
 ifeq ($(shell uname -s), Darwin)
     LDFLAGS += -framework Accelerate -L/opt/homebrew/lib -L/opt/homebrew/opt/unixodbc/lib -lodbc
+else ifeq ($(OS),Windows_NT)
+    # Windows libraries are configured in the platform block above.
 else ifeq ($(shell uname -s), SunOS) 
     # g++ automatically links libstdc++; we only need to provide OpenBLAS here
     LDFLAGS += -L/usr/local/openblas/lib -Wl,-rpath,/usr/local/openblas/lib -lopenblas
@@ -43,12 +51,14 @@ endif
 
 # Evaluate definitions and default to shared library if neither __TEST_MAIN__ nor __CLI_MAIN__ is provided
 ifneq ($(filter 1,$(if $(__TEST_MAIN__),1)$(if $(__CLI_MAIN__),1)),)
-    TARGET := $(BIN_DIR)/tuxedocat    
+    TARGET := $(BIN_DIR)/tuxedocat$(EXE_EXT)
     $(if $(__TEST_MAIN__),$(eval CFLAGS += -D__TEST_MAIN__)) #ok
     $(if $(__CLI_MAIN__),$(eval CFLAGS += -D__CLI_MAIN__))
 else
-    TARGET := $(BIN_DIR)/libtuxedocat.dylib # OK
-    CFLAGS += -fPIC
+    TARGET := $(BIN_DIR)/libtuxedocat$(if $(SHARED_EXT),$(SHARED_EXT),.dylib)
+    ifneq ($(OS),Windows_NT)
+        CFLAGS += -fPIC
+    endif
     LDFLAGS += -shared 
 endif
 
@@ -73,6 +83,10 @@ $(TARGET): $(OBJS) | $(BIN_DIR)
 	$(CC) $(OBJS) $(LDFLAGS) -o $@ 
 
 # Adjusted to create nested directories dynamically before compiling
+ifeq ($(OS),Windows_NT)
+$(OBJ_DIR)/nanodbc/nanodbc.o: CFLAGS += -Wno-int-to-pointer-cast
+endif
+
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
