@@ -13,7 +13,8 @@ namespace cli {
 
         // Grouping signals by symbol into `journal` map.
         for(const Signal & signal: signals) {
-            const DataFrame & dataframe = dataframe_feed.dataframe(signal.symbol()).value();
+            const auto dataframe_result = dataframe_feed.dataframe(signal.symbol());
+            const DataFrame & dataframe = dataframe_result.value().get();
             const std::chrono::sys_seconds timestamp = signal.timestamp();
 
             if(!dataframe.timestamps().contains(timestamp)) {

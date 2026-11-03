@@ -25,6 +25,14 @@ namespace dataframe {
     }
 
     namespace {
+        inline std::time_t timegm_utc(std::tm * value) {
+    #ifdef _WIN32
+            return _mkgmtime(value);
+    #else
+            return timegm(value);
+    #endif
+        }
+
         inline bool parse_double_fast(const std::string & cell, double & value) {
             const char * begin = cell.data();
             const char * end = begin + cell.size();
@@ -132,7 +140,7 @@ namespace dataframe {
                         return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
                     }
 
-                    std::time_t tt = timegm(&t);
+                    std::time_t tt = timegm_utc(&t);
                     row_time = std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::from_time_t(tt));
                     timestamp_to_row_index_[row_time] = rows;
                     timestamps_.insert(row_time);
@@ -769,8 +777,7 @@ std::expected<DataFrame, TuxedoError> DataFrame::Create(ODBCDataSource & odbc_da
             return std::unexpected(TuxedoError::ERR_INVALID_DATA_FORMAT);
         }
         
-        // timegm safely converts std::tm to time_t assuming UTC time.
-        std::time_t tt = timegm(&t); 
+        std::time_t tt = timegm_utc(&t);
         std::chrono::sys_seconds ts = std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::system_clock::from_time_t(tt));
         
         return operator[](ts, col_name);
