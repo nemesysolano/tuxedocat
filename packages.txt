@@ -8,3 +8,4 @@ matplotlib
 mplfinance
 plotly
 pyodbc
+alpaca-py

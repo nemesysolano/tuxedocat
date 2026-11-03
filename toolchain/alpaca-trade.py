@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import math
 import os
 from pathlib import Path
@@ -261,95 +262,36 @@ def compute_stop_loss(
     direction: int,
     entry_price: float,
     tp_price: float,
-    mu: float,
-    sigma: float,
-    delta: float,
-    window_size: int,
-    r: float,
-    x_min: float,
-    x_max: float,
-    acceleration: float,
+    mu: float = 0.0,
+    sigma: float = 0.0,
+    delta: float = 0.0,
+    window_size: int = 1,
+    r: float = 0.0,
+    x_min: float = 0.0,
+    x_max: float = 0.0,
+    acceleration: float = 0.0,
     params: dict = None
 ):
     """
-    Return the stop-loss price for a trade, or None if no valid stop can be placed.
-
-    'fixed' mode:
-        SL distance = base_ratio * |TP - entry|   (base_ratio = 0.5 reproduces the original rule)
-
-    'dynamic' mode: SL distance = ratio * TP distance, with
-        ratio = base_ratio * f_drift * f_accel * f_shock
-      1. f_drift = 1 + w_d * tanh(direction * μ * sqrt(W) / σ)
-         Horizon drift-to-noise. Drift in the trade direction raises the odds of reaching TP,
-         so the stop gets more room; adverse drift tightens it.
-      2. f_accel = 1 + w_a * tanh(direction * acceleration / δ)
-         Acceleration with the trade means momentum is building, so the stop gets more room;
-         acceleration against the trade (the Tier 2 reversal condition) tightens it.
-      3. f_shock = 1 + w_s * tanh(|r| / σ - 1)
-         Last bar return relative to typical volatility. A shock bar widens the stop to
-         avoid whipsaw; a quiet bar tightens it.
-      Then, in order:
-      4. Noise floor: SL distance >= noise_mult * entry * σ * sqrt(W), so the stop sits
-         outside the expected random move over the trade horizon.
-      5. Structural cap: SL never goes beyond the opposite channel barrier (x_min for longs,
-         x_max for shorts), where the signal's thesis is invalidated.
-      6. Ratio bounds: clip SL distance to [min_ratio, max_ratio] * TP distance. This step
-         has the final word, so reward-to-risk always stays in [1/max_ratio, 1/min_ratio].
-      Dynamic mode requires TP on the profitable side of entry; otherwise it returns None.
+    Use the channel barriers [x_min, x_max] directly as Take Profit and Stop Loss:
+      - Long  (direction ==  1): TP = x_max, SL = x_min
+      - Short (direction == -1): TP = x_min, SL = x_max
+    Requires entry_price to lie strictly between x_min and x_max (0 < x_min < entry_price < x_max).
     """
-    p = dict(DEFAULT_SL_PARAMS)
-    if params:
-        p.update(params)
-
-    if not np.isfinite(entry_price) or entry_price <= 0.0 or not np.isfinite(tp_price) or tp_price <= 0.0:
+    sl_price = x_min if direction == 1 else x_max
+    if (
+        not np.isfinite(entry_price) or entry_price <= 0.0
+        or not np.isfinite(tp_price) or tp_price <= 0.0
+        or not np.isfinite(sl_price) or sl_price <= 0.0
+    ):
         return None
 
     tp_dist = direction * (tp_price - entry_price)
-    if not np.isfinite(tp_dist) or tp_dist <= 0.0:
+    sl_dist = direction * (entry_price - sl_price)
+    if not np.isfinite(tp_dist) or tp_dist <= 0.0 or not np.isfinite(sl_dist) or sl_dist <= 0.0:
         return None
 
-    if p['mode'] == 'fixed':
-        sl_price = entry_price - direction * p['base_ratio'] * tp_dist
-        return sl_price if np.isfinite(sl_price) and sl_price > 0.0 else None
-
-    sigma_ok = np.isfinite(sigma) and sigma > 0.0
-    horizon = max(int(window_size), 1) if np.isfinite(window_size) else 1
-    sqrt_h = math.sqrt(horizon)
-
-    # 1. Horizon drift-to-noise alignment
-    f_drift = 1.0
-    if sigma_ok and np.isfinite(mu):
-        f_drift = 1.0 + p['drift_weight'] * math.tanh(direction * mu * sqrt_h / sigma)
-
-    # 2. Acceleration alignment, normalized by δ (fallback: one-bar expected price move)
-    f_accel = 1.0
-    accel_scale = delta if (np.isfinite(delta) and delta > 0.0) else (entry_price * sigma if sigma_ok else 0.0)
-    if accel_scale > 0.0 and np.isfinite(acceleration):
-        f_accel = 1.0 + p['accel_weight'] * math.tanh(direction * acceleration / accel_scale)
-
-    # 3. Last-bar return shock
-    f_shock = 1.0
-    if sigma_ok and np.isfinite(r):
-        f_shock = 1.0 + p['shock_weight'] * math.tanh(abs(r) / sigma - 1.0)
-
-    sl_dist = p['base_ratio'] * f_drift * f_accel * f_shock * tp_dist
-
-    # 4. Noise floor over trade horizon
-    if sigma_ok:
-        sl_dist = max(sl_dist, p['noise_mult'] * entry_price * sigma * sqrt_h)
-
-    # 5. Structural cap at the opposite channel barrier
-    opposite = x_min if direction == 1 else x_max
-    if np.isfinite(opposite):
-        struct_dist = direction * (entry_price - opposite)
-        if struct_dist > 0.0:
-            sl_dist = min(sl_dist, struct_dist)
-
-    # 6. Reward-to-risk bounds
-    sl_dist = float(np.clip(sl_dist, p['min_ratio'] * tp_dist, p['max_ratio'] * tp_dist))
-
-    sl_price = entry_price - direction * sl_dist
-    return sl_price if np.isfinite(sl_price) and sl_price > 0.0 else None
+    return float(sl_price)
 
 
 def evaluate_single_file(args_tuple):
@@ -841,6 +783,220 @@ def evaluate_single_file(args_tuple):
     }
 
 
+def extract_latest_signal_from_file(args_tuple):
+    filepath, sl_params, max_leverage, target_date = args_tuple
+    filepath = Path(filepath)
+    try:
+        df = pd.read_csv(filepath)
+    except Exception:
+        return None
+
+    if df.empty:
+        return None
+
+    df.columns = [str(c).strip().lower() for c in df.columns]
+    required_cols = {'timestamp', 'close', 'signal', 'window_size', 'x_min', 'x_max'}
+    if not required_cols.issubset(df.columns):
+        return None
+
+    df = df.sort_values('timestamp').reset_index(drop=True)
+    if df.empty:
+        return None
+
+    # Identify row t to inspect:
+    # If target_date is given (YYYY-MM-DD), find matching date; otherwise use latest session row (last index)
+    if target_date:
+        ts_str = df['timestamp'].astype(str)
+        matches = df[ts_str.str.startswith(target_date)]
+        if matches.empty:
+            return None
+        t = matches.index[-1]
+    else:
+        t = len(df) - 1
+
+    raw_sig = df.at[t, 'signal']
+    if pd.isna(raw_sig) or raw_sig not in [1, -1, 1.0, -1.0]:
+        return None
+
+    direction = int(raw_sig)
+    raw_window = df.at[t, 'window_size']
+    if pd.isna(raw_window) or int(raw_window) < 1:
+        return None
+    window_size = int(raw_window)
+
+    last_close = float(df.at[t, 'close'])
+    if not np.isfinite(last_close) or last_close <= 0.0:
+        return None
+
+    timestamp = str(df.at[t, 'timestamp'])
+    x_min_val = float(df.at[t, 'x_min'])
+    x_max_val = float(df.at[t, 'x_max'])
+
+    # Helper series for stop loss / leverage
+    deltas = ensure_delta_column(df).values
+    r_sq_s = ensure_r_squared_series(df)
+    accelerations = ensure_acceleration_series(df)
+    log_returns = ensure_log_return_series(df)
+    μ_s = df['μ'].astype(float).values if 'μ' in df.columns else np.zeros(len(df))
+    σ_s = df['σ'].astype(float).values if 'σ' in df.columns else np.ones(len(df)) * 0.01
+
+    delta = float(deltas[t])
+    μ = float(μ_s[t]) if t < len(μ_s) else float('nan')
+    σ = float(σ_s[t]) if t < len(σ_s) else float('nan')
+    r_sq = float(r_sq_s[t]) if t < len(r_sq_s) else float('nan')
+    r_val = float(log_returns[t]) if t < len(log_returns) else float('nan')
+    accel_val = float(accelerations[t]) if t < len(accelerations) else float('nan')
+
+    if not all(np.isfinite(v) for v in (last_close, x_min_val, x_max_val, delta, μ, σ, r_sq, r_val, accel_val)):
+        return None
+
+    # Overnight estimated entry price at close t (pre-open t + 1)
+    tp_price = x_max_val if direction == 1 else x_min_val
+    sl_price = compute_stop_loss(
+        direction=direction,
+        entry_price=last_close,
+        tp_price=tp_price,
+        mu=μ,
+        sigma=σ,
+        delta=delta,
+        window_size=window_size,
+        r=r_val,
+        x_min=x_min_val,
+        x_max=x_max_val,
+        acceleration=accel_val,
+        params=sl_params
+    )
+
+    if sl_price is None or not np.isfinite(tp_price) or tp_price <= 0.0:
+        return None
+
+    sl_dist = abs(last_close - sl_price)
+    tp_dist = abs(tp_price - last_close)
+    rr_ratio = round(tp_dist / sl_dist, 2) if (sl_dist > 0.0) else 0.0
+
+    leverage = compute_optimal_leverage(
+        direction=direction,
+        entry_price=last_close,
+        sl_price=sl_price,
+        x_min=x_min_val,
+        x_max=x_max_val,
+        delta=delta,
+        mu=μ,
+        sigma=σ,
+        r_sq=r_sq,
+        max_leverage=max_leverage
+    )
+
+    return {
+        'Symbol': filepath.stem,
+        'Timestamp': timestamp,
+        'Signal': 'BUY (LONG)' if direction == 1 else 'SELL (SHORT)',
+        'Close ($)': round(last_close, 4),
+        'TP ($)': round(tp_price, 4),
+        'SL ($)': round(sl_price, 4),
+        'R/R': rr_ratio,
+        'Leverage': f'{leverage}x',
+        'Horizon (Bars)': window_size,
+        'μ (%)': round(μ * 100.0, 3),
+        'σ (%)': round(σ * 100.0, 3),
+        'δ ($)': round(delta, 4)
+    }
+
+
+def notify_active_signals(csv_files, output_file, sl_params, max_leverage, target_date=None):
+    today_str = target_date if target_date else datetime.date.today().isoformat()
+    print(f"\n{'=' * 115}")
+    print(f"  ALPACA OVERNIGHT ACTIVE SIGNALS MONITOR — System Date: {today_str}")
+    print(f"{'=' * 115}")
+
+    try:
+        df_report = pd.read_csv(output_file)
+    except Exception:
+        df_report = pd.DataFrame()
+
+    report_map = {}
+    if not df_report.empty and 'Symbol' in df_report.columns:
+        for _, row in df_report.iterrows():
+            report_map[str(row['Symbol'])] = row
+
+    filtered_csv_files = [f for f in csv_files if f.stem in report_map]
+    if not filtered_csv_files:
+        print(f"\n[INFO] No evaluated symbols in {output_file} to scan for signals.\n")
+        print(f"{'=' * 115}\n")
+        return
+
+    task_args = [
+        (f, sl_params, max_leverage, target_date)
+        for f in filtered_csv_files
+    ]
+
+    with Pool(cpu_count()) as pool:
+        results = pool.map(extract_latest_signal_from_file, task_args)
+
+    raw_signals = [r for r in results if r is not None]
+    if not raw_signals:
+        print(f"\n[INFO] No active signals found for {today_str} across {len(filtered_csv_files)} symbols.\n")
+        print(f"{'=' * 115}\n")
+        return
+
+    # Filter to current system date (today_str) if present; otherwise use the latest session date in the dataset
+    for r in raw_signals:
+        r['_date'] = str(r['Timestamp'])[:10]
+
+    if target_date:
+        active_date = target_date
+        date_filtered = [r for r in raw_signals if r['_date'] == active_date]
+    else:
+        today_matches = [r for r in raw_signals if r['_date'] == today_str]
+        if today_matches:
+            active_date = today_str
+            date_filtered = today_matches
+        else:
+            active_date = max(r['_date'] for r in raw_signals)
+            date_filtered = [r for r in raw_signals if r['_date'] == active_date]
+            print(f"[NOTE] No bars dated {today_str} found in input CSVs; showing signals for latest session date: {active_date}")
+
+    active_signals = []
+    for r in date_filtered:
+        sym = r['Symbol']
+        perf = report_map.get(sym)
+        if perf is None:
+            continue
+        r['Hist Win (%)'] = pd.to_numeric(perf.get('Win Rate (%)', np.nan), errors='coerce')
+        r['Hist PF'] = pd.to_numeric(perf.get('Profit Factor', np.nan), errors='coerce')
+        r['Hist DD (%)'] = pd.to_numeric(perf.get('Max Drawdown (%)', np.nan), errors='coerce')
+        r['Hist Ret (%)'] = pd.to_numeric(perf.get('Return (%)', np.nan), errors='coerce')
+        r.pop('_date', None)
+        active_signals.append(r)
+
+    if not active_signals:
+        print(f"\n[INFO] No active signals generated on {active_date}.\n")
+        print(f"{'=' * 115}\n")
+        return
+
+    df_signals = pd.DataFrame(active_signals)
+    ordered_cols = [
+        'Symbol', 'Timestamp', 'Signal', 'Close ($)', 'TP ($)', 'SL ($)',
+        'R/R', 'Leverage', 'Horizon (Bars)', 'μ (%)', 'σ (%)', 'δ ($)',
+        'Hist Win (%)', 'Hist PF', 'Hist DD (%)', 'Hist Ret (%)'
+    ]
+    df_signals = df_signals[ordered_cols].replace([np.inf, -np.inf], np.nan).dropna()
+
+    if df_signals.empty:
+        print(f"\n[INFO] No valid non-NaN active signals generated on {active_date}.\n")
+        print(f"{'=' * 115}\n")
+        return
+
+    df_signals = df_signals.sort_values(
+        by=['Hist Ret (%)', 'Hist PF', 'R/R'],
+        ascending=[False, False, False]
+    ).reset_index(drop=True)
+
+    print(f"\nFound {len(df_signals)} active signal(s) on session date {active_date} for execution at next open (t + 1):\n")
+    print(df_signals.to_string(index=False))
+    print(f"\n{'=' * 115}\n")
+
+
 def process_alpaca_trades(args):
     input_path = Path(args.input_folder)
     if input_path.is_file():
@@ -850,8 +1006,6 @@ def process_alpaca_trades(args):
 
     if not csv_files:
         raise FileNotFoundError(f"No CSV files found in {args.input_folder}")
-
-    print(f"Simulating Alpaca US Equity/ETF trades across {len(csv_files)} files using {cpu_count()} CPU cores...")
 
     sl_params = {
         'mode': args.sl_mode,
@@ -863,6 +1017,8 @@ def process_alpaca_trades(args):
         'shock_weight': args.sl_shock_weight,
         'noise_mult': args.sl_noise_mult,
     }
+
+    print(f"Simulating Alpaca US Equity/ETF trades across {len(csv_files)} files using {cpu_count()} CPU cores...")
 
     task_args = [
         (
@@ -912,6 +1068,16 @@ def process_alpaca_trades(args):
     print(f"Saved {len(valid_records)} symbol records to {args.output_file}")
     print(df_results.head(20).to_string())
 
+    if args.notify_today:
+        target_date = args.notify_date if args.notify_date else None
+        notify_active_signals(
+            csv_files=csv_files,
+            output_file=args.output_file,
+            sl_params=sl_params,
+            max_leverage=args.max_leverage,
+            target_date=target_date
+        )
+
 
 def str2bool(val):
     if isinstance(val, bool):
@@ -929,6 +1095,8 @@ def parse_args():
     )
     parser.add_argument('input_folder', help='Folder containing input signal CSV files (or a single CSV file).')
     parser.add_argument('output_file', help='Path to write the trading performance summary CSV.')
+    parser.add_argument('--notify-today', '--notify-tody', dest='notify_today', action='store_true', help='Inspect the latest session row (at time t) across symbols and print all active trade signals to stdout.')
+    parser.add_argument('--notify-date', type=str, default=None, help='Optional specific date (YYYY-MM-DD) to inspect for signals when using --notify-today. If omitted, uses the latest row available.')
     parser.add_argument('--initial-capital', type=float, default=10000.0, help='Initial account capital in USD (default: 10000.0).')
     parser.add_argument('--risk-pct', type=float, default=0.01, help='Base fraction of capital risked per trade at stop loss (default: 0.01 = 1%%).')
     parser.add_argument('--max-position-pct', type=float, default=0.25, help='Base maximum fraction of capital allocated to a single position (default: 0.25 = 25%%).')
@@ -962,7 +1130,8 @@ def parse_args():
     parser.add_argument('--sl-accel-weight', type=float, default=sl['accel_weight'], help='Dynamic mode: weight of acceleration/δ alignment factor (default: %(default)s).')
     parser.add_argument('--sl-shock-weight', type=float, default=sl['shock_weight'], help='Dynamic mode: weight of last-bar |r|/σ shock factor (default: %(default)s).')
     parser.add_argument('--sl-noise-mult', type=float, default=sl['noise_mult'], help='Dynamic mode: SL floor as multiple of entry·σ·sqrt(W) (default: %(default)s).')
-    return parser.parse_args()
+    args = parser.parse_args()
+    return args
 
 
 if __name__ == '__main__':

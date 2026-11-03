@@ -4,16 +4,18 @@
 #include <unordered_map>
 #include <string>
 #include "events/SignalEvent.h"
+#include "timeseries/timeseries.h"
 #include <vector>
 
 using namespace std;
 using namespace events;
+using namespace timeseries;
 
 /* 
     [
         {
-            "timestamp": "2001-12-31T00:00:00.00"
-            {
+            "timestamp": "2001-12-31T00:00:00.00",
+            "entries": {
                 "AAPL": {
                     "generator_a": {
                         "filter_a":{
@@ -75,7 +77,10 @@ using namespace events;
     ]
 */
 namespace cli {
-    
+    class EnsembleEntry {
+        sys_seconds timestamp;
+        unordered_map</* symbol */ string, unordered_map</* generator */ string, unordered_map</* filter */ string, Signal>>> entries;
+    };
     int ensemble(int argc, char * argv[]);
 }
 #endif

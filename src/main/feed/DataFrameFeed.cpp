@@ -31,7 +31,7 @@ namespace feed {
         (void)records_loaded;
     }
 
-    void DataFrameFeed::process_dataframes(MarketEventHandler market_event_handler_){
+    void DataFrameFeed::process_dataframes(MarketEventHandler market_event_handler_) const{
         bool has_records = true;
         auto symbols(views::keys(dataframes_));
 

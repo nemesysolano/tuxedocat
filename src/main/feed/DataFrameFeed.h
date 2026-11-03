@@ -33,7 +33,7 @@ namespace feed {
             DataFrameFeed& operator=(const DataFrameFeed&) = delete;
             DataFrameFeed(DataFrameFeed&&) noexcept = default;
             DataFrameFeed& operator=(DataFrameFeed&&) noexcept = default;
-            void process_dataframes(MarketEventHandler market_event_handler_);
+            void process_dataframes(MarketEventHandler market_event_handler_) const;
             
             inline const std::vector<std::string> & symbols() const { return symbols_; }
             inline const std::expected<std::reference_wrapper<const dataframe::DataFrame>, TuxedoError> dataframe(const std::string & symbol) const {
