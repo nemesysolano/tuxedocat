@@ -11,10 +11,11 @@
 #include "process/ThreadPool.h"
 #include "utils/names.h"
 #include "nanodbc/nanodbc.h"
-
+#include "process/ThreadPool.h"
 using namespace std;
 using namespace events;
 using namespace dataframe;
+using namespace process;
 
 namespace feed {
     vector<reference_wrapper<const string>> EXPECTED_COLUMN_NAMES({
@@ -151,6 +152,29 @@ namespace feed {
         unordered_map<string, unique_ptr<DataFrame>> dataframes;
         dataframes.emplace(symbol, std::make_unique<DataFrame>(std::move(dataframe_result.value())));
         return DataFrameFeed(std::move(dataframes));
+    }
+
+    unordered_map<string, DataFrameFeed> DataFrameFeed::CreateBatch(ODBCDataSource & datasource, ThreadPool & thread_pool) {
+        vector<string> symbols = fetch_symbols(datasource);
+        vector<future<pair<string,expected<DataFrameFeed, TuxedoError>>>> feed_result_futures;
+        unordered_map<string, DataFrameFeed> feed;
+
+         for(const string & symbol: symbols) { 
+           feed_result_futures.emplace_back(thread_pool.enqueue([&datasource, symbol] (){
+                return pair<string, expected<DataFrameFeed, TuxedoError>>(symbol,DataFrameFeed::Create(datasource, symbol));
+           }));
+            
+        }
+
+        for(future<pair<string, expected<DataFrameFeed, TuxedoError>>> & feed_result_future: feed_result_futures) {// 36,992.00// 809-338-2050
+           auto [symbol, dataframe_feed_result] = feed_result_future.get();
+           if(dataframe_feed_result.has_value()) {
+               feed.emplace(std::move(symbol), std::move(dataframe_feed_result.value()));
+            }
+                        
+         }
+
+         return feed;
     }
 
     expected<DataFrameFeed,TuxedoError> DataFrameFeed::Create(const vector<string> file_paths) {

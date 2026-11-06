@@ -12,6 +12,9 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "process/ThreadPool.h"
+using namespace process;
+using namespace dataframe;
 
 namespace feed {
     class DataFrameFeed;
@@ -49,6 +52,7 @@ namespace feed {
             static std::expected<DataFrameFeed, TuxedoError> Create(const std::vector<std::string> file_paths);
             static std::expected<DataFrameFeed, TuxedoError> Create(dataframe::ODBCDataSource & datasource);
             static std::expected<DataFrameFeed, TuxedoError> Create(dataframe::ODBCDataSource & datasource, const std::string & symbol);
+            static unordered_map<string, DataFrameFeed> CreateBatch(ODBCDataSource & datasource, ThreadPool & thread_pool);
     };
 }
 #endif

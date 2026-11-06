@@ -4,4 +4,6 @@ obj/*
 !obj/.gitignore
 **/._*
 pydevs/*
-documents/results/*.csv
+/results/*.csv
+/results/ensemble/ 
+data/*.csv

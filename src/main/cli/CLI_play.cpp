@@ -34,9 +34,6 @@ using namespace filter;
 using namespace process;
 
 namespace cli {
-    unique_ptr<Generator> strategy_factory(const string & name);
-    unique_ptr<Filter> portfolio_factory(const string & name);
-
     const int PLAY_MIN_ARGC = 8;
     const int PLAY_STRATEGY_ARG = 2;
     const int PLAY_PORTFOLIO_ARG = 3;
@@ -44,20 +41,6 @@ namespace cli {
     const int PLAY_UID_ARG = 5;
     const int PLAY_PWD_ARG = 6;
     const int PLAY_OUT_DIR_ARG = 7;
-    
-    const string PLAY_SMALL_CAPS_STRATEGY("normalized-z");
-    const string PLAY_ESTIMATED_STDEV_STRATEGY("estimated-stdev");
-    const string PLAY_LOG_VARIANCE_STRATEGY("log-variance");
-
-    const string PLAY_GAUSSIAN_FILTER("gaussian"); //
-    const string PLAY_HYPERBOLIC_FILTER("hyperbolic"); // 
-    const string PLAY_MERTON_JUMP("merton-jump"); 
-    const string PLAY_EXTREME_VALUE("extreme-value");
-    const string PLAY_STUDENT_T("student");
-    const string PLAY_VARIANCE_GAMMA("variance-gamma");
-    
-    const set<string> strategies_names({PLAY_SMALL_CAPS_STRATEGY, PLAY_ESTIMATED_STDEV_STRATEGY, PLAY_LOG_VARIANCE_STRATEGY});
-    const set<string> portfolio_names({PLAY_GAUSSIAN_FILTER, PLAY_HYPERBOLIC_FILTER, PLAY_MERTON_JUMP, PLAY_EXTREME_VALUE, PLAY_STUDENT_T, PLAY_VARIANCE_GAMMA});
 
     template<typename MapA, typename MapB>void assert_equals(const MapA & a, const MapB & b) {
         assert(a.size() == b.size());
@@ -79,35 +62,6 @@ namespace cli {
                 assert(bar_a.volume() == bar_b.volume());
             }
         }
-    }
-
-    unique_ptr<Generator> strategy_factory(const string & name) {
-        if(name == PLAY_SMALL_CAPS_STRATEGY) {
-            return make_unique<NormalizedZGenerator>();
-        }else if (name == PLAY_ESTIMATED_STDEV_STRATEGY) {
-            return make_unique<EstimatedDevGenerator>();
-        }else if (name == PLAY_LOG_VARIANCE_STRATEGY) {
-            return make_unique<LogVarianceGenerator>();
-        }
-
-        return nullptr;
-    }
-
-    unique_ptr<Filter> portfolio_factory(const string & name){
-        if(name == PLAY_GAUSSIAN_FILTER) {
-            return make_unique<DynamicGaussianEnvelope>();
-        } else if (name == PLAY_HYPERBOLIC_FILTER) {
-            return make_unique<GeneralizedHyperbolicWave>();
-        } else if (name == PLAY_MERTON_JUMP) {
-            return make_unique<MertonJumpDiffusion>();
-        } else if (name == PLAY_EXTREME_VALUE) {
-            return make_unique<ExtremeValue>();
-        } else if (name == PLAY_STUDENT_T) {
-            return make_unique<Student>();
-        }else if (name == PLAY_VARIANCE_GAMMA) {
-            return make_unique<VarianceGamma>();
-        }
-        return nullptr;
     }
 
    void print_journal(
@@ -136,15 +90,15 @@ namespace cli {
                     pair.first.low_price(),
                     pair.first.close_price(),
                     pair.first.volume(),
-                    pair.second.get().μ(),
-                    pair.second.get().σ(),
-                    pair.second.get().δ(),
-                    std::to_underlying(pair.second.get().direction()),
-                    pair.second.get().window_size(),
-                    pair.second.get().r(),
-                    pair.second.get().x_min(),
-                    pair.second.get().x_max(),
-                    pair.second.get().a()
+                    pair.second.μ(),
+                    pair.second.σ(),
+                    pair.second.δ(),
+                    std::to_underlying(pair.second.direction()),
+                    pair.second.window_size(),
+                    pair.second.r(),
+                    pair.second.x_min(),
+                    pair.second.x_max(),
+                    pair.second.a()
                 ) << endl;                
             }
         }
@@ -159,12 +113,12 @@ namespace cli {
             return false;
         }
         
-        unique_ptr<Generator> strategy(strategy_factory(strategy_name));
-        unique_ptr<Filter> portfolio(portfolio_factory(portfolio_name));
+        unique_ptr<Generator> generator(generator_factory(strategy_name));
+        unique_ptr<Filter> portfolio(filter_factory(portfolio_name));
         vector<Signal> signals;        
         vector<string> files({input_file});
 
-        auto market_event_handler_test_impl = [&strategy, &portfolio, &signals](
+        auto market_event_handler_test_impl = [&generator, &portfolio, &signals](
             unique_ptr<MarketEvent> market_event,
             const DataFrameFeed & dataframe_feed,
             const unordered_map<string, std::size_t> & records_loaded
@@ -172,7 +126,7 @@ namespace cli {
             (void)dataframe_feed;
             (void)records_loaded;
             portfolio->process_market_event(*market_event);
-            unique_ptr<SignalEvent> strategy_response(strategy->process_market(*market_event));
+            unique_ptr<SignalEvent> strategy_response(generator->process_market(*market_event));
 
             if (!strategy_response || strategy_response->event_type != EventType::SIGNAL) {
                 log_error_message("Market event did not produce a valid signal event.");
@@ -199,6 +153,32 @@ namespace cli {
         return true;
     }
 
+    vector<Signal> play(const DataFrameFeed & dataframe_feed, const string & symbol, Generator & generator, Filter & filter) {
+        vector<Signal> signals;
+
+        auto market_event_handler_test_impl = [&generator, &filter, &signals](
+            unique_ptr<MarketEvent> market_event,
+            const DataFrameFeed & dataframe_feed,
+            const unordered_map<string, std::size_t> & records_loaded
+        ) {
+            (void)dataframe_feed;
+            (void)records_loaded;
+            filter.process_market_event(*market_event);
+            unique_ptr<SignalEvent> strategy_response(generator.process_market(*market_event));
+
+            if (!strategy_response || strategy_response->event_type != EventType::SIGNAL) {
+                log_error_message("Market event did not produce a valid signal event.");
+                signals.clear();
+                return;
+            }
+            const SignalEvent & signal_event = static_cast<const SignalEvent &>(*strategy_response.get());
+            signals.append_range(filter.process_signals(signal_event.signals()));
+        };
+
+        dataframe_feed.process_dataframes(market_event_handler_test_impl);
+        return signals;
+    }
+
     bool play(dataframe::ODBCDataSource & datasource, const string & symbol, const string & strategy_name, const string & portfolio_name, const string & output_directory) {
         const string output_file = (filesystem::path(output_directory) / format("{}.csv", symbol)).string();
         ofstream out(output_file);
@@ -207,28 +187,8 @@ namespace cli {
             return false;
         }
 
-        unique_ptr<Generator> strategy(strategy_factory(strategy_name));
-        unique_ptr<Filter> portfolio(portfolio_factory(portfolio_name));
-        vector<Signal> signals;
-
-        auto market_event_handler_test_impl = [&strategy, &portfolio, &signals](
-            unique_ptr<MarketEvent> market_event,
-            const DataFrameFeed & dataframe_feed,
-            const unordered_map<string, std::size_t> & records_loaded
-        ) {
-            (void)dataframe_feed;
-            (void)records_loaded;
-            portfolio->process_market_event(*market_event);
-            unique_ptr<SignalEvent> strategy_response(strategy->process_market(*market_event));
-
-            if (!strategy_response || strategy_response->event_type != EventType::SIGNAL) {
-                log_error_message("Market event did not produce a valid signal event.");
-                return;
-            }
-            const SignalEvent & signal_event = static_cast<const SignalEvent &>(*strategy_response.get());
-            signals.append_range(portfolio->process_signals(signal_event.signals()));
-        };
-
+        unique_ptr<Generator> generator(generator_factory(strategy_name));
+        unique_ptr<Filter> filter(filter_factory(portfolio_name));
         auto dataframe_feed_result = DataFrameFeed::Create(datasource, symbol);
 
         if(!dataframe_feed_result.has_value()) {
@@ -236,9 +196,13 @@ namespace cli {
             return false;
         }
 
-        auto & dataframe_feed = dataframe_feed_result.value();
+        const DataFrameFeed & dataframe_feed = dataframe_feed_result.value();
+        vector<Signal> signals = play(dataframe_feed, symbol, *generator, *filter);
 
-        dataframe_feed.process_dataframes(market_event_handler_test_impl);
+        if(signals.size() == 0) {            
+            return false;
+        }
+
         print_journal(out, signals, dataframe_feed);
 
         out.flush();
@@ -257,14 +221,14 @@ namespace cli {
         } // <dsn> <uid> <pwd>
 
         string strategy_name(argv[PLAY_STRATEGY_ARG]);
-        if(!strategies_names.contains(strategy_name)) {
+        if(!generator_names.contains(strategy_name)) {
             log_error_message(std::format("'{}' is not a valid strategy name.", strategy_name));
             return -2;                
         }
 
-        string portfolio_name(argv[PLAY_PORTFOLIO_ARG]);
-        if(!portfolio_names.contains(portfolio_name)) {
-            log_error_message(std::format("'{}' is not a valid portfolio name.", portfolio_name));
+        string filter_name(argv[PLAY_PORTFOLIO_ARG]);
+        if(!filter_names.contains(filter_name)) {
+            log_error_message(std::format("'{}' is not a valid portfolio name.", filter_name));
             return -3;
         }
 
@@ -290,8 +254,8 @@ namespace cli {
         futures.reserve(symbols.size());
         for(const string & symbol: symbols) {
             futures.emplace_back(threa_pool.enqueue(
-                [&datasource, symbol, strategy_name, portfolio_name, output_directory]() {
-                    return play(datasource, symbol, strategy_name, portfolio_name, output_directory);
+                [&datasource, symbol, strategy_name, filter_name, output_directory]() {
+                    return play(datasource, symbol, strategy_name, filter_name, output_directory);
                 }
             ));
         }

@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+function prepare_folder {
+    FOLDER=$1
+    if [ ! -d "${FOLDER}"  ];
+    then
+        mkdir -p "$FOLDER"
+    else
+        rm -rf "${FOLDER}/*"
+    fi    
+}
+
+SCRIPT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )"
+GENERATORS=("normalized-z" "estimated-stdev" "log-variance")
+FILTERS=("gaussian" "hyperbolic" "merton-jump" "extreme-value" "student" "variance-gamma")
+ENSEMBLE_FOLDER=$(realpath "${SCRIPT_DIR}/../results/ensemble")
+TOOLCHAIN_FOLDER=$(realpath "${SCRIPT_DIR}/../toolchain")
+BIN_FOLDER=$(realpath "${SCRIPT_DIR}/../bin")
+
+GENERATE_INPUT=false
+
+case "${1:-}" in
+    --generate-input=*)
+        GENERATE_INPUT="${1#*=}"
+        shift
+        ;;
+    --generate-input)
+        GENERATE_INPUT=true
+        shift
+        ;;
+esac
+
+if [ "${GENERATE_INPUT}" = "true" ]; then
+    prepare_folder "$ENSEMBLE_FOLDER"
+
+    for GENERATOR in "${GENERATORS[@]}"; do
+        for FILTER in "${FILTERS[@]}"; do
+            OUTPUT_FOLDER="${ENSEMBLE_FOLDER}/${GENERATOR}/${FILTER}"
+            prepare_folder "$OUTPUT_FOLDER"
+            "${BIN_FOLDER}/tuxedocat" play "${GENERATOR}" "${FILTER}" "${ENSEMBLE_DSN}" "${ENSEMBLE_UID}" "${ENSEMBLE_PWD}" "$OUTPUT_FOLDER"
+            echo "Generated ensemble info ${GENERATOR} ${FILTER}"
+        done
+    done
+fi
+
+python3 "${TOOLCHAIN_FOLDER}/ensemble.py" "$@"
+    
