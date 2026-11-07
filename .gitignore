@@ -6,4 +6,3 @@ obj/*
 pydevs/*
 /results/*.csv
 /results/ensemble/ 
-data/*.csv
