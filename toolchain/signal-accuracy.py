@@ -156,8 +156,17 @@ def evaluate_symbol_task(task_args):
 
     hit_rate = (hits / evaluations) * 100.0 if evaluations > 0 else 0.0
 
+    # Determine if symbol hasn't crashed yet (e.g. is still tradable)
+    is_tradable = False
+    if pd.notna(latest_direction) and pd.notna(latest_x_min) and pd.notna(latest_x_max):
+        last_close = float(df['close'].iloc[-1]) if 'close' in df.columns and len(df) > 0 else np.nan
+        if pd.notna(last_close):
+            is_tradable = (latest_x_min < last_close < latest_x_max)
+
+    symbol_display = f"{symbol} ✅" if is_tradable else f"{symbol} 💀"
+
     return {
-        'Symbol': symbol,
+        'Symbol': symbol_display,
         'Best Generator': best_gen,
         'Best Filter': best_fil,
         'Evaluations': evaluations,
@@ -269,7 +278,11 @@ def process_signal_accuracy(ensemble_output, output_file, input_dir=None, worker
     df_results.to_csv(output_path, index=False)
 
     print(f"Saved {len(valid_records)} records to {output_file}")
-    print(df_results.head(20).to_string(index=False))
+    df_preview = df_results.head(20).copy()
+    if "timestamp" in df_preview.columns and not df_preview.empty:
+        max_ts_len = max(int(df_preview["timestamp"].astype(str).map(len).max()), len("timestamp"))
+        df_preview = df_preview.rename(columns={"timestamp": "timestamp".ljust(max_ts_len)})
+    print(df_preview.to_string(index=False))
 
 
 def parse_args():
