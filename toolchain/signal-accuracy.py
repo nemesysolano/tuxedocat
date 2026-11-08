@@ -105,10 +105,20 @@ def evaluate_symbol_task(task_args):
     long_hits = 0
     short_hits = 0
 
+    latest_timestamp = None
+    latest_direction = None
+    latest_x_min = np.nan
+    latest_x_max = np.nan
+
     for t in range(n_bars):
         sig = signals[t]
         if pd.isna(sig) or sig not in (1, -1, 1.0, -1.0):
             continue
+
+        latest_timestamp = str(df.at[t, 'timestamp'])
+        latest_direction = int(sig)
+        latest_x_min = round(float(x_mins[t]), 4) if pd.notna(x_mins[t]) else np.nan
+        latest_x_max = round(float(x_maxs[t]), 4) if pd.notna(x_maxs[t]) else np.nan
 
         if t + 1 >= n_bars:
             continue
@@ -156,10 +166,14 @@ def evaluate_symbol_task(task_args):
         'Short Hits': short_hits,
         'Misses': misses,
         'Hit Rate': round(hit_rate, 2),
+        'timestamp': latest_timestamp,
+        'direction': latest_direction,
+        'x_min': latest_x_min,
+        'x_max': latest_x_max,
     }
 
 
-def process_signal_accuracy(ensemble_output, output_file, input_dir=None, workers=None):
+def process_signal_accuracy(ensemble_output, output_file, input_dir=None, workers=None, sort="hit-rate", sort_order="desc"):
     ensemble_output_path = Path(ensemble_output)
     if not ensemble_output_path.is_file():
         raise FileNotFoundError(f"Ensemble output file not found: {ensemble_output}")
@@ -223,11 +237,34 @@ def process_signal_accuracy(ensemble_output, output_file, input_dir=None, worker
 
     df_results = pd.DataFrame(valid_records)
 
-    # Sort by Hit Rate (descending), then Evaluations (descending)
-    df_results = df_results.sort_values(
-        by=["Hit Rate", "Evaluations"],
-        ascending=[False, False]
-    ).reset_index(drop=True)
+    # Sort results according to --sort and --sort-order
+    is_ascending = (str(sort_order).strip().lower() == "asc")
+    if sort == "timestamp":
+        df_results["_ts_sort"] = pd.to_datetime(df_results["timestamp"], errors="coerce")
+        df_results = df_results.sort_values(
+            by=["_ts_sort", "Hit Rate"],
+            ascending=[is_ascending, False],
+            na_position="last",
+        ).drop(columns=["_ts_sort"]).reset_index(drop=True)
+    else:
+        df_results = df_results.sort_values(
+            by=["Hit Rate", "Evaluations"],
+            ascending=[is_ascending, False],
+            na_position="last",
+        ).reset_index(drop=True)
+
+    # Ensure the selected --sort column is placed to the left of the other non-selected column
+    selected_col = "timestamp" if sort == "timestamp" else "Hit Rate"
+    unselected_col = "Hit Rate" if sort == "timestamp" else "timestamp"
+    cols = list(df_results.columns)
+    if selected_col in cols and unselected_col in cols:
+        sel_idx = cols.index(selected_col)
+        unsel_idx = cols.index(unselected_col)
+        if sel_idx > unsel_idx:
+            cols.remove(selected_col)
+            new_unsel_idx = cols.index(unselected_col)
+            cols.insert(new_unsel_idx, selected_col)
+            df_results = df_results[cols]
 
     df_results.to_csv(output_path, index=False)
 
@@ -260,6 +297,18 @@ def parse_args():
         default=None,
         help="Number of parallel worker processes (default: all CPUs)."
     )
+    parser.add_argument(
+        "--sort",
+        choices=["hit-rate", "timestamp"],
+        default="hit-rate",
+        help="Field to sort results by ('hit-rate' or 'timestamp', default: hit-rate).",
+    )
+    parser.add_argument(
+        "--sort-order",
+        choices=["asc", "desc"],
+        default="desc",
+        help="Sort order for the field specified by --sort ('asc' or 'desc', default: desc).",
+    )
     return parser.parse_args()
 
 
@@ -270,6 +319,8 @@ if __name__ == '__main__':
         output_file=args.output_file,
         input_dir=args.input_dir,
         workers=args.workers,
+        sort=args.sort,
+        sort_order=args.sort_order,
     )
 
 # μ: average of log return at time $t-1$
