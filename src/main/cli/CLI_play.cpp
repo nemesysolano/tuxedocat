@@ -81,6 +81,23 @@ namespace cli {
                     first = false;
                     continue;
                 }
+
+                //TODO: Target calculations must be relocated inside a function
+                double M = (pair.second.x_min() + pair.second.x_max()) / 2.0; // Assumption: x_min and x_max are both positive
+                double last_close = pair.first.close_price();
+                double x_min = pair.second.x_min();
+                double x_max = pair.second.x_max();
+                double d_min = std::abs(last_close - x_min);
+                double d_max = std::abs(x_max - last_close);
+                double distance = (std::min(d_min, d_max) + ((d_min + d_max) / 2.0)) / 2.0;
+                double δ = pair.second.δ();
+                double delta_ratio = (M > 0.0 ? δ / M : 0.0);
+                SignalDirection direction = pair.second.direction();
+                double x_min_adjusted = x_min - (direction == SignalDirection::SHORT ? distance * (1.0 + delta_ratio) : distance);
+                double x_max_adjusted = x_max + (direction == SignalDirection::LONG  ? distance * (1.0 + delta_ratio) : distance);
+                SignalDirection direction_adjusted = (x_min_adjusted < x_max_adjusted) && (last_close > x_min_adjusted && last_close < x_max_adjusted) ? direction : SignalDirection::IDLE;
+                //END-TODO
+                
                 output << format(
                     "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
                     pair.first.symbol(),
@@ -93,11 +110,11 @@ namespace cli {
                     pair.second.μ(),
                     pair.second.σ(),
                     pair.second.δ(),
-                    std::to_underlying(pair.second.direction()),
+                    to_underlying(direction_adjusted),
                     pair.second.window_size(),
                     pair.second.r(),
-                    pair.second.x_min(),
-                    pair.second.x_max(),
+                    x_min_adjusted,
+                    x_max_adjusted,
                     pair.second.a()
                 ) << endl;                
             }
