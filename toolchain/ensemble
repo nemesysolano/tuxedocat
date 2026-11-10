@@ -16,6 +16,7 @@ FILTERS=("gaussian" "hyperbolic" "merton-jump" "extreme-value" "student" "varian
 ENSEMBLE_FOLDER=$(realpath "${SCRIPT_DIR}/../results/ensemble")
 TOOLCHAIN_FOLDER=$(realpath "${SCRIPT_DIR}/../toolchain")
 BIN_FOLDER=$(realpath "${SCRIPT_DIR}/../bin")
+SIGNALS_FOLDER=$(realpath "${SCRIPT_DIR}/../results/signals")
 
 GENERATE_INPUT=false
 
@@ -43,5 +44,5 @@ if [ "${GENERATE_INPUT}" = "true" ]; then
     done
 fi
 
-python3 "${TOOLCHAIN_FOLDER}/ensemble.py" "$@"
+python "${TOOLCHAIN_FOLDER}/ensemble.py" "$@"
     
