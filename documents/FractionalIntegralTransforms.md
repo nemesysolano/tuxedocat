@@ -42,7 +42,9 @@ The normalized Hermite-Gaussian functions $h_n(x)$ are eigenfunctions of the fra
 $\mathcal{F}_θ[h_n](x) = e^{inθ} h_n(x), \quad n \in \mathbb{N}_0$
 
 where:
-$h_n(x) = \frac{e^{-x^2/2}}{\pi^{1/4} \sqrt{2^n n!}} H_n(x)$ and $H_n(x)$ is the $n$-th Hermite polynomial.
+$h_n(x) = \frac{e^{-x^2/2}}{π^{1/4} \sqrt{2^n n!}} H_n(x)$ and
+
+$H_n(x) = n! \sum\limits_{m=0}^{⌊n/2⌋} \frac{(-1)^m}{m!\,(n - 2m)!} (2x)^{n - 2m} = (-1)^n e^{x^2} \frac{d^n}{dx^n}(e^{-x^2})$ is the $n$-th Hermite polynomial (in explicit closed-form and Rodrigues' formula representations).
 
 
 #### Additivity ####
@@ -71,18 +73,18 @@ where the power $n$ denotes $n$ successive applications of the operator $\left( 
 
 Let
 
-$$\tilde{f}(t) = f(t) e^{-i a(θ) t^2}, \quad \tilde{g}(t) = g(t) e^{-i a(θ) t^2}$$
+$\tilde{f}(t) = f(t) e^{-i a(θ) t^2}, \quad \tilde{g}(t) = g(t) e^{-i a(θ) t^2}$
 
-The fractional convolution of order $θ$, denoted by $(f *_\theta g)(t)$, is defined as:
+The fractional convolution of order $θ$, denoted by $(f * g)(t)$, is defined as:
 
-$$h(t) = (f *_\theta g)(t) = d(θ) e^{i a(θ) t^2} (\tilde{f} * \tilde{g})(t)$$
+$h(t) = (f * g)(t) = d(θ) e^{i a(θ) t^2} (\tilde{f} * \tilde{g})(t)$
 
-where $*$ denotes the standard classical convolution $(\tilde{f} * \tilde{g})(t) = \int_{\mathbb{R}} \tilde{f}(\tau) \tilde{g}(t - \tau) \, d\tau$.
+where $*$ denotes the standard classical convolution $(\tilde{f} * \tilde{g})(t) = \int_{\mathbb{R}} \tilde{f}(τ) \tilde{g}(t - τ) \, dτ$.
 
 Then the fractional Fourier transform of $h(t)$ satisfies:
 
-$$e^{-i a(θ) x^2} \hat{\mathcal{H}}_θ(x) = \sqrt{2\pi} \hat{\mathcal{F}}_θ(x) \hat{\mathcal{G}}_θ(x)$$
+$e^{-i a(θ) x^2} \hat{\mathcal{H}}_θ(x) = \sqrt{2π} \hat{\mathcal{F}}_θ(x) \hat{\mathcal{G}}_θ(x)$
 
 or equivalently:
 
-$$\hat{\mathcal{H}}_θ(x) = \sqrt{2\pi} e^{i a(θ) x^2} \hat{\mathcal{F}}_θ(x) \hat{\mathcal{G}}_θ(x)$$
+$\hat{\mathcal{H}}_θ(x) = \sqrt{2π} e^{i a(θ) x^2} \hat{\mathcal{F}}_θ(x) \hat{\mathcal{G}}_θ(x)$

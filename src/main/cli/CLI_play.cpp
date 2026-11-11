@@ -93,8 +93,8 @@ namespace cli {
                 double δ = pair.second.δ();
                 double delta_ratio = (M > 0.0 ? δ / M : 0.0);
                 SignalDirection direction = pair.second.direction();
-                double x_min_adjusted = x_min - (direction == SignalDirection::SHORT ? distance * (1.0 + delta_ratio) : distance);
-                double x_max_adjusted = x_max + (direction == SignalDirection::LONG  ? distance * (1.0 + delta_ratio) : distance);
+                double x_min_adjusted = pair.first.close_price() - (direction == SignalDirection::SHORT ? distance * (1.0 + delta_ratio) : distance);
+                double x_max_adjusted = pair.first.close_price() + (direction == SignalDirection::LONG  ? distance * (1.0 + delta_ratio) : distance);
                 SignalDirection direction_adjusted = (x_min_adjusted < x_max_adjusted) && (last_close > x_min_adjusted && last_close < x_max_adjusted) ? direction : SignalDirection::IDLE;
                 //END-TODO
                 

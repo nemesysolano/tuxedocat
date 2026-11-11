@@ -183,13 +183,13 @@ def compute_alpaca_fees_and_costs(
     }
 
 
-def compute_barriers(direction: int, entry_price: float, x_min: float, x_max: float, delta: float):
+def compute_barriers(direction: int, last_close: float, x_min: float, x_max: float, delta: float):
     """
     Long entry:  take_profit = x_max + δ, stop_loss = x_min
     Short entry: take_profit = x_min - δ, stop_loss = x_max
     """
     if (
-        not np.isfinite(entry_price) or entry_price <= 0.0
+        not np.isfinite(last_close) or last_close <= 0.0
         or not np.isfinite(x_min) or x_min <= 0.0
         or not np.isfinite(x_max) or x_max <= 0.0
         or not np.isfinite(delta) or delta < 0.0
@@ -206,8 +206,8 @@ def compute_barriers(direction: int, entry_price: float, x_min: float, x_max: fl
     if not np.isfinite(tp_price) or tp_price <= 0.0 or not np.isfinite(sl_price) or sl_price <= 0.0:
         return None, None
 
-    tp_dist = direction * (tp_price - entry_price)
-    sl_dist = direction * (entry_price - sl_price)
+    tp_dist = direction * (tp_price - last_close)
+    sl_dist = direction * (last_close - sl_price)
     if tp_dist <= 0.0 or sl_dist <= 0.0:
         return None, None
 
@@ -380,7 +380,7 @@ def load_symbol_ensemble_data(symbol_entries):
 
 def select_best_candidate_at_bar(
     candidates,
-    entry_price: float,
+    last_close: float,
     capital: float,
 ):
     """
@@ -410,15 +410,15 @@ def select_best_candidate_at_bar(
         r_sq = cand["r_sq"]
         window_size = cand["window_size"]
 
-        tp_price, sl_price = compute_barriers(direction, entry_price, x_min_val, x_max_val, delta)
+        tp_price, sl_price = compute_barriers(direction, last_close, x_min_val, x_max_val, delta)
         if tp_price is None or sl_price is None:
             skipped += 1
             continue
 
-        sl_distance = abs(entry_price - sl_price)
+        sl_distance = abs(last_close - sl_price)
         leverage = compute_optimal_leverage(
             direction=direction,
-            entry_price=entry_price,
+            entry_price=last_close,
             sl_price=sl_price,
             tp_price=tp_price,
             x_min=x_min_val,
@@ -432,7 +432,7 @@ def select_best_candidate_at_bar(
 
         risk_budget = capital * RISK_PCT * leverage
         desired_shares = risk_budget / sl_distance
-        max_shares_by_capital = (capital * MAX_POSITION_PCT * leverage) / entry_price
+        max_shares_by_capital = (capital * MAX_POSITION_PCT * leverage) / last_close
         shares = float(math.floor(min(desired_shares, max_shares_by_capital)))
         if shares < 1.0:
             skipped += 1
@@ -440,10 +440,10 @@ def select_best_candidate_at_bar(
 
         est_exit_price = tp_price
         unit_fee_info = compute_alpaca_fees_and_costs(
-            shares=1.0, entry_price=entry_price, exit_price=est_exit_price, direction=direction
+            shares=1.0, entry_price=last_close, exit_price=est_exit_price, direction=direction
         )
         pos_fee_info = compute_alpaca_fees_and_costs(
-            shares=shares, entry_price=entry_price, exit_price=est_exit_price, direction=direction
+            shares=shares, entry_price=last_close, exit_price=est_exit_price, direction=direction
         )
         required_min_delta = max(unit_fee_info["per_share_cost"], pos_fee_info["per_share_cost"])
         if delta < required_min_delta:
@@ -455,7 +455,7 @@ def select_best_candidate_at_bar(
 
         score = score_signal_candidate(
             direction=direction,
-            entry_price=entry_price,
+            entry_price=last_close,
             tp_price=tp_price,
             sl_price=sl_price,
             x_min=x_min_val,
@@ -582,19 +582,23 @@ def evaluate_symbol_task(task_tuple):
         if capital <= 0.0:
             break
 
+        decision_price = float(closes[t])
+        if not np.isfinite(decision_price) or decision_price <= 0.0:
+            continue
+
+        candidates = signals_by_bar[t]
+        best_cand, skipped_count = select_best_candidate_at_bar(candidates, decision_price, capital)
+        if best_cand is None:
+            if skipped_count > 0:
+                skipped_low_delta += 1
+            continue
+
         entry_price = float(opens[t + 1])
         if not np.isfinite(entry_price) or entry_price <= 0.0:
             continue
 
-        if is_split_discontinuity(float(closes[t]), entry_price, float(highs[t + 1]), float(lows[t + 1])):
+        if is_split_discontinuity(decision_price, entry_price, float(highs[t + 1]), float(lows[t + 1])):
             skipped_low_delta += 1
-            continue
-
-        candidates = signals_by_bar[t]
-        best_cand, skipped_count = select_best_candidate_at_bar(candidates, entry_price, capital)
-        if best_cand is None:
-            if skipped_count > 0:
-                skipped_low_delta += 1
             continue
 
         direction = best_cand["direction"]

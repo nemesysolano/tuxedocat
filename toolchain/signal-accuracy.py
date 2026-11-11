@@ -1,5 +1,6 @@
 import argparse
 import os
+import shutil
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 
@@ -63,10 +64,15 @@ def resolve_input_dir(candidate_dir=None, ensemble_output_path=None) -> Path:
 
 def evaluate_symbol_task(task_args):
     """
-    Evaluates signal accuracy for a single symbol using its Best (Generator, Filter) CSV file.
-    task_args: (symbol, best_gen, best_fil, csv_path)
+    Evaluates signal accuracy for a single symbol using its Best (Generator, Filter) CSV file,
+    and optionally writes the selected signal CSV file to output_dir.
+    task_args: (symbol, best_gen, best_fil, csv_path[, output_dir_path])
     """
-    symbol, best_gen, best_fil, csv_path = task_args
+    if len(task_args) == 5:
+        symbol, best_gen, best_fil, csv_path, output_dir_path = task_args
+    else:
+        symbol, best_gen, best_fil, csv_path = task_args
+        output_dir_path = None
 
     if not csv_path.exists():
         return {"error": f"Skipping {symbol}: CSV file not found at {csv_path}"}
@@ -89,9 +95,18 @@ def evaluate_symbol_task(task_args):
         missing = required_cols - set(df.columns)
         return {"error": f"Skipping {symbol} ({csv_path}): Missing required columns {missing}"}
 
+    if output_dir_path is not None:
+        dest_csv_path = Path(output_dir_path) / f"{symbol}.csv"
+        try:
+            if csv_path.resolve() != dest_csv_path.resolve():
+                shutil.copy2(csv_path, dest_csv_path)
+        except Exception as e:
+            return {"error": f"Failed to write selected signal CSV for {symbol} to {dest_csv_path}: {str(e)}"}
+
     df = df.sort_values('timestamp').reset_index(drop=True)
     n_bars = len(df)
 
+    open_arr = df['open'].values if 'open' in df.columns else df['close'].values
     high_arr = df['high'].values if 'high' in df.columns else df['close'].values
     low_arr = df['low'].values if 'low' in df.columns else df['close'].values
     signals = df['signal'].values
@@ -139,13 +154,14 @@ def evaluate_symbol_task(task_args):
 
         evaluations += 1
         win = False
+        open_t1 = open_arr[t + 1]
 
         if sig == 1:
-            if (high_arr[t + 1 : end_idx] >= target_high).any():
+            if pd.notna(open_t1) and open_t1 >= target_low and (high_arr[t + 1 : end_idx] >= target_high).any():
                 win = True
                 long_hits += 1
         elif sig == -1:
-            if (low_arr[t + 1 : end_idx] <= target_low).any():
+            if pd.notna(open_t1) and open_t1 <= target_high and (low_arr[t + 1 : end_idx] <= target_low).any():
                 win = True
                 short_hits += 1
 
@@ -182,7 +198,15 @@ def evaluate_symbol_task(task_args):
     }
 
 
-def process_signal_accuracy(ensemble_output, output_file, input_dir=None, workers=None, sort="hit-rate", sort_order="desc"):
+def process_signal_accuracy(
+    ensemble_output,
+    output_file,
+    input_dir=None,
+    output_dir=None,
+    workers=None,
+    sort="hit-rate",
+    sort_order="desc",
+):
     ensemble_output_path = Path(ensemble_output)
     if not ensemble_output_path.is_file():
         raise FileNotFoundError(f"Ensemble output file not found: {ensemble_output}")
@@ -206,6 +230,10 @@ def process_signal_accuracy(ensemble_output, output_file, input_dir=None, worker
     output_path = Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    output_dir_path = Path(output_dir) if output_dir else None
+    if output_dir_path is not None:
+        output_dir_path.mkdir(parents=True, exist_ok=True)
+
     tasks = []
     for _, row in df_ensemble.iterrows():
         sym = str(row[sym_col]).strip()
@@ -214,7 +242,7 @@ def process_signal_accuracy(ensemble_output, output_file, input_dir=None, worker
         if not sym or gen.lower() in ("n/a", "nan", "") or fil.lower() in ("n/a", "nan", ""):
             continue
         csv_path = resolved_input_dir / gen / fil / f"{sym}.csv"
-        tasks.append((sym, gen, fil, csv_path))
+        tasks.append((sym, gen, fil, csv_path, output_dir_path))
 
     n_workers = int(workers) if workers and workers > 0 else cpu_count()
     print(
@@ -278,6 +306,8 @@ def process_signal_accuracy(ensemble_output, output_file, input_dir=None, worker
     df_results.to_csv(output_path, index=False)
 
     print(f"Saved {len(valid_records)} records to {output_file}")
+    if output_dir_path is not None:
+        print(f"Saved {len(valid_records)} individual ticker signal CSV files to {output_dir_path}")
     df_preview = df_results.head(20).copy()
     if "timestamp" in df_preview.columns and not df_preview.empty:
         max_ts_len = max(int(df_preview["timestamp"].astype(str).map(len).max()), len("timestamp"))
@@ -292,7 +322,7 @@ def parse_args():
     parser.add_argument(
         "ensemble_output",
         metavar="ensemble-output",
-        help="Path to ensemble output CSV file containing Symbol, Best Generator, and Best Filter."
+        help="Path to ensemble output CSV file containing Symbol, Best Generator, and Best Filter (usually documents/ensemble.csv)."
     )
     parser.add_argument(
         "input_dir",
@@ -303,6 +333,11 @@ def parse_args():
         "output_file",
         metavar="output-file",
         help="Destination path for the signal accuracy results CSV (usually documents/signal-accuracy.csv)."
+    )        
+    parser.add_argument(
+        "output_dir",
+        metavar="output-dir",
+        help="Destination path for for signal files --one per ticker-- (usually results/signals)."
     )    
     parser.add_argument(
         "--workers",
@@ -325,12 +360,13 @@ def parse_args():
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == '__main__': # python3 toolchain/signal-accuracy.py documents/ensemble.csv results/ensemble  documents/signal-accuracy.csv results/signals --sort hit-rate --sort-order desc
     args = parse_args()
     process_signal_accuracy(
         ensemble_output=args.ensemble_output,
         output_file=args.output_file,
         input_dir=args.input_dir,
+        output_dir=args.output_dir,
         workers=args.workers,
         sort=args.sort,
         sort_order=args.sort_order,
