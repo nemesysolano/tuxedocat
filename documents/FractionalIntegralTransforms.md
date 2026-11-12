@@ -73,13 +73,13 @@ where the power $n$ denotes $n$ successive applications of the operator $\left( 
 
 Let
 
-$\tilde{f}(t) = f(t) e^{-i a(θ) t^2}, \quad \tilde{g}(t) = g(t) e^{-i a(θ) t^2}$
+$\overset{↼}{f}(t) = f(t) e^{-i a(θ) t^2}, \quad \overset{↼}{g}(t) = g(t) e^{-i a(θ) t^2}$
 
 The fractional convolution of order $θ$, denoted by $(f * g)(t)$, is defined as:
 
-$h(t) = (f * g)(t) = d(θ) e^{i a(θ) t^2} (\tilde{f} * \tilde{g})(t)$
+$h(t) = (f * g)(t) = d(θ) e^{i a(θ) t^2} (\overset{↼}{f} * \overset{↼}{g})(t)$
 
-where $*$ denotes the standard classical convolution $(\tilde{f} * \tilde{g})(t) = \int_{\mathbb{R}} \tilde{f}(τ) \tilde{g}(t - τ) \, dτ$.
+where $*$ denotes the standard classical convolution $(\overset{↼}{f} * \overset{↼}{g})(t) = \int_{\mathbb{R}} \overset{↼}{f}(τ) \overset{↼}{g}(t - τ) \, dτ$.
 
 Then the fractional Fourier transform of $h(t)$ satisfies:
 
@@ -88,3 +88,27 @@ $e^{-i a(θ) x^2} \hat{\mathcal{H}}_θ(x) = \sqrt{2π} \hat{\mathcal{F}}_θ(x) \
 or equivalently:
 
 $\hat{\mathcal{H}}_θ(x) = \sqrt{2π} e^{i a(θ) x^2} \hat{\mathcal{F}}_θ(x) \hat{\mathcal{G}}_θ(x)$
+
+#### Fractional Product ####
+
+For periodic signals, the product-type counterpart of the fractional convolution is the circular product. Let $f,g \in C([0,T])$ be continuous and $T$-periodic, and define the chirp-modified functions
+
+$\overset{⇀}{f}(t) = f(t)e^{i a(θ)t^2}, \quad \overset{⇀}{g}(t) = g(t)e^{i a(θ)t^2}$.
+
+Then the circular fractional product of order $θ$, denoted by $(f \otimes g)(t)$, is defined by
+
+$(f \otimes g)(t) = d(-θ)e^{-i a(θ)t^2}\big(\overset{⇀}{f} * \overset{⇀}{g}\big)(t)$,
+
+where $*$ denotes the usual (non-periodic) convolution on $\mathbb{R}$. In the periodic setting, this is equivalent to the circular convolution
+
+$(f \otimes g)(t) = \int_0^T f(\tau)\,g\big((t-\tau)\bmod T\big)\,d\tau$.
+
+For a general positive period $T$, the modulo operation is defined by
+
+$t \bmod T = t - T\left\lfloor\frac{t}{T}\right\rfloor$,
+
+so that $t \bmod T \in [0,T)$. This definition applies equally to integer, rational, and real values of $T$. Thus, the circular product is well defined for any positive real period, provided the functions are interpreted on the periodic domain $\mathbb{R}/T\mathbb{Z}$.
+
+This is a periodic product operation and should be distinguished from the more general fractional Fourier product theorem, which is usually formulated with chirp factors and fractional-domain kernels rather than a plain modulo-$T$ integral. In particular, the identity above is valid for periodic signals, whereas the general FRFT product law is not simply a circular convolution.
+
+
