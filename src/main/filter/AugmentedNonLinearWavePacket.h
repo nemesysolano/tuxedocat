@@ -1,5 +1,5 @@
-#ifndef __FOURIER_RISK_H__
-#define __FOURIER_RISK_H__
+#ifndef __AUGMENTED_NON_LINEAR_WAVE_PACKET_H__
+#define __AUGMENTED_NON_LINEAR_WAVE_PACKET_H__
 #include "Filter.h"
 #include "stats/averages.h"
 #include "stats/probability.h"
