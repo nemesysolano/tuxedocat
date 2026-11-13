@@ -12,6 +12,7 @@
 #include <numbers>
 #include <span>
 #include <unordered_map>
+#include <numbers>
 
 using namespace std;
 using namespace events;
@@ -19,13 +20,15 @@ using namespace stats;
 using namespace slice;
 
 namespace filter {   
-    constexpr int ANGLES_COUNT = 90;
-    constexpr double START_ANGLE = 1.584;
-    constexpr double END_ANGLE = 2.830;
+    constexpr int ANGLES_COUNT = 7 ; //n columns in Augmented Fractional Packet
+    constexpr double START_ANGLE = numbers::pi / 2;
+    constexpr double END_ANGLE = (numbers::pi * 9)/10;;
     constexpr int FRACTIONAL_PACKET_UNSOLVABLE = -1;
     constexpr int FRACTIONAL_PACKET_MORE_DATA = 0;
     constexpr int FRACTIONAL_PACKET_SOLVED = 1;
-    constexpr int MIN_ROW_INDEX = ANGLES_COUNT + 2;
+    constexpr int FRACTIONAL_PACKET_SYS_COLUMNS = ANGLES_COUNT; //n columns in Augmented Fractional Packet
+    constexpr int FRACTIONAL_PACKET_SYS_ROWS    = FRACTIONAL_PACKET_SYS_COLUMNS + 1; //m rows in Augmented Fractional Packet
+    constexpr int FRACTIONAL_MIN_HISTORY = FRACTIONAL_PACKET_SYS_ROWS * FRACTIONAL_PACKET_SYS_COLUMNS + MIN_FILTER_BARS;
 
     constexpr auto generate_fractional_angles() {
         std::array<double, ANGLES_COUNT> angles{};
@@ -142,14 +145,14 @@ namespace filter {
             double r_squared_;
 
         public:
-            AugmentedFractionalPacketCoeff(): AugmentedFractionalPacketCoeff(Eigen::Matrix<complex<double>, ANGLES_COUNT, 1>::Zero(), 0.0) {}
-            AugmentedFractionalPacketCoeff(const Eigen::Matrix<complex<double>, ANGLES_COUNT, 1> & eigen_coefficients_, double r_squared_);
+            AugmentedFractionalPacketCoeff(): AugmentedFractionalPacketCoeff(Eigen::Matrix<complex<double>, FRACTIONAL_PACKET_SYS_COLUMNS, 1>::Zero(), 0.0) {}
+            AugmentedFractionalPacketCoeff(const Eigen::Matrix<complex<double>, FRACTIONAL_PACKET_SYS_COLUMNS, 1> & eigen_coefficients_, double r_squared_);
 
             [[nodiscard]] double r_squared() const noexcept { return r_squared_; }
             [[nodiscard]] const vector<complex<double>> & values() const noexcept { return values_; }
 
             inline void map_eigen_coefficients(
-                const Eigen::Matrix<complex<double>, ANGLES_COUNT, 1> & eigen_coefficients,
+                const Eigen::Matrix<complex<double>, FRACTIONAL_PACKET_SYS_COLUMNS, 1> & eigen_coefficients,
                 double r_squared
             ) {
                 values_.assign(eigen_coefficients.begin(), eigen_coefficients.end());
@@ -173,8 +176,8 @@ namespace filter {
         protected:
             unordered_map<string, size_t> initialized_rows_;
             Eigen::MatrixXcd eigen_X_;
-            Eigen::Matrix<complex<double>, MIN_ROW_INDEX, 1> eigen_y_;            
-            Eigen::Matrix<complex<double>, ANGLES_COUNT, 1> eigen_coefficients_;
+            Eigen::Matrix<complex<double>, FRACTIONAL_PACKET_SYS_ROWS   , 1> eigen_y_;            
+            Eigen::Matrix<complex<double>, FRACTIONAL_PACKET_SYS_COLUMNS, 1> eigen_coefficients_;
             AugmentedFractionalPacketCoeff coeff_;
             int min_lookback_;
             unordered_map<string, vector<double>> r_;        
@@ -184,7 +187,13 @@ namespace filter {
             AugmentedFractionalPacket();
     };
 
+    
+
     class GuassianFractionalPacket: public AugmentedFractionalPacket {
+        public:
+            using AugmentedFractionalPacket::AugmentedFractionalPacket;
+            vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;
+            optional<AugmentedFractionalPacketArgs> arguments(const Signal & signal);
 
     };
 }
