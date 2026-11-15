@@ -54,6 +54,7 @@ namespace strategy {
             double third_to_last = (*iterator).close_price(); iterator++;
             double fourth_to_last = (*iterator).close_price();
             double acceleration = (second_to_last - third_to_last) - (third_to_last - fourth_to_last);
+            double M = 0;
             double δ = 0;
             double μ_ = 0.0;
             double σ_ = 0.0;
@@ -61,28 +62,19 @@ namespace strategy {
             SignalDirection direction_ = SignalDirection::IDLE;
 
             if(lower_low.has_value() && higher_high.has_value() && max(lower_low.value().index, higher_high.value().index) > MIN_AVERAGE_BARS) {                
-                auto prev = bars_span_1.begin();
-                auto next = prev + 1;
-                auto end = bars_span_1.end();
-                vector<double> log_returns;
-                vector<double> prices;
-
-                prices.push_back(prev->close_price());
-                while(next != end) {
-                    log_returns.emplace_back(log(next->close_price()/prev->close_price()));
-                    prev++;
-                    prices.push_back(next->close_price());
-                    next++;
-                }
-
-                auto log_moments_result = d2_moments(x_log_min, x_log_max, log_returns);    
-                auto price_moment_result = d2_moments(x_min, x_max, prices);                    
-                if(log_moments_result.has_value() && price_moment_result.has_value()) {
-                    δ = price_moment_result.value().σ; // Uses outer δ
-                    const auto & log_moments = log_moments_result.value();
-                    ν = log_moments.ν;                    
-                    μ_ = log_moments.μ;
-                    σ_ = log_moments.σ;                          
+                auto log_return_moments_results = log_return_moments(bars_span_1);
+                const auto & log_return_moments_ = log_return_moments_results.value();
+                auto d2_moments_result = d2_moments(x_log_min, x_log_max, log_return_moments_.log_returns);    
+                auto price_moment_result = simple_moving_moments(bars_span_1, [](const Bar & bar) {return bar.close_price();});    
+                                
+                if(d2_moments_result.has_value() && price_moment_result.has_value()) {
+                    const auto & price_moment = price_moment_result.value();
+                    δ = price_moment.σ;
+                    M = price_moment.μ;
+                    const auto & d2_moments_ = d2_moments_result.value();
+                    ν = d2_moments_.ν;                    
+                    μ_ = d2_moments_.μ;
+                    σ_ = d2_moments_.σ;                          
                     
                     // const double current_close = bars_span_1.back().close_price();
 
@@ -97,7 +89,7 @@ namespace strategy {
 
             }
              
-            signals.emplace_back(Signal(timestamp, symbol, direction_, μ_, σ_, r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν, δ, acceleration));
+            signals.emplace_back(Signal(timestamp, symbol, direction_, μ_, σ_, r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν, M, δ, acceleration));
         }
     }
 

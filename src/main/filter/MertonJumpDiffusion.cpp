@@ -47,6 +47,7 @@ namespace filter {
                     direction == SignalDirection::IDLE ? 0 : signal.x_log_min(),
                     direction == SignalDirection::IDLE ? 0 : signal.x_log_max(),
                     signal.ν(),
+                    signal.M(),
                     signal.δ(),
                     signal.a()
                 ));

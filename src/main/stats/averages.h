@@ -4,6 +4,7 @@
 #include <optional>
 #include <span>
 #include <cstddef>
+#include <functional>
 #include "data/Result.h"
 #include "data/Bar.h"
 #include "events/SignalEvent.h"
@@ -21,6 +22,13 @@ namespace stats {
             const double σ; // Standard Deviation
             const int ν; // degrees of freedom.
     };    
+
+    class LogReturnMoments: public Moments {
+        
+        public:            
+            LogReturnMoments(double μ_, double σ_, int ν_, vector<double> & log_returns_): Moments(μ_, σ_, ν_), log_returns(std::move(log_returns_)){}
+            const vector<double> log_returns;
+    };
     
     class Extreme {
         public:
@@ -34,8 +42,10 @@ namespace stats {
     optional<Extreme> nearest_higher_high(span<const Bar> series); // $x_{\max}(t)$
     optional<Extreme> nearest_lower_low(span<const Bar> series);
     expected<Moments, TuxedoError> simple_moving_moments(span<const double> series);
+    expected<LogReturnMoments, TuxedoError> log_return_moments(span<const Bar> series);
     expected<Moments, TuxedoError> d2_moments(double x_min, double x_max, span<const double> series);
     expected<Moments, TuxedoError> log_variance_moments(double x_min, double x_max, span<const double> series);
+    expected<Moments, TuxedoError> simple_moving_moments(span<const Bar> series, function<double(const Bar&)> mapper);
 }
 
 #endif

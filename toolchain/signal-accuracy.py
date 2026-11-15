@@ -109,6 +109,7 @@ def evaluate_symbol_task(task_args):
     open_arr = df['open'].values if 'open' in df.columns else df['close'].values
     high_arr = df['high'].values if 'high' in df.columns else df['close'].values
     low_arr = df['low'].values if 'low' in df.columns else df['close'].values
+    close_arr = df['close'].values
     signals = df['signal'].values
     windows = df['window_size'].values
     x_mins = df['x_min'].values
@@ -120,6 +121,8 @@ def evaluate_symbol_task(task_args):
     long_hits = 0
     short_hits = 0
 
+    latest_sig_idx = None
+    latest_w = 0
     latest_timestamp = None
     latest_direction = None
     latest_x_min = np.nan
@@ -130,6 +133,8 @@ def evaluate_symbol_task(task_args):
         if pd.isna(sig) or sig not in (1, -1, 1.0, -1.0):
             continue
 
+        latest_sig_idx = t
+        latest_w = int(windows[t]) if pd.notna(windows[t]) and windows[t] > 0 else 0
         latest_timestamp = str(df.at[t, 'timestamp'])
         latest_direction = int(sig)
         latest_x_min = round(float(x_mins[t]), 4) if pd.notna(x_mins[t]) else np.nan
@@ -148,36 +153,64 @@ def evaluate_symbol_task(task_args):
             continue
 
         trade_horizon = int(w)
-        end_idx = min(t + 1 + trade_horizon, n_bars)
+        full_end_idx = t + 1 + trade_horizon
+        end_idx = min(full_end_idx, n_bars)
         if end_idx <= t + 1:
             continue
 
-        evaluations += 1
         win = False
+        stopped = False
         open_t1 = open_arr[t + 1]
 
         if sig == 1:
-            if pd.notna(open_t1) and open_t1 >= target_low and (high_arr[t + 1 : end_idx] >= target_high).any():
-                win = True
-                long_hits += 1
+            if pd.isna(open_t1) or open_t1 <= target_low:
+                stopped = True
+            else:
+                for k in range(t + 1, end_idx):
+                    if pd.notna(low_arr[k]) and low_arr[k] <= target_low:
+                        stopped = True
+                        break
+                    if pd.notna(high_arr[k]) and high_arr[k] >= target_high:
+                        win = True
+                        break
         elif sig == -1:
-            if pd.notna(open_t1) and open_t1 <= target_high and (low_arr[t + 1 : end_idx] <= target_low).any():
-                win = True
-                short_hits += 1
+            if pd.isna(open_t1) or open_t1 >= target_high:
+                stopped = True
+            else:
+                for k in range(t + 1, end_idx):
+                    if pd.notna(high_arr[k]) and high_arr[k] >= target_high:
+                        stopped = True
+                        break
+                    if pd.notna(low_arr[k]) and low_arr[k] <= target_low:
+                        win = True
+                        break
 
+        # Skip incomplete horizon windows at the end of the series that have not resolved yet
+        if full_end_idx > n_bars and not (win or stopped):
+            continue
+
+        evaluations += 1
         if win:
             hits += 1
+            if sig == 1:
+                long_hits += 1
+            else:
+                short_hits += 1
         else:
             misses += 1
 
     hit_rate = (hits / evaluations) * 100.0 if evaluations > 0 else 0.0
 
-    # Determine if symbol hasn't crashed yet (e.g. is still tradable)
+    # Determine if the latest signal is still valid/tradable within [x_min, x_max]
     is_tradable = False
-    if pd.notna(latest_direction) and pd.notna(latest_x_min) and pd.notna(latest_x_max):
-        last_close = float(df['close'].iloc[-1]) if 'close' in df.columns and len(df) > 0 else np.nan
-        if pd.notna(last_close):
-            is_tradable = (latest_x_min < last_close < latest_x_max)
+    if latest_sig_idx is not None and pd.notna(latest_direction) and pd.notna(latest_x_min) and pd.notna(latest_x_max):
+        ref_close = (
+            float(close_arr[-1])
+            if latest_sig_idx + latest_w >= n_bars - 1
+            else float(close_arr[latest_sig_idx])
+        )
+        if pd.notna(ref_close):
+            is_tradable = (latest_x_min < ref_close < latest_x_max)
 
     symbol_display = f"{symbol} ✅" if is_tradable else f"{symbol} 💀"
 

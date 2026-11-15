@@ -3,6 +3,8 @@
 #include <cmath>
 #include "data/D2.h"
 #include <vector>
+#include <ranges>
+#include <span>
 
 using namespace std;
 using namespace data;
@@ -49,6 +51,35 @@ namespace stats {
         return {};
     }
     
+    expected<LogReturnMoments, TuxedoError> log_return_moments(span<const Bar> series) {
+        if(series.size() < MIN_AVERAGE_BARS) {
+            return unexpected(TuxedoError::ERR_ARR_INDEX_OUT_OF_BOUNDS);
+        }
+        auto series_prev = series.begin();
+        auto series_next = series_prev + 1;
+        auto series_end = series.end();     
+        vector<double> log_series;
+        double log_sum = 0;
+        double log_return = 0;
+
+        while(series_next != series_end) {
+            log_return = log(series_next->close_price()/series_prev->close_price());
+            log_sum += log_return;
+            log_series.emplace_back(log_return);
+            series_prev++;
+            series_next++;
+        }
+
+        double μ = log_sum / series.size(); // Mean
+        double diff_sum = 0;
+        auto log_end = log_series.end();
+        for(auto iterator = log_series.begin(); iterator != log_end; iterator++) {
+            diff_sum += (*iterator - μ) * (*iterator - μ);
+        }
+        double σ = sqrt(diff_sum / (series.size()-1));
+        int ν = (int)(series.size()-1);
+        return LogReturnMoments(μ, σ, ν, log_series);         
+    }
 
     expected<Moments, TuxedoError> simple_moving_moments(span<const double> series) {
         if(series.size() < MIN_AVERAGE_BARS) {
@@ -71,6 +102,17 @@ namespace stats {
         int ν = (int)(series.size()-1);
         return Moments(μ, σ, ν);
 
+    }
+
+    expected<Moments, TuxedoError> simple_moving_moments(span<const Bar> series, function<double(const Bar&)> mapper) {
+        vector<double> v;
+        v.reserve(series.size());
+        
+        for(const Bar & bar: series) {
+            v.emplace_back(mapper(bar));
+        }
+        span<const double> series_span(v);
+        return simple_moving_moments(series_span);
     }
 
     expected<Moments, TuxedoError> d2_moments(double x_min, double x_max, span<const double> series) {

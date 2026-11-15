@@ -4,15 +4,16 @@
 #include "stats/averages.h"
 #include "stats/probability.h"
 #include "data/slice.h"
+#include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <complex>
 #include <cstddef>
 #include <deque>
 #include <numbers>
 #include <span>
 #include <unordered_map>
-#include <numbers>
 
 using namespace std;
 using namespace events;
@@ -28,7 +29,11 @@ namespace filter {
     constexpr int FRACTIONAL_PACKET_SOLVED = 1;
     constexpr int FRACTIONAL_PACKET_SYS_COLUMNS = ANGLES_COUNT; //n columns in Augmented Fractional Packet
     constexpr int FRACTIONAL_PACKET_SYS_ROWS    = FRACTIONAL_PACKET_SYS_COLUMNS + 1; //m rows in Augmented Fractional Packet
-    constexpr int FRACTIONAL_MIN_HISTORY = FRACTIONAL_PACKET_SYS_ROWS * FRACTIONAL_PACKET_SYS_COLUMNS + MIN_FILTER_BARS;
+    constexpr int FRACTIONAL_SCALE_WINDOW       = 360; //Ns slow lookback window for scale s
+    constexpr int FRACTIONAL_LOOKBACK_WINDOW    = std::max(
+        FRACTIONAL_PACKET_SYS_ROWS * FRACTIONAL_PACKET_SYS_COLUMNS + static_cast<int>(MIN_FILTER_BARS),
+        FRACTIONAL_SCALE_WINDOW
+    );
 
     constexpr auto generate_fractional_angles() {
         std::array<double, ANGLES_COUNT> angles{};
@@ -158,18 +163,38 @@ namespace filter {
                 values_.assign(eigen_coefficients.begin(), eigen_coefficients.end());
                 r_squared_ = r_squared;
             }
+
+            inline bool valid() const noexcept {
+                if (values_.size() != static_cast<std::size_t>(FRACTIONAL_PACKET_SYS_COLUMNS)) {
+                    return false;
+                }
+                for (const complex<double> & entry : values_) {
+                    if (!std::isfinite(entry.real()) || !std::isfinite(entry.imag())) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
     };    
 
     class AugmentedFractionalPacketArgs {
         private:
             string symbol_;
-            vector<complex<double>> X_;
-            complex<double> y_;                        
+            Eigen::Matrix<complex<double>, FRACTIONAL_PACKET_SYS_ROWS, FRACTIONAL_PACKET_SYS_COLUMNS> X_;
+            Eigen::Matrix<complex<double>, FRACTIONAL_PACKET_SYS_ROWS, 1> y_;
+            double scale_;
         public:
-            inline AugmentedFractionalPacketArgs(const string & symbol, const vector<complex<double>> & X, complex<double> y): symbol_(symbol), X_(X.begin(), X.end()), y_(y) {}
-            [[nodiscard]] const vector<complex<double>> & X() const noexcept { return X_; }
-            [[nodiscard]] const string & symbol() const { return symbol_;}
-            [[nodiscard]] const complex<double> y() const { return y_;}
+            inline AugmentedFractionalPacketArgs(
+                const string & symbol,
+                const Eigen::Matrix<complex<double>, FRACTIONAL_PACKET_SYS_ROWS, FRACTIONAL_PACKET_SYS_COLUMNS> & X,
+                const Eigen::Matrix<complex<double>, FRACTIONAL_PACKET_SYS_ROWS, 1> & y,
+                double scale
+            ): symbol_(symbol), X_(X), y_(y), scale_(scale) {}
+            [[nodiscard]] const Eigen::Matrix<complex<double>, FRACTIONAL_PACKET_SYS_ROWS, FRACTIONAL_PACKET_SYS_COLUMNS> & X() const noexcept { return X_; }
+            [[nodiscard]] const string & symbol() const noexcept { return symbol_; }
+            [[nodiscard]] const Eigen::Matrix<complex<double>, FRACTIONAL_PACKET_SYS_ROWS, 1> & y() const noexcept { return y_; }
+            [[nodiscard]] double scale() const noexcept { return scale_; }
     };
 
     class AugmentedFractionalPacket: public Filter {
@@ -181,8 +206,10 @@ namespace filter {
             AugmentedFractionalPacketCoeff coeff_;
             int min_lookback_;
             unordered_map<string, vector<double>> r_;        
+            unordered_map<string, vector<double>> μ_;
+            unordered_map<string, vector<double>> σ_;
 
-            virtual int solve_system(const AugmentedFractionalPacketArgs & terms);
+            virtual int solve_system(const AugmentedFractionalPacketArgs & args);
         public:
             AugmentedFractionalPacket();
     };
@@ -192,10 +219,10 @@ namespace filter {
     class GuassianFractionalPacket: public AugmentedFractionalPacket {
         public:
             using AugmentedFractionalPacket::AugmentedFractionalPacket;
-            vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;
-            optional<AugmentedFractionalPacketArgs> arguments(const Signal & signal);
-
+            vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;           
     };
+    complex<double> gaussian_fourier(double x, double μ, double σ);
+    optional<AugmentedFractionalPacketArgs> gaussian_fractional_args(const Signal & signal, const vector<double> & r_, const vector<double> & μ_, const vector<double> & σ_);
 }
 
 

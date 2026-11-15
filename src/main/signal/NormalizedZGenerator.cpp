@@ -33,7 +33,8 @@ namespace strategy {
             const double x_min = lower_low.has_value() ? lower_low->price : 0.0;
             const double x_max = higher_high.has_value() ? higher_high->price : 0.0;
             sys_seconds timestamp = series.back().timestamp();
-            double D = 0.0;
+            double M = 0;
+            double δ = 0.0;
             double μ_ = 0;
             double σ_ = 0;      
             double r_ = 0;
@@ -48,86 +49,29 @@ namespace strategy {
             double acceleration = (second_to_last - third_to_last) - (third_to_last - fourth_to_last);
 
             if(lower_low.has_value() && higher_high.has_value() && max(lower_low.value().index, higher_high.value().index) > MIN_AVERAGE_BARS) {                
-                auto prev = bars_span_1.begin();
-                auto next = prev + 1;
-                auto end = bars_span_1.end();
-                vector<double> log_returns;
-
-                while(next != end) {
-                    log_returns.emplace_back(log(next->close_price()/prev->close_price()));
-                    prev++;
-                    next++;
-                }
-
-                prev = bars_span_1.begin();
-                end = bars_span_1.end();
-                double S = 0;
-                int C = 0;
-
-                while(prev != end) {
-                    S += prev->close_price();
-                    C++;
-                    prev++;
-                }
-
-                double M = S / C;
-                
-                prev = bars_span_1.begin();
-                while(prev != end) {
-                    D += (prev->close_price() - M)*(prev->close_price() - M);
-                    prev++;
-                }
-                D = sqrt(D / (bars_span_1.size() - 1));
-                
-                auto moments_result = simple_moving_moments(log_returns);                
-                if(moments_result.has_value()) {
-                    const auto & moments = moments_result.value();
-                    ν = moments.ν;
-                    
-                    μ_ = moments.μ;
-                    σ_ = moments.σ;
+                auto log_returns_moments_result = log_return_moments(bars_span_1);                                
+                if(log_returns_moments_result.has_value()) {
+                    const auto & log_returns_moments_ = log_returns_moments_result.value();
+                    ν = log_returns_moments_.ν;                    
+                    μ_ = log_returns_moments_.μ;
+                    σ_ = log_returns_moments_.σ;
                     r_ = log(last / second_to_last);
 
-                    // Directionally aligned modulation factor d in [0, 1]
-                    double d = 0.0;
-                    if (σ_ > 0.0 && window_size > 0 && isfinite(μ_) && isfinite(σ_) && isfinite(acceleration) && acceleration != 0.0) {
-                        const double sqrt_w = sqrt(static_cast<double>(window_size));
-                        const double accel_sign = (acceleration > 0.0) ? 1.0 : -1.0;
-
-                        // 1. Horizon-normalized log-barrier span
-                        const double log_span = abs(x_log_max - x_log_min);
-                        const double span_ratio = log_span / (σ_ * sqrt_w + 1e-12);
-
-                        // 2. Signed drift gate: expands toward 2 when μ_ aligns with acceleration, contracts toward 0 when opposing
-                        const double signed_drift_z = (accel_sign * μ_ * sqrt_w) / (σ_ + 1e-12);
-                        const double drift_gate = 1.0 + tanh(signed_drift_z);
-
-                        // 3. Signed log-barrier asymmetry gate in [0.5, 1.5]
-                        const double signed_log_asym = (log_span > 0.0)
-                            ? ((accel_sign * (x_log_max + x_log_min)) / log_span)
-                            : 0.0;
-                        const double asym_gate = clamp(1.0 + 0.5 * signed_log_asym, 0.5, 1.5);
-
-                        const double raw_d = tanh(0.5 * span_ratio * drift_gate * asym_gate);
-                        if (isfinite(raw_d)) {
-                            d = clamp(raw_d, 0.0, 1.0);
+                    auto price_moment_result = simple_moving_moments(bars_span_1, [](const Bar & bar) {return bar.close_price();});                    
+                    if(price_moment_result.has_value()) {
+                        const auto & price_moment = price_moment_result.value();
+                        δ = price_moment.σ;
+                        M = price_moment.μ;
+                        if(acceleration > 0 && (μ_ + σ_) > x_log_max) {
+                            direction_ = SignalDirection::LONG;
+                        } else if (acceleration < 0 && (μ_ - σ_) < x_log_min){
+                            direction_ = SignalDirection::SHORT;
                         }
-                    }
-
-                    // Scale D by (1 + d)
-                    D *= (1.0 + d);
-
-                    if(acceleration > 0 && (bars_span_1.back().close_price() +  D) > x_max && (μ_ + σ_) > x_log_max) {
-                        direction_ = SignalDirection::LONG;
-                    } else if (acceleration < 0 && (bars_span_1.back().close_price() - D) < x_min && (μ_ - σ_) < x_log_min){
-                        direction_ = SignalDirection::SHORT;
-                    } else {
-                        direction_ = SignalDirection::IDLE;
                     }
                 }
             }            
              
-            signals.emplace_back(Signal(timestamp, symbol, direction_, μ_, σ_, r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν, D, acceleration));
+            signals.emplace_back(Signal(timestamp, symbol, direction_, μ_, σ_, r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν, M, δ, acceleration));
         }
     }
 }

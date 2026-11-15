@@ -73,7 +73,7 @@ namespace cli {
 
         // Output `journal` into standard output as json format.
         
-        output << "symbol,timestamp,open,high,low,close,volume,μ,σ,δ,signal,window_size,r,x_min,x_max,acceleration" << endl;
+        output << "symbol,timestamp,open,high,low,close,volume,μ,σ,M,δ,signal,window_size,r,x_min,x_max,acceleration" << endl;
         for (const auto & [symbol, entries] : journal) {
             bool first = true;
             for(const auto & [timestamp, pair]: entries) {
@@ -83,23 +83,23 @@ namespace cli {
                 }
 
                 //TODO: Target calculations must be relocated inside a function
-                double M = (pair.second.x_min() + pair.second.x_max()) / 2.0; // Assumption: x_min and x_max are both positive
+                double M = pair.second.M(); // Assumption: x_min and x_max are both positive
                 double last_close = pair.first.close_price();
                 double x_min = pair.second.x_min();
                 double x_max = pair.second.x_max();
-                double d_min = std::abs(last_close - x_min);
-                double d_max = std::abs(x_max - last_close);
-                double distance = (std::min(d_min, d_max) + ((d_min + d_max) / 2.0)) / 2.0;
+                double d_min = abs(M - x_min);
+                double d_max = abs(x_max - M);
+                double distance = (max(d_min, d_max) + ((d_min + d_max) / 2.0)) / 2.0;
                 double δ = pair.second.δ();
-                double delta_ratio = (M > 0.0 ? δ / M : 0.0);
+                double delta_ratio = (M != 0.0 ? δ / abs(M) : 0.0);
                 SignalDirection direction = pair.second.direction();
-                double x_min_adjusted = pair.first.close_price() - (direction == SignalDirection::SHORT ? distance * (1.0 + delta_ratio) : distance);
-                double x_max_adjusted = pair.first.close_price() + (direction == SignalDirection::LONG  ? distance * (1.0 + delta_ratio) : distance);
+                double x_min_adjusted = M - (direction == SignalDirection::SHORT ? distance * (1.0 + delta_ratio) : distance);
+                double x_max_adjusted = M + (direction == SignalDirection::LONG  ? distance * (1.0 + delta_ratio) : distance);
                 SignalDirection direction_adjusted = (x_min_adjusted < x_max_adjusted) && (last_close > x_min_adjusted && last_close < x_max_adjusted) ? direction : SignalDirection::IDLE;
                 //END-TODO
                 
                 output << format(
-                    "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+                    "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
                     pair.first.symbol(),
                     pair.first.timestamp(),
                     pair.first.open_price(),
@@ -109,6 +109,7 @@ namespace cli {
                     pair.first.volume(),
                     pair.second.μ(),
                     pair.second.σ(),
+                    pair.second.M(),
                     pair.second.δ(),
                     to_underlying(direction_adjusted),
                     pair.second.window_size(),

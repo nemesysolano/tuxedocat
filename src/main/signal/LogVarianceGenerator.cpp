@@ -54,6 +54,7 @@ namespace strategy {
             double third_to_last = (*iterator).close_price(); iterator++;
             double fourth_to_last = (*iterator).close_price();
             double acceleration = (second_to_last - third_to_last) - (third_to_last - fourth_to_last);
+            double M = 0;
             double δ = 0;
             double μ_ = 0.0;
             double σ_ = 0.0;
@@ -76,10 +77,12 @@ namespace strategy {
                 }
 
                 auto log_moments_result = log_variance_moments(x_log_min, x_log_max, log_returns);    
-                auto price_moment_result = log_variance_moments(x_min, x_max, prices);                    
+                auto price_moment_result = simple_moving_moments(bars_span_1, [](const Bar & bar) {return bar.close_price();});                    
 
                 if(log_moments_result.has_value() && price_moment_result.has_value()) {
-                    δ = price_moment_result.value().σ; // Uses outer δ
+                    const auto & price_moment = price_moment_result.value();
+                    δ = price_moment.σ;
+                    M = price_moment.μ;
                     const auto & log_moments = log_moments_result.value();
                     ν = log_moments.ν;                    
                     μ_ = log_moments.μ;
@@ -90,14 +93,12 @@ namespace strategy {
                         direction_ = SignalDirection::LONG;
                     } else if ((acceleration < 0) && (μ_ - σ_ < 0)){
                         direction_ = SignalDirection::SHORT;
-                    } else {
-                        direction_ = SignalDirection::IDLE;
-                    }
+                    } 
                }
 
             }
              
-            signals.emplace_back(Signal(timestamp, symbol, direction_, μ_, σ_, r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν, δ, acceleration));
+            signals.emplace_back(Signal(timestamp, symbol, direction_, μ_, σ_, r_, window_size, 0, x_min, x_max, x_log_min, x_log_max, ν, M, δ, acceleration));
         }
     }
 
