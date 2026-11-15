@@ -62,6 +62,31 @@ def resolve_input_dir(candidate_dir=None, ensemble_output_path=None) -> Path:
     return Path("results/ensemble")
 
 
+def _evaluate_hit_window(sig, target_low, target_high, open_arr, high_arr, low_arr, t, end_idx):
+    """Return (hit, stopped) over [t + 1, end_idx): hit target bound strictly before opposite bound."""
+    sign = 1.0 if sig == 1 else -1.0
+    fav_bound = sign * (target_high if sig == 1 else target_low)
+    adv_bound = sign * (target_low if sig == 1 else target_high)
+    fav_arr = high_arr if sig == 1 else low_arr
+    adv_arr = low_arr if sig == 1 else high_arr
+
+    for k in range(t + 1, end_idx):
+        ok = open_arr[k]
+        if pd.isna(ok):
+            return False, True
+        if sign * ok <= adv_bound:
+            return False, True
+        if sign * ok >= fav_bound:
+            return True, False
+        ak = adv_arr[k]
+        if pd.notna(ak) and sign * ak <= adv_bound:
+            return False, True
+        fk = fav_arr[k]
+        if pd.notna(fk) and sign * fk >= fav_bound:
+            return True, False
+    return False, False
+
+
 def evaluate_symbol_task(task_args):
     """
     Evaluates signal accuracy for a single symbol using its Best (Generator, Filter) CSV file,
@@ -120,6 +145,8 @@ def evaluate_symbol_task(task_args):
     misses = 0
     long_hits = 0
     short_hits = 0
+    direction_evaluations = 0
+    direction_hits = 0
 
     latest_sig_idx = None
     latest_w = 0
@@ -133,15 +160,23 @@ def evaluate_symbol_task(task_args):
         if pd.isna(sig) or sig not in (1, -1, 1.0, -1.0):
             continue
 
+        sig_dir = int(sig)
         latest_sig_idx = t
         latest_w = int(windows[t]) if pd.notna(windows[t]) and windows[t] > 0 else 0
         latest_timestamp = str(df.at[t, 'timestamp'])
-        latest_direction = int(sig)
+        latest_direction = sig_dir
         latest_x_min = round(float(x_mins[t]), 4) if pd.notna(x_mins[t]) else np.nan
         latest_x_max = round(float(x_maxs[t]), 4) if pd.notna(x_maxs[t]) else np.nan
 
         if t + 1 >= n_bars:
             continue
+
+        open_t1 = open_arr[t + 1]
+        close_t1 = close_arr[t + 1]
+        if pd.notna(open_t1) and pd.notna(close_t1):
+            direction_evaluations += 1
+            if (sig_dir == 1 and close_t1 > open_t1) or (sig_dir == -1 and close_t1 < open_t1):
+                direction_hits += 1
 
         w = windows[t]
         if pd.isna(w) or w <= 0:
@@ -158,32 +193,9 @@ def evaluate_symbol_task(task_args):
         if end_idx <= t + 1:
             continue
 
-        win = False
-        stopped = False
-        open_t1 = open_arr[t + 1]
-
-        if sig == 1:
-            if pd.isna(open_t1) or open_t1 <= target_low:
-                stopped = True
-            else:
-                for k in range(t + 1, end_idx):
-                    if pd.notna(low_arr[k]) and low_arr[k] <= target_low:
-                        stopped = True
-                        break
-                    if pd.notna(high_arr[k]) and high_arr[k] >= target_high:
-                        win = True
-                        break
-        elif sig == -1:
-            if pd.isna(open_t1) or open_t1 >= target_high:
-                stopped = True
-            else:
-                for k in range(t + 1, end_idx):
-                    if pd.notna(high_arr[k]) and high_arr[k] >= target_high:
-                        stopped = True
-                        break
-                    if pd.notna(low_arr[k]) and low_arr[k] <= target_low:
-                        win = True
-                        break
+        win, stopped = _evaluate_hit_window(
+            sig_dir, target_low, target_high, open_arr, high_arr, low_arr, t, end_idx
+        )
 
         # Skip incomplete horizon windows at the end of the series that have not resolved yet
         if full_end_idx > n_bars and not (win or stopped):
@@ -192,14 +204,18 @@ def evaluate_symbol_task(task_args):
         evaluations += 1
         if win:
             hits += 1
-            if sig == 1:
+            if sig_dir == 1:
                 long_hits += 1
             else:
                 short_hits += 1
         else:
             misses += 1
 
-    hit_rate = (hits / evaluations) * 100.0 if evaluations > 0 else 0.0
+    hit_accuracy = (hits / evaluations) * 100.0 if evaluations > 0 else 0.0
+    direction_accuracy = (
+        (direction_hits / direction_evaluations) * 100.0 if direction_evaluations > 0 else 0.0
+    )
+    avg_accuracy = (hit_accuracy + direction_accuracy) / 2.0
 
     # Determine if the latest signal is still valid/tradable within [x_min, x_max]
     is_tradable = False
@@ -219,11 +235,14 @@ def evaluate_symbol_task(task_args):
         'Best Generator': best_gen,
         'Best Filter': best_fil,
         'Evaluations': evaluations,
-        'Hits': hits,
+        'Hit Count': hits,
         'Long Hits': long_hits,
         'Short Hits': short_hits,
         'Misses': misses,
-        'Hit Rate': round(hit_rate, 2),
+        'Hit Accuracy (%)': round(hit_accuracy, 2),
+        'Direction Count': direction_hits,
+        'Direction Accuracy (%)': round(direction_accuracy, 2),
+        'Avg Accuracy (%)': round(avg_accuracy, 2),
         'timestamp': latest_timestamp,
         'direction': latest_direction,
         'x_min': latest_x_min,
@@ -237,7 +256,7 @@ def process_signal_accuracy(
     input_dir=None,
     output_dir=None,
     workers=None,
-    sort="hit-rate",
+    sort="hit-accuracy",
     sort_order="desc",
 ):
     ensemble_output_path = Path(ensemble_output)
@@ -308,24 +327,32 @@ def process_signal_accuracy(
     df_results = pd.DataFrame(valid_records)
 
     # Sort results according to --sort and --sort-order
+    sort_col_map = {
+        "hit-rate": "Hit Accuracy (%)",
+        "hit-accuracy": "Hit Accuracy (%)",
+        "direction-accuracy": "Direction Accuracy (%)",
+        "avg-accuracy": "Avg Accuracy (%)",
+        "timestamp": "timestamp",
+    }
+    sort_col = sort_col_map.get(sort, "Hit Accuracy (%)")
     is_ascending = (str(sort_order).strip().lower() == "asc")
-    if sort == "timestamp":
+    if sort_col == "timestamp":
         df_results["_ts_sort"] = pd.to_datetime(df_results["timestamp"], errors="coerce")
         df_results = df_results.sort_values(
-            by=["_ts_sort", "Hit Rate"],
+            by=["_ts_sort", "Hit Accuracy (%)"],
             ascending=[is_ascending, False],
             na_position="last",
         ).drop(columns=["_ts_sort"]).reset_index(drop=True)
     else:
         df_results = df_results.sort_values(
-            by=["Hit Rate", "Evaluations"],
+            by=[sort_col, "Evaluations"],
             ascending=[is_ascending, False],
             na_position="last",
         ).reset_index(drop=True)
 
     # Ensure the selected --sort column is placed to the left of the other non-selected column
-    selected_col = "timestamp" if sort == "timestamp" else "Hit Rate"
-    unselected_col = "Hit Rate" if sort == "timestamp" else "timestamp"
+    selected_col = sort_col
+    unselected_col = "Hit Accuracy (%)" if sort_col == "timestamp" else "timestamp"
     cols = list(df_results.columns)
     if selected_col in cols and unselected_col in cols:
         sel_idx = cols.index(selected_col)
@@ -380,9 +407,9 @@ def parse_args():
     )
     parser.add_argument(
         "--sort",
-        choices=["hit-rate", "timestamp"],
-        default="hit-rate",
-        help="Field to sort results by ('hit-rate' or 'timestamp', default: hit-rate).",
+        choices=["hit-accuracy", "direction-accuracy", "avg-accuracy", "hit-rate", "timestamp"],
+        default="hit-accuracy",
+        help="Field to sort results by ('hit-accuracy', 'direction-accuracy', 'avg-accuracy', 'hit-rate', or 'timestamp', default: hit-accuracy).",
     )
     parser.add_argument(
         "--sort-order",
@@ -393,7 +420,7 @@ def parse_args():
     return parser.parse_args()
 
 
-if __name__ == '__main__': # python3 toolchain/signal-accuracy.py documents/ensemble.csv results/ensemble  documents/signal-accuracy.csv results/signals --sort hit-rate --sort-order desc
+if __name__ == '__main__': # python3 toolchain/signal-accuracy.py documents/ensemble.csv results/ensemble documents/signal-accuracy.csv results/signals --sort hit-accuracy --sort-order desc
     args = parse_args()
     process_signal_accuracy(
         ensemble_output=args.ensemble_output,
