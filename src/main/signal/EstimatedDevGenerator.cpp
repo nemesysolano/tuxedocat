@@ -5,6 +5,7 @@
 #include "timeseries/timeseries.h"
 #include "utils/log.h"
 #include <cmath>
+#include "stats/distributions.h"
 
 using namespace std;
 using namespace data;
@@ -76,14 +77,13 @@ namespace strategy {
                     μ_ = d2_moments_.μ;
                     σ_ = d2_moments_.σ;                          
                     
-                    // const double current_close = bars_span_1.back().close_price();
+                    const double m1 = (log_return_moments_.σ > 0.0) ? (distributions::normal::standard_cdf(log_return_moments_.μ / log_return_moments_.σ) - 0.5) : 0.0;
+                    const double m2 = (δ > 0.0) ? (distributions::normal::standard_cdf((last - M) / δ) - 0.5) : 0.0;
 
-                    if(acceleration > 0 && μ_ + σ_ > 0) {
+                    if (acceleration > 0 && (μ_ + σ_) > 0.0 && m1 > 0.0 && m2 > 0.0 && m2 < 0.15) {
                         direction_ = SignalDirection::LONG;
-                    } else if (acceleration < 0 && μ_ - σ_ < 0){
+                    } else if (acceleration < 0 && (μ_ - σ_) < 0.0 && m1 < 0.0 && m2 < 0.0 && m2 > -0.15) {
                         direction_ = SignalDirection::SHORT;
-                    } else {
-                        direction_ = SignalDirection::IDLE;
                     }
                 }
 

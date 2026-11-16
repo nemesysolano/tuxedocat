@@ -339,7 +339,14 @@ def process_signal_accuracy(
     if sort_col == "timestamp":
         df_results["_ts_sort"] = pd.to_datetime(df_results["timestamp"], errors="coerce")
         df_results = df_results.sort_values(
-            by=["_ts_sort", "Hit Accuracy (%)"],
+            by=["_ts_sort", "Avg Accuracy (%)"],
+            ascending=[is_ascending, False],
+            na_position="last",
+        ).drop(columns=["_ts_sort"]).reset_index(drop=True)
+    elif sort_col == "Avg Accuracy (%)":
+        df_results["_ts_sort"] = pd.to_datetime(df_results["timestamp"], errors="coerce")
+        df_results = df_results.sort_values(
+            by=["Avg Accuracy (%)", "_ts_sort"],
             ascending=[is_ascending, False],
             na_position="last",
         ).drop(columns=["_ts_sort"]).reset_index(drop=True)
@@ -352,7 +359,7 @@ def process_signal_accuracy(
 
     # Ensure the selected --sort column is placed to the left of the other non-selected column
     selected_col = sort_col
-    unselected_col = "Hit Accuracy (%)" if sort_col == "timestamp" else "timestamp"
+    unselected_col = "Avg Accuracy (%)" if sort_col == "timestamp" else "timestamp"
     cols = list(df_results.columns)
     if selected_col in cols and unselected_col in cols:
         sel_idx = cols.index(selected_col)

@@ -5,12 +5,14 @@
 #include <cmath>
 #include "timeseries/timeseries.h"
 #include "utils/log.h"
+#include "stats/distributions.h"
 
 using namespace std;
 using namespace data;
 using namespace events;
 using namespace stats;
 using namespace timeseries;
+using namespace stats;
 
 namespace strategy {
     inline bool is_valid_number(double number) {
@@ -62,9 +64,13 @@ namespace strategy {
                         const auto & price_moment = price_moment_result.value();
                         δ = price_moment.σ;
                         M = price_moment.μ;
-                        if(acceleration > 0 && (μ_ + σ_) > x_log_max) {
+                        
+                        const double m1 = (σ_ > 0.0) ? (distributions::normal::standard_cdf(μ_ / σ_) - 0.5) : 0.0;
+                        const double m2 = (δ > 0.0) ? (distributions::normal::standard_cdf((last - M) / δ) - 0.5) : 0.0;
+
+                        if (acceleration > 0 && (μ_ + σ_) > x_log_max && m1 > 0.0 && m2 > 0.0 && m2 < 0.15) {
                             direction_ = SignalDirection::LONG;
-                        } else if (acceleration < 0 && (μ_ - σ_) < x_log_min){
+                        } else if (acceleration < 0 && (μ_ - σ_) < x_log_min && m1 < 0.0 && m2 < 0.0 && m2 > -0.15) {
                             direction_ = SignalDirection::SHORT;
                         }
                     }

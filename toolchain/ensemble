@@ -17,6 +17,7 @@ ENSEMBLE_FOLDER=$(realpath "${SCRIPT_DIR}/../results/ensemble")
 TOOLCHAIN_FOLDER=$(realpath "${SCRIPT_DIR}/../toolchain")
 BIN_FOLDER=$(realpath "${SCRIPT_DIR}/../bin")
 SIGNALS_FOLDER=$(realpath "${SCRIPT_DIR}/../results/signals")
+PYTHON_ENV="${SCRIPT_DIR}/../pydevs"
 
 GENERATE_INPUT=false
 
@@ -32,6 +33,7 @@ case "${1:-}" in
 esac
 
 if [ "${GENERATE_INPUT}" = "true" ]; then
+    make -C "${SCRIPT_DIR}/.." __CLI_MAIN__=true -j8 || exit 1
     prepare_folder "$ENSEMBLE_FOLDER"
 
     for GENERATOR in "${GENERATORS[@]}"; do
@@ -44,5 +46,20 @@ if [ "${GENERATE_INPUT}" = "true" ]; then
     done
 fi
 
-python "${TOOLCHAIN_FOLDER}/ensemble.py" "$@"
+make __CLI_MAIN__=true __DEBUG__=true
+
+if [ -x "${PYTHON_ENV}/bin/python" ]; then
+    PYTHON="${PYTHON_ENV}/bin/python"
+elif [ -x "${PYTHON_ENV}/Scripts/python.exe" ]; then
+    PYTHON="${PYTHON_ENV}/Scripts/python.exe"
+elif command -v python >/dev/null 2>&1; then
+    PYTHON="$(command -v python)"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON="$(command -v python3)"
+else
+    echo "Error: Python is required to run the ensemble." >&2
+    exit 127
+fi
+
+exec "$PYTHON" "${TOOLCHAIN_FOLDER}/ensemble.py" "$@"
     

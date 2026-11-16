@@ -52,6 +52,8 @@ FINRA_TAF_RATE = 0.0        # FINRA TAF rate (equities capped at $8.30)
 FINRA_CAT_RATE = 0.000003   # FINRA CAT rate per executed share
 ALPACA_MIN_MARGINABLE_PRICE = 5.0  # Under $5.00 leverage capped at 1x
 SPLIT_DISCONTINUITY_MAX_RATIO = 4.0  # > 300% jump/drop filter
+MIN_RR_RATIO = 0.65         # Reject inverted setups where TP/SL < 0.65
+MIN_TP_PCT = 0.04           # Require >= 4% TP move so fees don't eat small targets
 
 
 def round_up_cent(value: float) -> float:
@@ -185,8 +187,9 @@ def compute_alpaca_fees_and_costs(
 
 def compute_barriers(direction: int, last_close: float, x_min: float, x_max: float, delta: float):
     """
-    Long entry:  take_profit = x_max + δ, stop_loss = x_min
-    Short entry: take_profit = x_min - δ, stop_loss = x_max
+    Long entry:  take_profit = x_max, stop_loss = x_min
+    Short entry: take_profit = x_min, stop_loss = x_max
+    (Note: CLI_play.cpp already widens the target x_max/x_min by delta_ratio before writing to CSV)
     """
     if (
         not np.isfinite(last_close) or last_close <= 0.0
@@ -197,10 +200,10 @@ def compute_barriers(direction: int, last_close: float, x_min: float, x_max: flo
         return None, None
 
     if direction == 1:
-        tp_price = x_max + delta
+        tp_price = x_max
         sl_price = x_min
     else:
-        tp_price = x_min - delta
+        tp_price = x_min
         sl_price = x_max
 
     if not np.isfinite(tp_price) or tp_price <= 0.0 or not np.isfinite(sl_price) or sl_price <= 0.0:
@@ -395,6 +398,7 @@ def select_best_candidate_at_bar(
     total_cands = len(candidates)
     gen_filter_counts = Counter(c["generator"] for c in candidates)
     max_filters = max(len(FILTER_NAMES), 1)
+    max_models = max(len(GENERATOR_NAMES) * len(FILTER_NAMES), total_cands, 1)
 
     best_cand = None
     best_score = -1.0
@@ -415,7 +419,11 @@ def select_best_candidate_at_bar(
             skipped += 1
             continue
 
+        tp_distance = abs(tp_price - last_close)
         sl_distance = abs(last_close - sl_price)
+        if sl_distance <= 0.0 or (tp_distance / sl_distance) < MIN_RR_RATIO or (tp_distance / last_close) < MIN_TP_PCT:
+            skipped += 1
+            continue
         leverage = compute_optimal_leverage(
             direction=direction,
             entry_price=last_close,
@@ -450,7 +458,7 @@ def select_best_candidate_at_bar(
             skipped += 1
             continue
 
-        consensus_ratio = dir_counts[direction] / total_cands
+        consensus_ratio = dir_counts[direction] / max_models
         filter_agreement_ratio = gen_filter_counts[cand["generator"]] / max_filters
 
         score = score_signal_candidate(

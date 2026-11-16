@@ -85,6 +85,7 @@ namespace cli {
                 //TODO: Target calculations must be relocated inside a function
                 double M = pair.second.M(); // Assumption: x_min and x_max are both positive
                 double last_close = pair.first.close_price();
+                double center = (M + last_close) / 2.0;
                 double x_min = pair.second.x_min();
                 double x_max = pair.second.x_max();
                 double d_min = abs(M - x_min);
@@ -93,9 +94,12 @@ namespace cli {
                 double δ = pair.second.δ();
                 double delta_ratio = (M != 0.0 ? δ / abs(M) : 0.0);
                 SignalDirection direction = pair.second.direction();
-                double x_min_adjusted = M - (direction == SignalDirection::SHORT ? distance * (1.0 + delta_ratio) : distance);
-                double x_max_adjusted = M + (direction == SignalDirection::LONG  ? distance * (1.0 + delta_ratio) : distance);
-                SignalDirection direction_adjusted = (x_min_adjusted < x_max_adjusted) && (last_close > x_min_adjusted && last_close < x_max_adjusted) ? direction : SignalDirection::IDLE;
+                double x_min_adjusted = center - (direction == SignalDirection::SHORT ? distance * (1.0 + delta_ratio) : distance);
+                double x_max_adjusted = center + (direction == SignalDirection::LONG  ? distance * (1.0 + delta_ratio) : distance);
+                double tp_dist = (direction == SignalDirection::LONG) ? (x_max_adjusted - last_close) : (last_close - x_min_adjusted);
+                double sl_dist = (direction == SignalDirection::LONG) ? (last_close - x_min_adjusted) : (x_max_adjusted - last_close);
+                bool valid_rr = (sl_dist > 0.0 && last_close > 0.0) && ((tp_dist / sl_dist) >= 0.65) && ((tp_dist / last_close) >= 0.04);
+                SignalDirection direction_adjusted = (x_min_adjusted < x_max_adjusted) && (last_close > x_min_adjusted && last_close < x_max_adjusted) && valid_rr ? direction : SignalDirection::IDLE;
                 //END-TODO
                 
                 output << format(

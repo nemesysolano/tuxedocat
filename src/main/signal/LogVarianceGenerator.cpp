@@ -5,6 +5,7 @@
 #include "timeseries/timeseries.h"
 #include "utils/log.h"
 #include <cmath>
+#include "stats/distributions.h"
 
 using namespace std;
 using namespace data;
@@ -62,39 +63,31 @@ namespace strategy {
             SignalDirection direction_ = SignalDirection::IDLE;
 
             if(lower_low.has_value() && higher_high.has_value() && max(lower_low.value().index, higher_high.value().index) > MIN_AVERAGE_BARS) {                
-                auto prev = bars_span_1.begin();
-                auto next = prev + 1;
-                auto end = bars_span_1.end();
-                vector<double> log_returns;
-                vector<double> prices;
+                auto log_return_moments_results = log_return_moments(bars_span_1);
+                if(log_return_moments_results.has_value()) {
+                    const auto & log_return_moments_ = log_return_moments_results.value();
+                    auto log_moments_result = log_variance_moments(x_log_min, x_log_max, log_return_moments_.log_returns);    
+                    auto price_moment_result = simple_moving_moments(bars_span_1, [](const Bar & bar) {return bar.close_price();});                    
 
-                prices.push_back(prev->close_price());
-                while(next != end) {
-                    log_returns.emplace_back(log(next->close_price()/prev->close_price()));
-                    prev++;
-                    prices.push_back(next->close_price());
-                    next++;
+                    if(log_moments_result.has_value() && price_moment_result.has_value()) {
+                        const auto & price_moment = price_moment_result.value();
+                        δ = price_moment.σ;
+                        M = price_moment.μ;
+                        const auto & log_moments = log_moments_result.value();
+                        ν = log_moments.ν;                    
+                        μ_ = log_moments.μ;
+                        σ_ = log_moments.σ;                                              
+
+                        const double m1 = (log_return_moments_.σ > 0.0) ? (distributions::normal::standard_cdf(log_return_moments_.μ / log_return_moments_.σ) - 0.5) : 0.0;
+                        const double m2 = (δ > 0.0) ? (distributions::normal::standard_cdf((last - M) / δ) - 0.5) : 0.0;
+
+                        if (acceleration > 0 && (μ_ + σ_) > 0.0 && m1 > 0.0 && m2 > 0.0 && m2 < 0.15) {
+                            direction_ = SignalDirection::LONG;
+                        } else if (acceleration < 0 && (μ_ - σ_) < 0.0 && m1 < 0.0 && m2 < 0.0 && m2 > -0.15) {
+                            direction_ = SignalDirection::SHORT;
+                        }
+                    }
                 }
-
-                auto log_moments_result = log_variance_moments(x_log_min, x_log_max, log_returns);    
-                auto price_moment_result = simple_moving_moments(bars_span_1, [](const Bar & bar) {return bar.close_price();});                    
-
-                if(log_moments_result.has_value() && price_moment_result.has_value()) {
-                    const auto & price_moment = price_moment_result.value();
-                    δ = price_moment.σ;
-                    M = price_moment.μ;
-                    const auto & log_moments = log_moments_result.value();
-                    ν = log_moments.ν;                    
-                    μ_ = log_moments.μ;
-                    σ_ = log_moments.σ;                                              
-                    
-
-                    if((acceleration > 0) && (μ_ + σ_ > 0) ) {
-                        direction_ = SignalDirection::LONG;
-                    } else if ((acceleration < 0) && (μ_ - σ_ < 0)){
-                        direction_ = SignalDirection::SHORT;
-                    } 
-               }
 
             }
              
