@@ -86,9 +86,17 @@ def find_protective_option_contract(
     today = datetime.date.today()
     required_oi = max(min_open_interest, option_qty * 2)
 
+    primary_min_dte = max(1, target_dte - 14)
+    primary_max_dte = max(45, target_dte + 25)
     windows = [
-        (today + datetime.timedelta(days=7), today + datetime.timedelta(days=45)),
-        (today + datetime.timedelta(days=1), today + datetime.timedelta(days=90)),
+        (
+            today + datetime.timedelta(days=primary_min_dte),
+            today + datetime.timedelta(days=primary_max_dte),
+        ),
+        (
+            today + datetime.timedelta(days=1),
+            today + datetime.timedelta(days=max(90, target_dte + 30)),
+        ),
     ]
 
     contracts = []
@@ -210,7 +218,7 @@ if __name__ == "__main__":
         "--option-dte",
         type=int,
         default=21,
-        help="Target days to expiration for the protective option (default: 21).",
+        help="Target days to expiration for the protective option (7 to 90, default: 21).",
     )
     parser.add_argument(
         "--min-open-interest",
@@ -240,6 +248,8 @@ if __name__ == "__main__":
         parser.error("for BUY, take-profit must be greater than stop-loss")
     if args.direction == "SELL" and args.take_profit >= args.stop_loss:
         parser.error("for SELL, take-profit must be less than stop-loss")
+    if not (7 <= args.option_dte <= 90):
+        parser.error("--option-dte must be between 7 and 90 days")
 
     api_key = os.environ.get("ALPACA_API_KEY")
     secret_key = os.environ.get("ALPACA_API_SECRET")
