@@ -23,6 +23,7 @@ namespace cli {
 
     extern const string PLAY_GAUSSIAN_FILTER; //
     extern const string PLAY_HYPERBOLIC_FILTER; // 
+    extern const string PLAY_HYPERBOLIC_FRACTIONAL_FILTER; // 
     extern const string PLAY_MERTON_JUMP; 
     extern const string PLAY_EXTREME_VALUE;
     extern const string PLAY_STUDENT_T;

@@ -15,12 +15,13 @@ PLAY_SMALL_CAPS_STRATEGY = "normalized-z"
 PLAY_ESTIMATED_STDEV_STRATEGY = "estimated-stdev"
 PLAY_LOG_VARIANCE_STRATEGY = "log-variance"
 
-PLAY_GAUSSIAN_FILTER = "gaussian"
-PLAY_HYPERBOLIC_FILTER = "hyperbolic"
-PLAY_MERTON_JUMP = "merton-jump"
-PLAY_EXTREME_VALUE = "extreme-value"
-PLAY_STUDENT_T = "student"
-PLAY_VARIANCE_GAMMA = "variance-gamma"
+PLAY_GAUSSIAN_FILTER="gaussian"
+PLAY_HYPERBOLIC_FILTER="hyperbolic-nonlinear"
+PLAY_HYPERBOLIC_FRACTIONAL_FILTER="hyperbolic-fractional"
+PLAY_MERTON_JUMP="merton-jump" 
+PLAY_EXTREME_VALUE="extreme-value"
+PLAY_STUDENT_T="student"
+PLAY_VARIANCE_GAMMA="variance-gamma"
 
 GENERATOR_NAMES = (
     PLAY_SMALL_CAPS_STRATEGY,
@@ -31,10 +32,11 @@ GENERATOR_NAMES = (
 FILTER_NAMES = (
     PLAY_GAUSSIAN_FILTER,
     PLAY_HYPERBOLIC_FILTER,
+    PLAY_HYPERBOLIC_FRACTIONAL_FILTER,
     PLAY_MERTON_JUMP,
     PLAY_EXTREME_VALUE,
     PLAY_STUDENT_T,
-    PLAY_VARIANCE_GAMMA,
+    PLAY_VARIANCE_GAMMA
 )
 
 # ==============================================================================

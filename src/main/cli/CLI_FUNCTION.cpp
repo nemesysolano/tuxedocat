@@ -5,6 +5,7 @@
 #include "filter/AugmentedNonLinearWavePacket.h"
 #include "filter/DynamicGaussianEnvelope.h"
 #include "filter/GeneralizedHyperbolicWave.h"
+#include "filter/AugmentedFractionalPacket.h"
 #include "filter/MertonJumpDiffusion.h"
 #include "filter/ExtremeValue.h"
 #include "filter/Student.h"
@@ -25,14 +26,15 @@ namespace cli {
     const string PLAY_LOG_VARIANCE_STRATEGY("log-variance");
 
     const string PLAY_GAUSSIAN_FILTER("gaussian"); //
-    const string PLAY_HYPERBOLIC_FILTER("hyperbolic"); // 
+    const string PLAY_HYPERBOLIC_FILTER("hyperbolic-nonlinear"); // 
+    const string PLAY_HYPERBOLIC_FRACTIONAL_FILTER("hyperbolic-fractional"); // 
     const string PLAY_MERTON_JUMP("merton-jump"); 
     const string PLAY_EXTREME_VALUE("extreme-value");
     const string PLAY_STUDENT_T("student");
     const string PLAY_VARIANCE_GAMMA("variance-gamma");
     
     const set<string> generator_names({PLAY_SMALL_CAPS_STRATEGY, PLAY_ESTIMATED_STDEV_STRATEGY, PLAY_LOG_VARIANCE_STRATEGY});
-    const set<string> filter_names({PLAY_GAUSSIAN_FILTER, PLAY_HYPERBOLIC_FILTER, PLAY_MERTON_JUMP, PLAY_EXTREME_VALUE, PLAY_STUDENT_T, PLAY_VARIANCE_GAMMA});
+    const set<string> filter_names({PLAY_GAUSSIAN_FILTER, PLAY_HYPERBOLIC_FILTER, PLAY_HYPERBOLIC_FRACTIONAL_FILTER, PLAY_MERTON_JUMP, PLAY_EXTREME_VALUE, PLAY_STUDENT_T, PLAY_VARIANCE_GAMMA});
     
     journal_map create_journal_map(const vector<Signal> & signals, const DataFrameFeed & dataframe_feed) {
         journal_map journal;
@@ -87,6 +89,8 @@ namespace cli {
             return make_unique<DynamicGaussianEnvelope>();
         } else if (name == PLAY_HYPERBOLIC_FILTER) {
             return make_unique<GeneralizedHyperbolicWave>();
+        } else if (name == PLAY_HYPERBOLIC_FRACTIONAL_FILTER) {
+            return make_unique<HyperbolicFractionalPacket>();
         } else if (name == PLAY_MERTON_JUMP) {
             return make_unique<MertonJumpDiffusion>();
         } else if (name == PLAY_EXTREME_VALUE) {

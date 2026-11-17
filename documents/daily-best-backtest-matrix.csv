@@ -1,0 +1,11 @@
+Configuration,Ranking Criterion,Filter Scope,Max Concurrent,Compounding,Total Trades,Win Rate (%),TP Hit Rate (%),SL Hit Rate (%),Profit Factor,Max Drawdown (%),Return (%),Final Capital ($),Total Fees ($),Avg Hold (Days)
+"4 Concurrent, Compounding (Baseline)",hit_acc,hyperbolic-fractional,4,True,851,67.92,69.1,30.32,1.82,10.99,1934.37,203437.18,10570.6,6.9
+"4 Concurrent, Fixed $10k Capital",hit_acc,hyperbolic-fractional,4,False,851,67.92,69.1,30.32,2.03,6.02,307.65,40764.92,1426.46,6.9
+"1 Position Sequential, Compounding",hit_acc,hyperbolic-fractional,1,True,249,68.67,69.08,30.12,1.92,7.0,155.61,25560.52,722.43,6.2
+"1 Position Sequential, Fixed $10k Capital",hit_acc,hyperbolic-fractional,1,False,249,68.67,69.08,30.12,2.07,3.54,95.45,19544.67,403.7,6.2
+"10 Concurrent Max Throughput, Compounding",hit_acc,hyperbolic-fractional,10,True,1514,66.51,67.77,31.7,1.75,30.53,10546.08,1064608.04,61107.56,6.8
+"10 Concurrent Max Throughput, Fixed $10k",hit_acc,hyperbolic-fractional,10,False,1514,66.51,67.77,31.7,1.84,10.54,480.79,58078.98,2487.9,6.8
+"Ensemble Return Ranking, 4 Concurrent",hist_ret,hyperbolic-fractional,4,True,743,65.01,65.28,34.19,1.73,10.85,988.43,108843.19,5201.11,8.0
+"Average Accuracy Ranking, 4 Concurrent",avg_acc,hyperbolic-fractional,4,True,828,63.16,64.61,34.78,1.59,12.87,652.65,75264.97,4509.53,7.1
+"Expected Value Ranking, 4 Concurrent",ev,hyperbolic-fractional,4,True,830,67.47,68.31,30.96,1.74,7.97,1723.42,182341.54,9793.57,7.0
+"All Filters (Hyperbolic + Gaussian), 4 Concurrent",hit_acc,all,4,True,948,68.67,70.25,29.32,1.91,10.36,3042.14,314214.38,15358.13,6.1

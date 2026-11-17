@@ -210,11 +210,15 @@ namespace filter {
             unordered_map<string, vector<double>> σ_;
 
             virtual int solve_system(const AugmentedFractionalPacketArgs & args);
+            template <typename ArgsFn, typename CdfFn>
+            vector<events::Signal> run_process_signals(
+                const vector<events::Signal> & signals,
+                ArgsFn && make_args,
+                CdfFn && eval_cdf
+            );
         public:
             AugmentedFractionalPacket();
     };
-
-    
 
     class GuassianFractionalPacket: public AugmentedFractionalPacket {
         public:
@@ -223,6 +227,14 @@ namespace filter {
     };
     complex<double> gaussian_fourier(double x, double μ, double σ);
     optional<AugmentedFractionalPacketArgs> gaussian_fractional_args(const Signal & signal, const vector<double> & r_, const vector<double> & μ_, const vector<double> & σ_);
+
+    class HyperbolicFractionalPacket: public AugmentedFractionalPacket {
+        public:
+            using AugmentedFractionalPacket::AugmentedFractionalPacket;
+            vector<events::Signal> process_signals(const vector<events::Signal> & signals) override;
+    };
+    complex<double> hyperbolic_fourier(double x, double μ, double σ, double α, double β);
+    optional<AugmentedFractionalPacketArgs> hyperbolic_fractional_args(const Signal & signal, const vector<double> & r_, const vector<double> & μ_, const vector<double> & σ_);
 }
 
 

@@ -1,0 +1,2 @@
+Initial Capital ($),Final Capital ($),Net Profit ($),Return (%),Total Trades,Wins,Win Rate (%),TP Hits,TP Hit Rate (%),SL Hits,SL Hit Rate (%),Timeouts,Profit Factor,Max Drawdown (%),Total Fees ($),Avg Hold Bars,Max Position (%),Filter Mode,Max Concurrent,Leverage Cap,Min Abs Sum,Compound,Apply Fees,Timeout Horizon
+10000.0,11316.91,1316.91,13.17,4187,2186,52.21,2223,53.09,1944,46.43,20,1.01,31.88,0.0,7.33,5.0,intersection,20,1.0,1,True,False,None
