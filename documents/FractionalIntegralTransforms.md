@@ -172,27 +172,48 @@ $$\mathcal{F}[f_{t-1}](x_t) = \frac{1}{\sqrt{2π}} \exp\left( i μ_{t-1} x_t - \
 
 ### Hyperbolic Fractional Packet ###
 
-Evaluating $\mathcal{F}_{θ_j}[f_{h,t}](x_t)$ directly on the **Generalized Hyperbolic probability density function** $f_{h,t}$ (defined in [Augmented-Non-Linear-Wave-Packet](Augmented-Non-Linear-Wave-Packet.md)) for $θ_j \neq \frac{π}{2}$ couples the quadratic chirp $e^{-i a(θ_j) u^2}$ with the modified Bessel function $K_{λ - 1/2}\!\left(α_t \sqrt{σ_t^2 + (u - μ_t)^2}\right)$, which admits no closed-form antiderivative and would require numerical quadrature for every matrix entry $A_{r,j}$.
-
-Instead, following the **Particular-to-General** transfer architecture of [particular-to-general](particular-to-general.md), we formulate the **Particular-to-General Hyperbolic Fractional Packet**:
-
-- **Left-hand side (Particular / Gaussian Baseline)**: Each matrix entry $A_{r,j} = \mathcal{F}_{θ_j}[f_{g, rn + j}](x_{rn + j})$ transforms the Gaussian baseline density $f_{g,k}$ using the exact closed form above.
-- **Right-hand side (General / Hyperbolic Target)**: Each target entry $b_r = \mathcal{F}[f_{h, (r+1)n - 1}](x_{(r+1)n})$ evaluates the classical Fourier transform ($θ = \frac{π}{2}$) of the Generalized Hyperbolic density $f_{h,t-1}$ at $x_t$ (with $t = (r+1)n$), where $f_{h,t}$ is given by:
+Suppose that each $f_{h,t}$ is the **Generalized Hyperbolic probability density function** defined in [Augmented-Non-Linear-Wave-Packet](Augmented-Non-Linear-Wave-Packet.md):
 
 $$f_{h,t}(u) = c_t \left( σ_t^2 + (u - μ_t)^2 \right)^{\frac{λ - 1/2}{2}} K_{λ - 1/2}\!\left( α_t \sqrt{σ_t^2 + (u - μ_t)^2} \right) e^{β_t(u - μ_t)}$$
 
-At $θ = \frac{π}{2}$, $\mathcal{F}[f_{h,t-1}](x_t)$ is $\frac{1}{\sqrt{2π}}$ times the Generalized Hyperbolic characteristic function of $f_{h,t-1}$ evaluated at $x_t$, which has the exact analytical closed form:
+with location $μ_t$ and scale $σ_t$ updated on the fast window, and shape parameters $(α_t, β_t)$ mapped via the Method of Moments from the slow-window skewness $S$ and excess kurtosis $K > 0$ for the Normal Inverse Gaussian specialization ($λ = -\frac{1}{2}$):
+
+$$γ_t = \frac{\sqrt{3}}{σ_t \sqrt{K}}, \quad β_t = \frac{3 S}{σ_t \sqrt{K}}, \quad α_t = \sqrt{β_t^2 + γ_t^2}$$
+
+#### Left-Hand Side ($\mathcal{F}_{θ_j}[f_{h,k}](x_k)$ via NIG Subordinator Mixture) ####
+
+Evaluating $\mathcal{F}_{θ_j}[f_{h,k}](x_k)$ directly in spatial $u$-coordinates for $θ_j \neq \frac{π}{2}$ couples the quadratic chirp $e^{-i a(θ_j) u^2}$ with the modified Bessel function $K_{-1}\!\left(α_k \sqrt{σ_k^2 + (u - μ_k)^2}\right)$. However, because the Normal Inverse Gaussian ($λ = -\frac{1}{2}$) distribution is an exact normal variance-mean mixture over an Inverse Gaussian subordinator $v > 0$:
+
+$$f_{h,k}(u) = \int_0^\infty \mathcal{N}\!\left(u \;\middle|\; μ_k + β_k v,\; v\right) g_{\text{IG}}(v; σ_k, γ_k)\,dv, \quad g_{\text{IG}}(v; σ_k, γ_k) = \frac{σ_k}{\sqrt{2π v^3}} \exp\!\left(-\frac{(γ_k v - σ_k)^2}{2v}\right)$$
+
+linearity of $\mathcal{F}_{θ_j}$ and Fubini's theorem express each matrix entry $A_{r,j} = \mathcal{F}_{θ_j}[f_{h,k}](x_k)$ ($k = rn + j$) as the expectation of the closed-form Gaussian fractional Fourier transform over $g_{\text{IG}}$:
+
+$$\mathcal{F}_{θ_j}[f_{h,k}](x_k) = \int_0^\infty \mathcal{F}_{θ_j}\!\left[\mathcal{N}\!\left(μ_k + β_k v,\; \sqrt{v}\right)\right](x_k) \, g_{\text{IG}}(v; σ_k, γ_k)\,dv$$
+
+Applying the exact normalizing change of variables $z = \sqrt{σ_k γ_k}\left(\sqrt{\frac{σ_k}{γ_k v}} - \sqrt{\frac{γ_k v}{σ_k}}\right) \in (-\infty, \infty)$ eliminates the $v^{-3/2}$ singularity and maps the subordinator measure onto the standard Gaussian density $\frac{1}{\sqrt{2π}} e^{-z^2 / 2}$:
+
+$$\mathcal{F}_{θ_j}[f_{h,k}](x_k) = \int_{-\infty}^{\infty} \mathcal{F}_{θ_j}\!\left[\mathcal{N}\!\left(μ_k + β_k v(z),\; \sqrt{v(z)}\right)\right](x_k) \left(1 + \frac{z}{\sqrt{z^2 + 4 σ_k γ_k}}\right) \frac{e^{-z^2 / 2}}{\sqrt{2π}}\,dz$$
+
+where for each symmetric quadrature pair $(\pm z)$ with $z > 0$ and $r_z = \sqrt{z^2 + 4 σ_k γ_k}$, the cancellation-free subordinator variances are:
+
+$$v(+z) = \frac{4 σ_k^2}{(r_z + z)^2}, \qquad v(-z) = \frac{(r_z + z)^2}{4 γ_k^2}$$
+
+This allows every LHS entry $A_{r,j}$ ($θ_j \neq \frac{π}{2}$) to be evaluated via fixed-node symmetric Gauss-Hermite quadrature using only elementary complex exponentials and square roots, with zero Bessel calls.
+
+#### Right-Hand Side and $θ_0 = \frac{π}{2}$ Reduction ($\mathcal{F}[f_{h,t-1}](x_t)$) ####
+
+At $θ = \frac{π}{2}$ (both column $j = 0$ on the left-hand side and every target entry $b_r = \mathcal{F}[f_{h, (r+1)n - 1}](x_{(r+1)n})$ on the right-hand side), $\mathcal{F}[f_{h,t-1}](x_t)$ is $\frac{1}{\sqrt{2π}}$ times the Generalized Hyperbolic characteristic function evaluated at $x_t$:
 
 $$\mathcal{F}[f_{h,t-1}](x_t) = \frac{e^{i μ_{t-1} x_t}}{\sqrt{2π}} \left( \frac{α_{t-1}^2 - β_{t-1}^2}{α_{t-1}^2 - (β_{t-1} + i x_t)^2} \right)^{\frac{λ}{2}} \frac{K_λ\!\left(σ_{t-1} \sqrt{α_{t-1}^2 - (β_{t-1} + i x_t)^2}\right)}{K_λ\!\left(σ_{t-1} \sqrt{α_{t-1}^2 - β_{t-1}^2}\right)}$$
 
-For the Normal Inverse Gaussian specialization ($λ = -\frac{1}{2}$, where $K_{-1/2}(z) = \sqrt{\frac{π}{2z}} e^{-z}$), the Bessel functions cancel identically and the right-hand side reduces to an elementary, Bessel-free closed form:
+For the Normal Inverse Gaussian specialization ($λ = -\frac{1}{2}$, where $K_{-1/2}(z) = \sqrt{\frac{π}{2z}} e^{-z}$), the Bessel functions cancel identically and the transform reduces to an elementary, Bessel-free closed form:
 
 $$\mathcal{F}[f_{h,t-1}](x_t) = \frac{1}{\sqrt{2π}} \exp\!\left( i μ_{t-1} x_t + σ_{t-1} \left( \sqrt{α_{t-1}^2 - β_{t-1}^2} - \sqrt{α_{t-1}^2 - (β_{t-1} + i x_t)^2} \right) \right)$$
 
-(Under the scale $s$, replacing $x_t \mapsto x_t / s$, $μ_{t-1} \mapsto μ_{t-1} / s$, $σ_{t-1} \mapsto σ_{t-1} / s$, $α_{t-1} \mapsto s α_{t-1}$, and $β_{t-1} \mapsto s β_{t-1}$ leaves all products inside the exponent invariant.)
+(Under the scale $s$, replacing $x_t \mapsto x_t / s$, $μ_{t-1} \mapsto μ_{t-1} / s$, $σ_{t-1} \mapsto σ_{t-1} / s$, $α_{t-1} \mapsto s α_{t-1}$, and $β_{t-1} \mapsto s β_{t-1}$ leaves all products inside the exponent and the subordinator product $σ_k γ_k$ invariant.)
 
 #### Advantages Over the Generalized Hyperbolic Wave Packet ####
 
-1. **$O(1)$ Closed-Form Matrix Assembly (No Bessel Calls for $λ = -\frac{1}{2}$)**: Both $A_{r,j}$ and $b_r$ are evaluated via elementary complex arithmetic, avoiding `cyl_bessel_k` evaluations when building the linear system and requiring numerical quadrature only once at the final CDF inference step $p = \int_{-\infty}^{x_{mn}} f_{h,mn - 1}(ξ)\,dξ$ when $R^2 > τ$.
-2. **Global Moment & Tail Encoding**: Rather than matching the density height $f_{h,t-1}(x_t)$ at a single point, $\mathcal{F}[f_{h,t-1}](x_t)$ matches the characteristic function of the target distribution, capturing location $μ_{t-1}$, scale $σ_{t-1}$, skewness $β_{t-1}$ (in the complex phase), and heavy-tail steepness $α_{t-1}$ (in the radical damping) simultaneously.
-3. **Unconditional Tail Boundedness**: Because $\left|\mathcal{F}[f_{h,t-1}](x_t)\right| \le \frac{1}{\sqrt{2π}}$ for all $x_t \in \mathbb{R}$, extreme return shocks cannot trigger the polynomial or rational derivative blowups ($u^3$, $u_x / u$, $u_{xx} / u$) present in the non-linear wave packet PDE.
+1. **Bessel-Free Matrix Assembly for $λ = -\frac{1}{2}$**: Both the NIG-subordinator Gauss-Hermite LHS ($A_{r,j}$) and the closed-form RHS ($b_r$) are evaluated via elementary complex arithmetic, avoiding `cyl_bessel_k` evaluations when building the linear system and requiring spatial Bessel quadrature only once at the final CDF inference step $p = \int_{-\infty}^{x_{mn}} f_{h,mn - 1}(ξ)\,dξ$ when $R^2 > τ$.
+2. **Full Generalized Hyperbolic Consistency**: Both the fractional basis columns $\mathcal{F}_{θ_j}[f_{h,k}](x_k)$ and the target vector $\mathcal{F}[f_{h,t-1}](x_t)$ encode location $μ$, scale $σ$, skewness $β$, and heavy-tail steepness $α$ simultaneously.
+3. **Unconditional Tail Boundedness**: Because $\left|\mathcal{F}_{θ_j}[f_{h,k}](x_k)\right| \le |c(θ_j)|$ and $\left|\mathcal{F}[f_{h,t-1}](x_t)\right| \le \frac{1}{\sqrt{2π}}$ for all $x \in \mathbb{R}$, extreme return shocks cannot trigger the polynomial or rational derivative blowups ($u^3$, $u_x / u$, $u_{xx} / u$) present in the non-linear wave packet PDE.

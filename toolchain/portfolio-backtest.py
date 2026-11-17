@@ -2,17 +2,15 @@
 """
 ALPACA DAILY ENSEMBLE PORTFOLIO BACKTESTER (CAUSAL)
 
-Defines filter sets A and B:
-  - A = ['gaussian', 'hyperbolic-fractional']
-  - B = ['hyperbolic-nonlinear', 'merton-jump', 'extreme-value', 'student', 'variance-gamma']
+Retains only the two dominant filters:
+  - FILTER_SET_A = ('hyperbolic-fractional',)
+  - FILTER_SET_B = ('gaussian',)
 
-In default 'intersection' mode:
-  1. For each generator on day t, requires strict intersection across all filters in A
-     and all filters in B: every filter in A and every filter in B must emit the same
-     non-zero direction d in {-1, +1} (when zero or disagreeing, do not trade).
-  2. Sums the surviving generator directions (-1, 0, 1) across generators for each ticker
-     on day t and trades in sign(sum).
-  3. Allocates no more than 5% of capital per position (MAX_POSITION_PCT = 0.05).
+Supports:
+  - 'intersection': requires agreement between 'hyperbolic-fractional' and 'gaussian' per generator
+  - 'all': sums signals across ('gaussian', 'hyperbolic-fractional') x generators
+  - 'hyperbolic-fractional' or 'gaussian': single-filter ensemble across generators
+Allocates no more than 5% of capital per position (MAX_POSITION_PCT = 0.05).
 """
 
 import argparse
@@ -55,22 +53,20 @@ FILTER_SET_A = (
 )
 
 FILTER_SET_B = (
-    "hyperbolic-nonlinear",
+    "gaussian",
 )
 
 
-def fast_discover_symbol_files(input_dir: Path, filter_mode: str = "hyperbolic-fractional+hyperbolic-nonlinear") -> dict:
+def fast_discover_symbol_files(input_dir: Path, filter_mode: str = "intersection") -> dict:
     """Fast directory scan using os.listdir to avoid per-file stat() overhead on external volumes."""
     symbol_map = defaultdict(list)
-    if filter_mode == "all":
+    if filter_mode in ("all", "intersection"):
         active_filters = FILTER_NAMES
-    elif filter_mode in ("intersection", "hyperbolic-fractional+hyperbolic-nonlinear"):
-        active_filters = tuple(dict.fromkeys(list(FILTER_SET_A) + list(FILTER_SET_B)))
     elif "+" in filter_mode or "," in filter_mode:
         sep = "+" if "+" in filter_mode else ","
-        active_filters = tuple(f.strip() for f in filter_mode.split(sep) if f.strip())
+        active_filters = tuple(f.strip() for f in filter_mode.split(sep) if f.strip() in FILTER_NAMES)
     else:
-        active_filters = (filter_mode,)
+        active_filters = (filter_mode,) if filter_mode in FILTER_NAMES else FILTER_NAMES
 
     for gen_name in GENERATOR_NAMES:
         gen_dir = input_dir / gen_name
@@ -877,6 +873,8 @@ def main():
     ensemble_path = Path(args.ensemble_dir)
     if args.filter_mode == "intersection":
         cache_tag = "intersect_" + "_".join(list(FILTER_SET_A) + list(FILTER_SET_B))
+    elif args.filter_mode == "all":
+        cache_tag = "all_" + "_".join(FILTER_NAMES)
     else:
         cache_tag = args.filter_mode
     cache_file = ensemble_path / f".signal_sum_cache_{cache_tag}.pkl"
@@ -893,7 +891,7 @@ def main():
     if symbols_dict is None:
         symbol_map = fast_discover_symbol_files(ensemble_path, args.filter_mode)
         all_cache_file = ensemble_path / ".signal_sum_cache_all.pkl"
-        if args.filter_mode != "all" and all_cache_file.exists() and not args.refresh_cache:
+        if all_cache_file.exists() and not args.refresh_cache:
             print(f"Reusing cached OHLC series from {all_cache_file} and scanning {args.filter_mode} signals...")
             with open(all_cache_file, "rb") as f:
                 base_cache = pickle.load(f)

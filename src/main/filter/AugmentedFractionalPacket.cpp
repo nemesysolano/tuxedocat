@@ -116,6 +116,45 @@ namespace filter {
             return HyperbolicShapeParams{α, β, γ, c};
         }
 
+        /// 40-point symmetric Gauss-Hermite positive nodes $z_q = \sqrt{2} x_q > 0$ and standard-normal weights $w_q = W_q / \sqrt{\pi}$ (truncated at machine epsilon $w_q > 10^{-17}$, 16 active pairs).
+        constexpr size_t NIG_GH_HALF_POINTS = 16;
+        constexpr array<double, NIG_GH_HALF_POINTS> NIG_GH_Z_POS = {
+            2.46832896022724346e-01,
+            7.40870725285930565e-01,
+            1.23603200479915842e+00,
+            1.73309059063172155e+00,
+            2.23285921863487191e+00,
+            2.73620834046543138e+00,
+            3.24408873299987066e+00,
+            3.75755977616898607e+00,
+            4.27782615636274954e+00,
+            4.80628719209387345e+00,
+            5.34460544572008711e+00,
+            5.89480567537201861e+00,
+            6.45942337758376794e+00,
+            7.04173840645382931e+00,
+            7.64616376454146174e+00,
+            8.27894062365947647e+00,
+        };
+        constexpr array<double, NIG_GH_HALF_POINTS> NIG_GH_W_POS = {
+            1.91059009661990409e-01,
+            1.49921111763570813e-01,
+            9.21765791700607934e-02,
+            4.42745552022768343e-02,
+            1.65378441425694106e-02,
+            4.77354488182336195e-03,
+            1.05587901690181287e-03,
+            1.77072928799240333e-04,
+            2.22117714324758295e-05,
+            2.04889743608146212e-06,
+            1.36034242157488005e-07,
+            6.32589718854887988e-09,
+            1.98911852602776876e-10,
+            4.03763858169521132e-12,
+            4.96808852919777053e-14,
+            3.38985344324832600e-16,
+        };
+
         /// Closed-form Gaussian FrFT $\mathcal{F}_{θ}[f](x)$ at rescaled $(x, μ, σ)$.
         complex<double> gaussian_frft(size_t angle_index, double x, double μ, double σ) {
             const double a = A_θ[angle_index];
@@ -128,14 +167,15 @@ namespace filter {
             return (c / sqrt(denom)) * exp(num / denom);
         }
 
-        /// Assemble the shared FrFT LHS matrix X and target Fourier RHS vector y.
-        template <typename RhsEvaluator>
+        /// Assemble the FrFT LHS matrix X and target Fourier RHS vector y.
+        template <typename LhsEvaluator, typename RhsEvaluator>
         optional<AugmentedFractionalPacketArgs> build_fractional_args(
             const Signal & signal,
             const vector<double> & r_,
             const vector<double> & μ_,
             const vector<double> & σ_,
             double s,
+            LhsEvaluator && eval_lhs,
             RhsEvaluator && eval_rhs
         ) {
             constexpr size_t cols = static_cast<size_t>(FRACTIONAL_PACKET_SYS_COLUMNS); // n
@@ -172,11 +212,11 @@ namespace filter {
                         return nullopt;
                     }
 
-                    const complex<double> term = gaussian_frft(col, x_k * inv_s, μ_k * inv_s, σ_k * inv_s);
-                    if (!isfinite(term.real()) || !isfinite(term.imag())) {
+                    const optional<complex<double>> term = eval_lhs(col, x_k * inv_s, μ_k * inv_s, σ_k * inv_s);
+                    if (!term.has_value() || !isfinite(term->real()) || !isfinite(term->imag())) {
                         return nullopt;
                     }
-                    X(static_cast<Eigen::Index>(row), static_cast<Eigen::Index>(col)) = term;
+                    X(static_cast<Eigen::Index>(row), static_cast<Eigen::Index>(col)) = *term;
                 }
 
                 // Row `row` RHS: \mathcal{F}[f_{(row+1)n - 1}](x_{(row+1)n}); final row uses current `signal.r()` for x_{mn}.
@@ -239,6 +279,13 @@ namespace filter {
             const auto & slow = *slow_out;
             return build_fractional_args(
                 signal, r_, μ_, σ_, slow.σ,
+                [&slow](size_t col, double x_scaled, double μ_scaled, double σ_scaled) -> optional<complex<double>> {
+                    const auto shape = nig_shape_parameters(σ_scaled, slow.skewness, slow.excess_kurtosis, false);
+                    if (!shape.has_value()) {
+                        return nullopt;
+                    }
+                    return hyperbolic_fourier(col, x_scaled, μ_scaled, σ_scaled, shape->α, shape->β);
+                },
                 [&slow](double x_scaled, double μ_scaled, double σ_scaled) -> optional<complex<double>> {
                     const auto shape = nig_shape_parameters(σ_scaled, slow.skewness, slow.excess_kurtosis, false);
                     if (!shape.has_value()) {
@@ -277,6 +324,65 @@ namespace filter {
         const double real_part = min(0.0, σ * (γ - w.real()));
         const double imag_part = μ * x - σ * w.imag();
         return inv_sqrt_2pi * exp(complex<double>(real_part, imag_part));
+    }
+
+    complex<double> hyperbolic_fourier(size_t angle_index, double x, double μ, double σ, double α, double β) {
+        if (angle_index >= static_cast<size_t>(ANGLES_COUNT) ||
+            !isfinite(x) || !isfinite(μ) || !isfinite(σ) || σ <= 0.0 ||
+            !isfinite(α) || !isfinite(β) || α <= abs(β)) {
+            constexpr double nan = numeric_limits<double>::quiet_NaN();
+            return complex<double>(nan, nan);
+        }
+
+        // At θ_0 = π/2 (a(θ_0) = 0), the fractional transform reduces to the exact O(1) classical Fourier transform.
+        if (angle_index == 0 || abs(A_θ[angle_index]) <= 1e-15) {
+            return hyperbolic_fourier(x, μ, σ, α, β);
+        }
+
+        const double abs_β = abs(β);
+        const double γ2 = (α - abs_β) * (α + abs_β);
+        const double γ = sqrt(γ2);
+        const double σ_γ = σ * γ;
+        if (!isfinite(γ) || γ <= 0.0 || !isfinite(σ_γ) || σ_γ <= 0.0) {
+            constexpr double nan = numeric_limits<double>::quiet_NaN();
+            return complex<double>(nan, nan);
+        }
+
+        const double a = A_θ[angle_index];
+        const double b = B_θ[angle_index];
+        const complex<double> & c_theta = C_θ[angle_index];
+        const double x2 = x * x;
+        const double four_σ2 = 4.0 * σ * σ;
+        const double inv_four_γ2 = 0.25 / γ2;
+        const double four_σ_γ = 4.0 * σ_γ;
+
+        auto eval_cond_gaussian = [&](double v) -> complex<double> {
+            const double μ_v = μ + β * v;
+            const complex<double> denom(1.0, 2.0 * a * v);
+            const complex<double> num(-0.5 * v * x2, b * μ_v * x - a * (x2 + μ_v * μ_v));
+            return (c_theta / sqrt(denom)) * exp(num / denom);
+        };
+
+        complex<double> accum(0.0, 0.0);
+        for (size_t q = 0; q < NIG_GH_HALF_POINTS; ++q) {
+            const double z = NIG_GH_Z_POS[q];
+            const double w = NIG_GH_W_POS[q];
+            const double rad_z = sqrt(z * z + four_σ_γ);
+            const double sum_rz = rad_z + z;
+            const double sum_rz2 = sum_rz * sum_rz;
+            const double z_over_rad = z / rad_z;
+
+            // +z node: v_+ = 4 σ^2 / (sqrt(z^2 + 4 σ γ) + z)^2, weight w_+ = w (1 + z / rad_z)
+            const double v_pos = four_σ2 / sum_rz2;
+            const double w_pos = w * (1.0 + z_over_rad);
+
+            // -z node: v_- = (sqrt(z^2 + 4 σ γ) + z)^2 / (4 γ^2), weight w_- = w (1 - z / rad_z)
+            const double v_neg = sum_rz2 * inv_four_γ2;
+            const double w_neg = w * (1.0 - z_over_rad);
+
+            accum += w_pos * eval_cond_gaussian(v_pos) + w_neg * eval_cond_gaussian(v_neg);
+        }
+        return accum;
     }
 
     AugmentedFractionalPacketCoeff::AugmentedFractionalPacketCoeff(const Eigen::Matrix<complex<double>, ANGLES_COUNT, 1> & values, double r_squared)
@@ -413,6 +519,9 @@ namespace filter {
         }
         return build_fractional_args(
             signal, r_, μ_, σ_, scale_result.value(),
+            [](size_t col, double x_scaled, double μ_scaled, double σ_scaled) -> optional<complex<double>> {
+                return gaussian_frft(col, x_scaled, μ_scaled, σ_scaled);
+            },
             [](double x_scaled, double μ_scaled, double σ_scaled) -> optional<complex<double>> {
                 return gaussian_fourier(x_scaled, μ_scaled, σ_scaled);
             }
