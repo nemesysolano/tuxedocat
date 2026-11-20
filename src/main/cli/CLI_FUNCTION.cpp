@@ -6,7 +6,7 @@
 #include "signal/NormalizedZGenerator.h"
 #include "signal/EstimatedDevGenerator.h"
 #include "signal/LogVarianceGenerator.h"
-
+#include "filter/GeneralFractionalPacket.h"
 using namespace std;
 using namespace dataframe;
 using namespace feed;
@@ -19,10 +19,12 @@ namespace cli {
     const string PLAY_LOG_VARIANCE_STRATEGY("log-variance");
 
     const string PLAY_GAUSSIAN_FRACTIONAL_FILTER("gaussian-fractional"); //
-    const string PLAY_HYPERBOLIC_FRACTIONAL_FILTER("hyperbolic-fractional"); // 
-    
+    const string PLAY_HYPERBOLIC_FRACTIONAL_FILTER("hyperbolic-fractional"); //     
+    const string PLAY_GAUSSIAN_GENERAL_FILTER("gaussian-general"); //
+    const string PLAY_HYPERBOLIC_GENERAL_FILTER("hyperbolic-general"); // 
+
     const set<string> generator_names({PLAY_SMALL_CAPS_STRATEGY, PLAY_ESTIMATED_STDEV_STRATEGY, PLAY_LOG_VARIANCE_STRATEGY});
-    const set<string> filter_names({PLAY_GAUSSIAN_FRACTIONAL_FILTER, PLAY_HYPERBOLIC_FRACTIONAL_FILTER});
+    const set<string> filter_names({PLAY_GAUSSIAN_FRACTIONAL_FILTER, PLAY_HYPERBOLIC_FRACTIONAL_FILTER, PLAY_GAUSSIAN_GENERAL_FILTER, PLAY_HYPERBOLIC_GENERAL_FILTER});
     
     journal_map create_journal_map(const vector<Signal> & signals, const DataFrameFeed & dataframe_feed) {
         journal_map journal;
@@ -75,9 +77,13 @@ namespace cli {
     unique_ptr<Filter> filter_factory(const string & name){
         if(name == PLAY_GAUSSIAN_FRACTIONAL_FILTER) {
             return make_unique<GuassianFractionalPacket>();
-        } if (name == PLAY_HYPERBOLIC_FRACTIONAL_FILTER) {
+        } else if (name == PLAY_HYPERBOLIC_FRACTIONAL_FILTER) {
             return make_unique<HyperbolicFractionalPacket>();
-        }
+        } else if (name == PLAY_GAUSSIAN_GENERAL_FILTER) {
+            return make_unique<GaussianGeneralFractionalPacket>();
+        } else if (name == PLAY_HYPERBOLIC_GENERAL_FILTER) {
+            return make_unique<HyperbolicGeneralFractionalPacket>();
+        }        
         return nullptr;
     }    
 }
