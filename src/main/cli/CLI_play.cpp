@@ -12,19 +12,12 @@
 #include <cassert>
 #include <functional>
 #include <iomanip>
-#include "filter/AugmentedNonLinearWavePacket.h"
-#include "filter/DynamicGaussianEnvelope.h"
-#include "filter/GeneralizedHyperbolicWave.h"
-#include "filter/MertonJumpDiffusion.h"
-#include "filter/ExtremeValue.h"
-#include "filter/Student.h"
-#include "filter/VarianceGamma.h"
 #include "utils/names.h"
 #include <fstream>
 #include "process/ThreadPool.h"
 #include "signal/LogVarianceGenerator.h"
 #include "CLI_FUNCTION.h"
-
+#include "filter/AugmentedFractionalPacket.h"
 using namespace names;
 using namespace std;
 using namespace strategy;

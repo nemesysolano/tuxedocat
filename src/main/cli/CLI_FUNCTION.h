@@ -21,7 +21,7 @@ namespace cli {
     extern const string PLAY_ESTIMATED_STDEV_STRATEGY;
     extern const string PLAY_LOG_VARIANCE_STRATEGY;
 
-    extern const string PLAY_GAUSSIAN_FILTER; //
+    extern const string PLAY_GAUSSIAN_FRACTIONAL_FILTER; //
     extern const string PLAY_HYPERBOLIC_FILTER; // 
     extern const string PLAY_HYPERBOLIC_FRACTIONAL_FILTER; // 
     extern const string PLAY_MERTON_JUMP; 

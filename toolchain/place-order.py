@@ -26,6 +26,17 @@ from alpaca.trading.requests import (
 )
 
 
+def str_to_bool(value):
+    if isinstance(value, bool):
+        return value
+    lowered = str(value).strip().lower()
+    if lowered in ("true", "1", "yes", "y", "on"):
+        return True
+    if lowered in ("false", "0", "no", "n", "off"):
+        return False
+    raise argparse.ArgumentTypeError("must be a boolean (true/false)")
+
+
 def positive_price(value):
     try:
         price = Decimal(value)
@@ -232,9 +243,12 @@ if __name__ == "__main__":
         help="Allow shorting Hard-to-Borrow (non-ETB) symbols.",
     )
     parser.add_argument(
-        "--no-protective-option",
-        action="store_true",
-        help="Skip submitting the protective Call/Put option order.",
+        "--protect",
+        type=str_to_bool,
+        nargs="?",
+        const=True,
+        default=False,
+        help="Submit a protective Call/Put option order (default: False).",
     )
     args = parser.parse_args()
 
@@ -284,7 +298,7 @@ if __name__ == "__main__":
         f"{submitted_order.id} ({submitted_order.status})"
     )
 
-    if not args.no_protective_option:
+    if args.protect:
         est_option_qty = max(1, round(args.quantity / 100))
         contract = find_protective_option_contract(
             client=client,
