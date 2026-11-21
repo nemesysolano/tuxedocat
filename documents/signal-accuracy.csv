@@ -1,29 +1,33 @@
 Symbol,Best Generator,Best Filter,Evaluations,Hit Count,Long Hits,Short Hits,Misses,Hit Accuracy (%),Direction Count,Direction Accuracy (%),timestamp,Avg Accuracy (%),direction,x_min,x_max
-BLMN ✅,normalized-z,gaussian-general,8,6,4,2,2,75.0,6,75.0,2026-11-19 00:00:00,75.0,1.0,9.195,11.1617
-ARDX ✅,normalized-z,gaussian-fractional,20,8,5,3,12,40.0,14,70.0,2026-11-19 00:00:00,55.0,-1.0,2.9301,3.2287
-TENB ✅,log-variance,hyperbolic-fractional,14,8,5,3,6,57.14,7,50.0,2026-11-19 00:00:00,53.57,1.0,38.9612,48.9097
-PMTS ✅,log-variance,gaussian-fractional,5,2,2,0,3,40.0,1,20.0,2026-11-19 00:00:00,30.0,1.0,23.4718,28.1833
-FTDR ✅,log-variance,gaussian-general,4,0,0,0,4,0.0,1,25.0,2026-11-19 00:00:00,12.5,1.0,81.2421,97.5153
+NPWR ✅,log-variance,gaussian-general,6,5,5,0,1,83.33,4,66.67,2026-11-20 00:00:00,75.0,-1.0,0.751,1.0492
+PLTK ✅,normalized-z,hyperbolic-fractional,10,9,1,8,1,90.0,5,50.0,2026-11-20 00:00:00,70.0,1.0,2.0073,2.5864
+QUIK ✅,log-variance,hyperbolic-general,13,9,4,5,4,69.23,7,53.85,2026-11-20 00:00:00,61.54,-1.0,7.7663,10.0486
+MAX ✅,normalized-z,gaussian-fractional,13,8,3,5,5,61.54,7,53.85,2026-11-20 00:00:00,57.69,1.0,12.2863,14.6014
+BLMN ✅,normalized-z,gaussian-general,8,6,4,2,2,75.0,6,66.67,2026-11-19 00:00:00,70.83,1.0,9.195,11.1617
+ARDX ✅,normalized-z,gaussian-fractional,20,8,5,3,12,40.0,15,71.43,2026-11-19 00:00:00,55.71,-1.0,2.9301,3.2287
+TENB ✅,log-variance,hyperbolic-fractional,14,8,5,3,6,57.14,7,46.67,2026-11-19 00:00:00,51.9,1.0,38.9612,48.9097
+PMTS ✅,log-variance,gaussian-fractional,5,2,2,0,3,40.0,1,16.67,2026-11-19 00:00:00,28.33,1.0,23.4718,28.1833
+FTDR ✅,log-variance,gaussian-general,4,0,0,0,4,0.0,1,20.0,2026-11-19 00:00:00,10.0,1.0,81.2421,97.5153
 ELVN ✅,normalized-z,gaussian-fractional,14,12,3,9,2,85.71,12,80.0,2026-11-18 00:00:00,82.86,1.0,40.869,48.5833
 CHPT ✅,log-variance,hyperbolic-fractional,14,9,2,7,5,64.29,10,66.67,2026-11-18 00:00:00,65.48,1.0,8.23,11.4868
-TSHA ✅,normalized-z,hyperbolic-general,23,15,9,6,8,65.22,13,56.52,2026-11-18 00:00:00,60.87,-1.0,3.7595,4.3037
-APAM ✅,log-variance,hyperbolic-fractional,5,2,2,0,3,40.0,4,66.67,2026-11-18 00:00:00,53.33,1.0,34.125,37.9165
+TSHA 💀,normalized-z,hyperbolic-general,23,15,9,6,8,65.22,13,56.52,2026-11-18 00:00:00,60.87,-1.0,3.7595,4.3037
+APAM 💀,log-variance,hyperbolic-fractional,6,2,2,0,4,33.33,4,66.67,2026-11-18 00:00:00,50.0,1.0,34.125,37.9165
 APOG ✅,log-variance,gaussian-fractional,9,3,3,0,6,33.33,4,40.0,2026-11-18 00:00:00,36.67,1.0,42.8392,47.511
-HUN ✅,normalized-z,gaussian-general,4,2,2,0,2,50.0,1,20.0,2026-11-18 00:00:00,35.0,1.0,8.6129,9.4913
 XENE ✅,log-variance,hyperbolic-general,10,4,2,2,6,40.0,3,27.27,2026-11-18 00:00:00,33.64,1.0,35.2357,40.0397
+HUN 💀,normalized-z,gaussian-general,5,2,2,0,3,40.0,1,20.0,2026-11-18 00:00:00,30.0,1.0,8.6129,9.4913
 ECPG ✅,normalized-z,gaussian-fractional,3,1,0,1,2,33.33,1,25.0,2026-11-18 00:00:00,29.17,1.0,100.09,109.64
 FLY ✅,log-variance,gaussian-fractional,5,1,1,0,4,20.0,2,33.33,2026-11-18 00:00:00,26.67,1.0,15.7441,24.9038
 JBSS ✅,normalized-z,gaussian-fractional,0,0,0,0,0,0.0,0,0.0,2026-11-18 00:00:00,0.0,-1.0,56.7723,65.6075
-DOUG ✅,log-variance,gaussian-general,10,7,2,5,3,70.0,8,72.73,2026-11-17 00:00:00,71.36,1.0,1.4432,1.7009
 MBIN ✅,log-variance,gaussian-fractional,6,4,4,0,2,66.67,5,71.43,2026-11-17 00:00:00,69.05,1.0,48.4483,53.6888
-MAGN ✅,log-variance,gaussian-general,7,5,2,3,2,71.43,4,57.14,2026-11-17 00:00:00,64.29,1.0,11.0875,12.8739
+DOUG 💀,log-variance,gaussian-general,11,7,2,5,4,63.64,8,72.73,2026-11-17 00:00:00,68.18,1.0,1.4432,1.7009
+MAGN 💀,log-variance,gaussian-general,7,5,2,3,2,71.43,4,57.14,2026-11-17 00:00:00,64.29,1.0,11.0875,12.8739
 AMC 💀,log-variance,gaussian-general,14,8,3,5,6,57.14,4,28.57,2026-11-17 00:00:00,42.86,1.0,2.9329,3.3614
 SLDB ✅,log-variance,gaussian-fractional,19,6,3,3,13,31.58,8,40.0,2026-11-17 00:00:00,35.79,-1.0,5.7425,6.8313
 MZTI ✅,normalized-z,hyperbolic-fractional,2,0,0,0,2,0.0,2,66.67,2026-11-17 00:00:00,33.33,1.0,101.891,114.087
-DYN ✅,log-variance,hyperbolic-general,11,3,1,2,8,27.27,5,41.67,2026-11-16 00:00:00,34.47,1.0,15.7346,17.6429
-AMPY ✅,normalized-z,hyperbolic-general,12,4,3,1,8,33.33,4,30.77,2026-11-16 00:00:00,32.05,-1.0,3.8197,4.358
+AMPY 💀,normalized-z,hyperbolic-general,13,5,3,2,8,38.46,4,30.77,2026-11-16 00:00:00,34.62,-1.0,3.8197,4.358
+DYN 💀,log-variance,hyperbolic-general,12,3,1,2,9,25.0,5,41.67,2026-11-16 00:00:00,33.33,1.0,15.7346,17.6429
 KBH ✅,log-variance,hyperbolic-fractional,8,1,0,1,7,12.5,3,33.33,2026-11-16 00:00:00,22.92,1.0,43.9593,50.2382
-PUMP ✅,normalized-z,hyperbolic-fractional,24,17,7,10,7,70.83,16,66.67,2026-11-13 00:00:00,68.75,-1.0,6.9076,8.223
+PUMP 💀,normalized-z,hyperbolic-fractional,24,17,7,10,7,70.83,16,66.67,2026-11-13 00:00:00,68.75,-1.0,6.9076,8.223
 VITL ✅,normalized-z,gaussian-fractional,14,9,1,8,5,64.29,7,50.0,2026-11-13 00:00:00,57.14,-1.0,8.5183,9.725
 AVIR 💀,log-variance,gaussian-fractional,20,11,4,7,9,55.0,10,50.0,2026-11-13 00:00:00,52.5,-1.0,4.0645,4.6601
 ASC 💀,log-variance,gaussian-general,8,5,1,4,3,62.5,3,37.5,2026-11-13 00:00:00,50.0,1.0,18.4572,20.34
@@ -31,10 +35,10 @@ HP 💀,log-variance,hyperbolic-general,9,6,2,4,3,66.67,3,33.33,2026-11-13 00:00
 RAIL ✅,log-variance,hyperbolic-fractional,15,7,3,4,8,46.67,6,37.5,2026-11-13 00:00:00,42.08,-1.0,4.1661,5.68
 SND ✅,log-variance,gaussian-fractional,15,3,3,0,12,20.0,8,50.0,2026-11-13 00:00:00,35.0,-1.0,4.2838,5.2775
 MDWD ✅,normalized-z,hyperbolic-general,5,0,0,0,5,0.0,1,20.0,2026-11-13 00:00:00,10.0,-1.0,11.9312,13.8588
+CNR 💀,normalized-z,hyperbolic-fractional,7,4,1,3,3,57.14,3,42.86,2026-11-12 00:00:00,50.0,-1.0,80.833,91.4912
 AKTS ✅,log-variance,gaussian-general,13,7,4,3,6,53.85,6,42.86,2026-11-12 00:00:00,48.35,-1.0,14.9831,17.6787
 ATRO ✅,log-variance,gaussian-fractional,10,4,3,1,6,40.0,6,54.55,2026-11-12 00:00:00,47.27,-1.0,53.9213,67.2459
 SHOE ✅,log-variance,gaussian-general,9,4,1,3,5,44.44,5,50.0,2026-11-12 00:00:00,47.22,1.0,13.0837,15.1747
-CNR ✅,normalized-z,hyperbolic-fractional,6,3,1,2,3,50.0,3,42.86,2026-11-12 00:00:00,46.43,-1.0,80.833,91.4912
 NVGS 💀,log-variance,gaussian-fractional,6,1,0,1,5,16.67,4,66.67,2026-11-12 00:00:00,41.67,-1.0,20.1417,22.9124
 MTH ✅,estimated-stdev,hyperbolic-fractional,7,1,0,1,6,14.29,3,37.5,2026-11-12 00:00:00,25.89,1.0,60.1143,68.3343
 RELL 💀,normalized-z,hyperbolic-fractional,6,1,1,0,5,16.67,2,33.33,2026-11-12 00:00:00,25.0,1.0,18.3186,20.9225
@@ -54,10 +58,10 @@ IMMX 💀,log-variance,gaussian-fractional,4,1,0,1,3,25.0,1,25.0,2026-11-10 00:0
 RGTI 💀,log-variance,gaussian-fractional,7,1,0,1,6,14.29,2,28.57,2026-11-10 00:00:00,21.43,-1.0,9.9137,14.5054
 ZIP 💀,log-variance,gaussian-fractional,14,10,5,5,4,71.43,8,57.14,2026-11-09 00:00:00,64.29,1.0,3.745,4.7921
 TDC 💀,normalized-z,gaussian-fractional,6,2,2,0,4,33.33,5,83.33,2026-11-09 00:00:00,58.33,1.0,29.9311,34.5556
-TDAY 💀,normalized-z,hyperbolic-general,16,7,5,2,9,43.75,8,50.0,2026-11-09 00:00:00,46.88,1.0,5.9822,7.6841
-QLYS ✅,estimated-stdev,gaussian-fractional,8,3,2,1,5,37.5,4,50.0,2026-11-09 00:00:00,43.75,1.0,187.6625,218.5135
+TDAY ✅,normalized-z,hyperbolic-general,16,7,5,2,9,43.75,8,50.0,2026-11-09 00:00:00,46.88,1.0,5.9822,7.6841
+QLYS 💀,estimated-stdev,gaussian-fractional,8,3,2,1,5,37.5,4,50.0,2026-11-09 00:00:00,43.75,1.0,187.6625,218.5135
 KFRC ✅,estimated-stdev,gaussian-fractional,4,1,0,1,3,25.0,3,60.0,2026-11-09 00:00:00,42.5,1.0,49.8729,58.5313
-VSTS ✅,estimated-stdev,gaussian-general,5,1,1,0,4,20.0,3,60.0,2026-11-09 00:00:00,40.0,1.0,13.7762,15.1082
+VSTS 💀,estimated-stdev,gaussian-general,5,1,1,0,4,20.0,3,60.0,2026-11-09 00:00:00,40.0,1.0,13.7762,15.1082
 NABL ✅,log-variance,hyperbolic-fractional,7,1,0,1,6,14.29,5,62.5,2026-11-09 00:00:00,38.39,1.0,4.3621,5.2217
 AIOT 💀,normalized-z,gaussian-fractional,11,7,3,4,4,63.64,7,63.64,2026-11-06 00:00:00,63.64,-1.0,2.4464,2.9188
 CTNM ✅,normalized-z,hyperbolic-general,9,5,2,3,4,55.56,6,66.67,2026-11-06 00:00:00,61.11,-1.0,8.0313,11.1541
@@ -65,7 +69,7 @@ CELC 💀,normalized-z,gaussian-fractional,13,8,2,6,5,61.54,7,53.85,2026-11-06 0
 NVAX 💀,log-variance,gaussian-general,16,8,1,7,8,50.0,10,62.5,2026-11-06 00:00:00,56.25,-1.0,9.199,12.383
 OLMA ✅,log-variance,gaussian-fractional,13,5,2,3,8,38.46,9,69.23,2026-11-06 00:00:00,53.85,-1.0,6.6166,8.0427
 ERAS ✅,normalized-z,gaussian-general,12,7,5,2,5,58.33,5,41.67,2026-11-06 00:00:00,50.0,-1.0,13.2177,15.7298
-SRPT 💀,normalized-z,gaussian-general,15,6,2,4,9,40.0,9,60.0,2026-11-06 00:00:00,50.0,-1.0,16.7274,19.0825
+SRPT ✅,normalized-z,gaussian-general,15,6,2,4,9,40.0,9,60.0,2026-11-06 00:00:00,50.0,-1.0,16.7274,19.0825
 SMHI ✅,log-variance,hyperbolic-general,9,4,4,0,5,44.44,4,44.44,2026-11-06 00:00:00,44.44,1.0,8.3075,9.1553
 FDMT ✅,normalized-z,gaussian-fractional,15,8,2,6,7,53.33,4,26.67,2026-11-06 00:00:00,40.0,-1.0,11.0097,13.6758
 BBCP ✅,normalized-z,gaussian-fractional,6,0,0,0,6,0.0,2,33.33,2026-11-06 00:00:00,16.67,-1.0,9.046,10.0675
@@ -82,14 +86,14 @@ CNK ✅,estimated-stdev,gaussian-fractional,11,4,1,3,7,36.36,6,54.55,2026-11-03 
 BGS ✅,log-variance,hyperbolic-general,15,9,3,6,6,60.0,6,40.0,2026-11-02 00:00:00,50.0,-1.0,2.0978,2.7674
 CLB 💀,normalized-z,gaussian-general,14,6,4,2,8,42.86,7,50.0,2026-11-02 00:00:00,46.43,1.0,9.4991,10.8402
 HOV ✅,log-variance,gaussian-fractional,11,4,2,2,7,36.36,5,45.45,2026-11-02 00:00:00,40.91,-1.0,97.8319,112.3544
-DNTH ✅,log-variance,gaussian-general,14,1,1,0,13,7.14,4,28.57,2026-11-02 00:00:00,17.86,-1.0,77.9175,86.5275
+DNTH ✅,log-variance,gaussian-fractional,14,2,2,0,12,14.29,3,21.43,2026-11-02 00:00:00,17.86,-1.0,77.9175,86.5275
 TYGO ✅,normalized-z,gaussian-fractional,5,1,1,0,4,20.0,0,0.0,2026-11-02 00:00:00,10.0,-1.0,0.8104,0.9516
 RGNX ✅,log-variance,hyperbolic-fractional,14,9,3,6,5,64.29,10,71.43,2026-10-30 00:00:00,67.86,-1.0,6.6218,7.9066
 KURA 💀,log-variance,hyperbolic-general,10,7,2,5,3,70.0,6,60.0,2026-10-30 00:00:00,65.0,-1.0,9.624,10.9275
 BKD ✅,log-variance,gaussian-general,10,5,3,2,5,50.0,7,70.0,2026-10-30 00:00:00,60.0,-1.0,9.6116,11.2021
 SVRA 💀,normalized-z,gaussian-general,19,11,7,4,8,57.89,11,57.89,2026-10-30 00:00:00,57.89,-1.0,4.5036,5.1375
 CGON 💀,normalized-z,gaussian-fractional,10,5,1,4,5,50.0,6,60.0,2026-10-30 00:00:00,55.0,-1.0,61.414,68.16
-RCKT 💀,log-variance,hyperbolic-fractional,14,6,4,2,8,42.86,8,57.14,2026-10-30 00:00:00,50.0,-1.0,2.2998,2.6362
+RCKT ✅,log-variance,hyperbolic-fractional,14,6,4,2,8,42.86,8,57.14,2026-10-30 00:00:00,50.0,-1.0,2.2998,2.6362
 ONIT 💀,log-variance,gaussian-general,5,2,1,1,3,40.0,3,60.0,2026-10-30 00:00:00,50.0,-1.0,26.3473,28.655
 CGEM 💀,estimated-stdev,gaussian-fractional,10,2,1,1,8,20.0,8,80.0,2026-10-30 00:00:00,50.0,-1.0,14.0439,16.1275
 RBBN ✅,estimated-stdev,gaussian-fractional,17,6,3,3,11,35.29,8,47.06,2026-10-30 00:00:00,41.18,-1.0,1.3539,1.7813
@@ -108,7 +112,7 @@ PWP ✅,log-variance,gaussian-fractional,8,4,2,2,4,50.0,3,37.5,2026-10-29 00:00:
 TROX ✅,log-variance,gaussian-fractional,16,6,1,5,10,37.5,8,50.0,2026-10-29 00:00:00,43.75,-1.0,3.526,3.9154
 CMCO ✅,log-variance,gaussian-fractional,11,4,3,1,7,36.36,4,36.36,2026-10-29 00:00:00,36.36,-1.0,14.391,16.3957
 EFOR ✅,normalized-z,gaussian-fractional,7,2,1,1,5,28.57,3,42.86,2026-10-29 00:00:00,35.71,1.0,33.0786,40.9015
-NEOG 💀,log-variance,hyperbolic-fractional,10,2,0,2,8,20.0,4,40.0,2026-10-29 00:00:00,30.0,-1.0,11.7427,12.9173
+NEOG ✅,log-variance,hyperbolic-fractional,10,2,0,2,8,20.0,4,40.0,2026-10-29 00:00:00,30.0,-1.0,11.7427,12.9173
 PMT ✅,log-variance,hyperbolic-fractional,2,0,0,0,2,0.0,0,0.0,2026-10-29 00:00:00,0.0,-1.0,6.9918,7.9402
 FOSL 💀,log-variance,gaussian-fractional,14,9,2,7,5,64.29,8,57.14,2026-10-28 00:00:00,60.71,1.0,6.34,6.9339
 CEVA ✅,normalized-z,gaussian-fractional,12,4,1,3,8,33.33,7,58.33,2026-10-28 00:00:00,45.83,1.0,29.1654,35.8894
@@ -173,7 +177,6 @@ HQI ✅,normalized-z,hyperbolic-fractional,9,2,2,0,7,22.22,4,44.44,2026-10-12 00
 JRVR ✅,log-variance,gaussian-fractional,14,4,3,1,10,28.57,5,35.71,2026-10-12 00:00:00,32.14,-1.0,3.4936,3.8823
 IMMR ✅,normalized-z,gaussian-fractional,4,1,0,1,3,25.0,1,25.0,2026-10-12 00:00:00,25.0,1.0,7.0057,7.6968
 DK ✅,log-variance,hyperbolic-fractional,18,11,7,4,7,61.11,13,72.22,2026-10-09 00:00:00,66.67,1.0,70.5789,78.154
-QUIK ✅,log-variance,hyperbolic-general,13,9,4,5,4,69.23,7,53.85,2026-10-09 00:00:00,61.54,-1.0,10.0132,11.6666
 SITC ✅,estimated-stdev,gaussian-general,4,2,1,1,2,50.0,2,50.0,2026-10-09 00:00:00,50.0,1.0,2.879,3.2548
 SIGA ✅,log-variance,gaussian-fractional,13,4,3,1,9,30.77,8,61.54,2026-10-09 00:00:00,46.15,1.0,3.0491,3.4756
 OSG ✅,normalized-z,gaussian-fractional,12,5,1,4,7,41.67,6,50.0,2026-10-09 00:00:00,45.83,1.0,4.3015,4.8976
@@ -247,7 +250,6 @@ ULCC ✅,log-variance,gaussian-fractional,12,2,1,1,10,16.67,6,50.0,2026-09-23 00
 RDVT ✅,log-variance,gaussian-fractional,12,8,5,3,4,66.67,5,41.67,2026-09-22 00:00:00,54.17,1.0,69.6806,76.8483
 CURI ✅,log-variance,gaussian-fractional,11,5,2,3,6,45.45,4,36.36,2026-09-22 00:00:00,40.91,1.0,2.7236,2.9994
 NX ✅,log-variance,hyperbolic-fractional,8,6,1,5,2,75.0,6,75.0,2026-09-21 00:00:00,75.0,-1.0,18.7935,21.8384
-PLTK ✅,normalized-z,hyperbolic-fractional,10,9,1,8,1,90.0,5,50.0,2026-09-21 00:00:00,70.0,-1.0,2.1795,2.4643
 GCMG ✅,log-variance,gaussian-general,2,1,0,1,1,50.0,1,50.0,2026-09-21 00:00:00,50.0,-1.0,12.6038,14.0502
 FCEL ✅,log-variance,gaussian-fractional,20,9,3,6,11,45.0,10,50.0,2026-09-21 00:00:00,47.5,-1.0,16.2147,19.5911
 LUMN ✅,log-variance,gaussian-fractional,13,8,3,5,5,61.54,9,69.23,2026-09-18 00:00:00,65.38,-1.0,5.9443,6.8738
@@ -551,6 +553,7 @@ IDYA ✅,normalized-z,hyperbolic-fractional,10,9,7,2,1,90.0,5,50.0,2026-07-20 00
 ARTV ✅,normalized-z,gaussian-fractional,9,6,4,2,3,66.67,4,44.44,2026-07-20 00:00:00,55.56,1.0,8.2084,10.2187
 CLDX ✅,log-variance,hyperbolic-fractional,20,9,8,1,11,45.0,11,55.0,2026-07-20 00:00:00,50.0,1.0,32.9529,37.6237
 VOR ✅,normalized-z,hyperbolic-fractional,19,10,6,4,9,52.63,9,47.37,2026-07-20 00:00:00,50.0,1.0,15.238,19.1491
+BHR ✅,log-variance,hyperbolic-fractional,13,5,3,2,8,38.46,7,53.85,2026-07-20 00:00:00,46.15,-1.0,1.9833,2.2557
 LGND ✅,log-variance,hyperbolic-fractional,11,5,3,2,6,45.45,5,45.45,2026-07-20 00:00:00,45.45,1.0,277.0259,307.1568
 ASTH ✅,log-variance,gaussian-fractional,13,4,2,2,9,30.77,7,53.85,2026-07-20 00:00:00,42.31,1.0,40.3004,48.0112
 PALI ✅,log-variance,hyperbolic-general,15,9,6,3,6,60.0,3,20.0,2026-07-20 00:00:00,40.0,1.0,1.7786,2.0552
@@ -738,7 +741,6 @@ PROK ✅,log-variance,gaussian-fractional,11,7,1,6,4,63.64,9,81.82,2026-05-29 00
 DNUT ✅,normalized-z,gaussian-general,7,4,2,2,3,57.14,5,71.43,2026-05-29 00:00:00,64.29,-1.0,3.3513,3.7432
 INNV ✅,log-variance,gaussian-fractional,9,7,4,3,2,77.78,3,33.33,2026-05-29 00:00:00,55.56,-1.0,7.2457,8.0071
 ATRC ✅,log-variance,gaussian-fractional,11,7,4,3,4,63.64,6,54.55,2026-05-28 00:00:00,59.09,-1.0,26.7212,29.4834
-MAX ✅,normalized-z,gaussian-fractional,13,8,3,5,5,61.54,7,53.85,2026-05-28 00:00:00,57.69,-1.0,8.371,9.5426
 ACRS ✅,normalized-z,hyperbolic-general,16,8,6,2,8,50.0,8,50.0,2026-05-28 00:00:00,50.0,1.0,4.3648,4.768
 GNK ✅,log-variance,gaussian-general,15,6,4,2,9,40.0,8,53.33,2026-05-28 00:00:00,46.67,-1.0,22.6909,25.7542
 LFMD ✅,normalized-z,hyperbolic-general,17,9,4,5,8,52.94,6,35.29,2026-05-28 00:00:00,44.12,1.0,4.3,4.8718
@@ -921,6 +923,7 @@ ASH ✅,estimated-stdev,gaussian-fractional,4,2,2,0,2,50.0,2,50.0,2026-04-02 00:
 KN ✅,log-variance,hyperbolic-fractional,5,1,1,0,4,20.0,3,60.0,2026-04-02 00:00:00,40.0,-1.0,24.2037,27.47
 GIII ✅,normalized-z,hyperbolic-fractional,12,4,2,2,8,33.33,5,41.67,2026-04-02 00:00:00,37.5,-1.0,26.5825,29.7196
 CWK ✅,log-variance,hyperbolic-fractional,14,4,2,2,10,28.57,5,35.71,2026-04-02 00:00:00,32.14,-1.0,11.8311,13.222
+WKC ✅,log-variance,gaussian-general,7,2,1,1,5,28.57,2,28.57,2026-04-02 00:00:00,28.57,-1.0,22.329,24.7994
 CBRL ✅,estimated-stdev,hyperbolic-fractional,11,6,2,4,5,54.55,8,72.73,2026-04-01 00:00:00,63.64,-1.0,26.9449,30.7337
 CAPR ✅,log-variance,gaussian-general,15,6,3,3,9,40.0,10,66.67,2026-04-01 00:00:00,53.33,1.0,26.9984,32.6182
 INGN ✅,normalized-z,hyperbolic-fractional,9,3,2,1,6,33.33,6,66.67,2026-04-01 00:00:00,50.0,1.0,5.9225,6.5583
@@ -1207,7 +1210,6 @@ CIA ✅,log-variance,gaussian-general,6,1,0,1,5,16.67,2,33.33,2025-10-23 00:00:0
 PRCT ✅,normalized-z,hyperbolic-general,10,6,3,3,4,60.0,5,50.0,2025-10-22 00:00:00,55.0,-1.0,33.4101,37.425
 RDN ✅,normalized-z,gaussian-fractional,5,2,0,2,3,40.0,2,40.0,2025-10-22 00:00:00,40.0,-1.0,32.9645,36.4355
 RNGR ✅,normalized-z,gaussian-fractional,8,4,3,1,4,50.0,2,25.0,2025-10-22 00:00:00,37.5,-1.0,12.7748,14.1046
-NPWR ✅,log-variance,gaussian-general,6,5,5,0,1,83.33,4,66.67,2025-10-21 00:00:00,75.0,1.0,2.7545,4.1437
 CALY ✅,estimated-stdev,hyperbolic-fractional,16,6,2,4,10,37.5,10,62.5,2025-10-16 00:00:00,50.0,-1.0,8.8042,9.7525
 NOVT ✅,log-variance,hyperbolic-fractional,11,5,3,2,6,45.45,5,45.45,2025-10-16 00:00:00,45.45,-1.0,101.9242,112.3475
 RFIL ✅,log-variance,hyperbolic-general,6,3,2,1,3,50.0,0,0.0,2025-10-16 00:00:00,25.0,1.0,7.215,9.1681
@@ -1223,7 +1225,6 @@ ANTX ✅,normalized-z,gaussian-fractional,4,2,2,0,2,50.0,2,50.0,2025-10-06 00:00
 TRON ✅,log-variance,hyperbolic-general,2,0,0,0,2,0.0,0,0.0,2025-10-06 00:00:00,0.0,-1.0,1.9381,3.9118
 IRTC ✅,normalized-z,hyperbolic-fractional,6,3,2,1,3,50.0,2,33.33,2025-10-03 00:00:00,41.67,1.0,162.865,188.3686
 EVEX ✅,normalized-z,gaussian-fractional,11,1,1,0,10,9.09,2,18.18,2025-10-01 00:00:00,13.64,-1.0,3.7019,4.0887
-BHR ✅,estimated-stdev,hyperbolic-fractional,12,3,1,2,9,25.0,6,50.0,2025-09-29 00:00:00,37.5,1.0,2.6275,2.8998
 SLG ✅,normalized-z,gaussian-fractional,11,2,2,0,9,18.18,2,18.18,2025-09-29 00:00:00,18.18,1.0,57.1813,62.5044
 HIPO ✅,log-variance,gaussian-general,9,7,5,2,2,77.78,7,77.78,2025-09-25 00:00:00,77.78,1.0,32.9455,36.4071
 ZBIO ✅,log-variance,hyperbolic-fractional,5,3,2,1,2,60.0,3,60.0,2025-09-25 00:00:00,60.0,1.0,15.8514,21.4941
@@ -1413,7 +1414,6 @@ BCPC ✅,log-variance,gaussian-fractional,3,1,1,0,2,33.33,2,66.67,2025-03-12 00:
 HLIT ✅,log-variance,gaussian-fractional,6,2,1,1,4,33.33,2,33.33,2025-03-11 00:00:00,33.33,-1.0,9.7084,11.1772
 NVCR ✅,log-variance,hyperbolic-fractional,9,4,2,2,5,44.44,2,22.22,2025-03-11 00:00:00,33.33,-1.0,19.3402,23.4642
 IART ✅,log-variance,gaussian-fractional,5,1,0,1,4,20.0,2,40.0,2025-03-11 00:00:00,30.0,-1.0,22.0841,25.7254
-WKC ✅,estimated-stdev,gaussian-general,7,2,1,1,5,28.57,3,42.86,2025-03-05 00:00:00,35.71,-1.0,26.7688,30.22
 BVFL ✅,log-variance,gaussian-fractional,1,1,0,1,0,100.0,0,0.0,2025-03-04 00:00:00,50.0,-1.0,14.5413,16.4275
 MKTW ✅,log-variance,gaussian-fractional,10,9,1,8,1,90.0,3,30.0,2025-02-25 00:00:00,60.0,1.0,0.5739,0.6391
 FUNC ✅,normalized-z,hyperbolic-general,4,2,2,0,2,50.0,2,50.0,2025-02-25 00:00:00,50.0,1.0,34.0321,38.9434
@@ -1822,4 +1822,5 @@ PCB ✅,estimated-stdev,gaussian-fractional,1,0,0,0,1,0.0,0,0.0,2020-10-09 00:00
 RBCAA ✅,normalized-z,gaussian-fractional,1,1,1,0,0,100.0,1,100.0,2020-10-07 00:00:00,100.0,1.0,28.8875,32.1083
 PKBK ✅,normalized-z,gaussian-fractional,1,0,0,0,1,0.0,0,0.0,2020-10-05 00:00:00,0.0,-1.0,11.9336,13.1338
 RMR ✅,log-variance,gaussian-fractional,1,1,1,0,0,100.0,1,100.0,2020-09-15 00:00:00,100.0,1.0,28.1259,30.5882
+GTXI ✅,normalized-z,gaussian-general,6,0,0,0,6,0.0,1,16.67,2019-03-26 00:00:00,8.33,1.0,0.9593,1.4502
 NWN 💀,normalized-z,gaussian-fractional,0,0,0,0,0,0.0,0,0.0,,0.0,,,
